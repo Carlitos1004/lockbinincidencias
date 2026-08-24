@@ -1,2 +1,0 @@
-# lockbinincidencias
-Incidencias lockbin
