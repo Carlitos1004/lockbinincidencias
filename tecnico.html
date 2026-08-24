@@ -1,193 +1,26 @@
-// =========================================================================
-// IMPORTADOR DE EQUIPOS
-// Lee el Excel completo en el navegador (con la librería SheetJS) y sube
-// los equipos a Supabase en lotes, usando "upsert" por m_control: si el
-// equipo ya existe lo actualiza, si es nuevo lo crea. Nunca borra nada.
-// =========================================================================
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Panel Técnico</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
 
-const TAMANO_LOTE = 500; // cuántas filas se suben por cada llamada a Supabase
+<div class="panel-header">
+  <h1>LockBin · Técnico</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
 
-const archivoInput = document.getElementById("archivo-input");
-const importarBtn = document.getElementById("importar-btn");
-const progreso = document.getElementById("progreso");
-const progresoTexto = document.getElementById("progreso-texto");
-const barraRelleno = document.getElementById("barra-relleno");
-const resultadoMsg = document.getElementById("resultado-msg");
-const totalEquiposEl = document.getElementById("total-equipos");
+<div class="panel-body">
+  <h2>Bienvenido, <span id="nombre-usuario">—</span></h2>
+  <p>Entraste con el rol <strong>Operario</strong>. Aquí va a vivir el flujo de reporte de campo: buscar equipo, reportar falla, cambio de componente, foto, estado final.</p>
+</div>
 
-archivoInput.addEventListener("change", () => {
-  importarBtn.disabled = !archivoInput.files.length;
-});
-
-importarBtn.addEventListener("click", async () => {
-  const archivo = archivoInput.files[0];
-  if (!archivo) return;
-
-  importarBtn.disabled = true;
-  resultadoMsg.hidden = true;
-  progreso.hidden = false;
-  progresoTexto.textContent = "Leyendo archivo...";
-  barraRelleno.style.width = "0%";
-
-  try {
-    const filas = await leerExcel(archivo);
-    const equiposMapeados = filas.map(mapearFilaAEquipo).filter(e => e.m_control);
-
-    // Deduplicar por m_control: si el Excel trae el mismo equipo repetido en
-    // más de una fila, Postgres no permite que un solo "upsert" afecte la
-    // misma fila dos veces — nos quedamos con la última aparición de cada MC.
-    const mapaEquipos = new Map();
-    equiposMapeados.forEach(eq => mapaEquipos.set(eq.m_control, eq));
-    const equipos = Array.from(mapaEquipos.values());
-    const duplicados = equiposMapeados.length - equipos.length;
-
-    let subidos = 0;
-    for (let i = 0; i < equipos.length; i += TAMANO_LOTE) {
-      const lote = equipos.slice(i, i + TAMANO_LOTE);
-      const { error } = await supabaseClient.from("equipos").upsert(lote, { onConflict: "m_control" });
-      if (error) throw error;
-
-      subidos += lote.length;
-      const porcentaje = Math.round((subidos / equipos.length) * 100);
-      barraRelleno.style.width = porcentaje + "%";
-      progresoTexto.textContent = `Subiendo... ${subidos} de ${equipos.length} equipos`;
-    }
-
-    const mensajeDuplicados = duplicados > 0
-      ? ` (se encontraron ${duplicados} MC repetidos en el archivo — se usó la última fila de cada uno)`
-      : "";
-    mostrarResultado(`✅ Listo. ${subidos} equipos actualizados.${mensajeDuplicados}`, false);
-  } catch (err) {
-    console.error(err);
-    mostrarResultado("❌ Error al importar: " + err.message, true);
-  } finally {
-    progreso.hidden = true;
-    importarBtn.disabled = false;
-    archivoInput.value = "";
-    cargarTotalEquipos();
-  }
-});
-
-function leerExcel(archivo) {
-  return new Promise((resolve, reject) => {
-    const lector = new FileReader();
-    lector.onload = (e) => {
-      try {
-        const datos = new Uint8Array(e.target.result);
-        const libro = XLSX.read(datos, { type: "array", cellDates: false });
-        const hoja = libro.Sheets[libro.SheetNames[0]];
-        const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
-        resolve(filas);
-      } catch (err) {
-        reject(err);
-      }
-    };
-    lector.onerror = () => reject(new Error("No se pudo leer el archivo"));
-    lector.readAsArrayBuffer(archivo);
-  });
-}
-
-// Convierte "Sí"/"No" (o vacío) en booleano
-function aBooleano(valor) {
-  return String(valor || "").trim().toLowerCase() === "sí" || String(valor || "").trim().toLowerCase() === "si";
-}
-
-// Convierte "dd/mm/aaaa" o "dd/mm/aaaa HH:MM" a formato ISO que entiende Postgres
-function aFechaISO(valor, conHora) {
-  const texto = String(valor || "").trim();
-  if (!texto) return null;
-
-  const partes = texto.split(" ");
-  const [dia, mes, anio] = partes[0].split("/");
-  if (!dia || !mes || !anio) return null;
-
-  let iso = `${anio}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`;
-  if (conHora && partes[1]) {
-    iso += "T" + partes[1] + ":00";
-  }
-  return iso;
-}
-
-function aNumero(valor) {
-  if (valor === "" || valor === null || valor === undefined) return null;
-  const num = parseFloat(String(valor).replace(",", "."));
-  return isNaN(num) ? null : num;
-}
-
-// Convierte una fila del Excel (objeto con las claves = encabezados) al
-// formato de la tabla "equipos" de Supabase.
-function mapearFilaAEquipo(fila) {
-  const lecturasBateria = [];
-  for (let n = 1; n <= 7; n++) {
-    const valor = aNumero(fila[`Batería lectura ${n}`]);
-    const fecha = fila[`Fecha lectura ${n}`];
-    if (valor !== null) {
-      lecturasBateria.push({ valor: valor, fecha: fecha || null });
-    }
-  }
-
-  return {
-    m_control: String(fila["M. de Control"] || "").trim(),
-    cliente: fila["Cliente"] || null,
-    serie_contenedor: fila["Nº serie Contenedor"] || null,
-    imei: fila["IMEI"] || null,
-    sim: fila["SIM"] || null,
-    modelo_bateria: fila["Modelo de batería"] || null,
-    serie_bateria: fila["Nº serie batería"] || null,
-    modelo_cierre: fila["Modelo de cierre"] || null,
-    serie_cierre: fila["Nº serie cierre"] || null,
-    modelo_lector: fila["Modelo de lector"] || null,
-    serie_lector: fila["Nº serie lector"] || null,
-    lote: fila["Lote"] || null,
-    fabricante: fila["Fabricante"] || null,
-    firmware: fila["Firmware"] || null,
-    hardware: fila["Hardware"] || null,
-    fecha_instalacion: aFechaISO(fila["Fecha instalación"], false),
-    fecha_fabricacion: aFechaISO(fila["Fecha Fabricación"], false),
-    broker: fila["Broker"] || null,
-    estado_montaje: fila["Estado de Montaje"] || null,
-    modelo: fila["Modelo"] || null,
-    fraccion: fila["Fracción"] || null,
-    tipo_carga: fila["Tipo de carga"] || null,
-    latitud: aNumero(fila["Latitud"]),
-    longitud: aNumero(fila["Longitud"]),
-    estado: fila["Estado"] || null,
-    ultima_apertura: aFechaISO(fila["Última apertura"], true),
-    ultima_comunicacion: aFechaISO(fila["Última comunicación"], true),
-    tipo_comunicacion: fila["Tipo de comunicación"] || null,
-    lecturas_bateria: lecturasBateria,
-    alarma_no_comunica: aBooleano(fila["No comunica"]),
-    alarma_error_servo: aBooleano(fila["Error servo"]),
-    alarma_vuelco: aBooleano(fila["Vuelco"]),
-    alarma_incendio: aBooleano(fila["Incendio"]),
-    alarma_bloqueado: aBooleano(fila["Bloqueado"]),
-    alarma_sin_bateria: aBooleano(fila["Sin batería"]),
-    alarma_tapa_abierta: aBooleano(fila["Tapa abierta"]),
-    secuencial: aBooleano(fila["Secuencial"]),
-    alarma_cambiar_bateria: aBooleano(fila["Cambiar batería"]),
-    alarma_cambiar_ubicacion: aBooleano(fila["Cambiar ubicación"]),
-    alarma_revisar_comunicacion: aBooleano(fila["Revisar comunicación"]),
-    alarma_operacion_erratica: aBooleano(fila["Operación errática"]),
-    actualizado_en: new Date().toISOString()
-  };
-}
-
-function mostrarResultado(texto, esError) {
-  resultadoMsg.textContent = texto;
-  resultadoMsg.className = esError ? "resultado-msg resultado-error" : "resultado-msg resultado-ok";
-  resultadoMsg.hidden = false;
-}
-
-async function cargarTotalEquipos() {
-  const { count, error } = await supabaseClient
-    .from("equipos")
-    .select("*", { count: "exact", head: true });
-
-  if (error) {
-    totalEquiposEl.textContent = "No se pudo cargar el total.";
-    return;
-  }
-  totalEquiposEl.textContent = `${count} equipos en la base de datos.`;
-}
-
-cargarTotalEquipos();
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "operario";</script>
+<script src="sesion.js"></script>
+</body>
+</html>
