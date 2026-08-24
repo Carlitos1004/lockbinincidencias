@@ -1,0 +1,190 @@
+/* =========================================================================
+   LockBin — Estilos base
+   Paleta: verde industrial (#0f5132, el mismo de tus reportes PDF) sobre
+   gris neutro frío, con un acento ámbar reservado para errores/alertas.
+   Tipografía: una sans utilitaria de alto contraste para textos, y una
+   monoespaciada para los campos que se parecen a códigos (MC, OT, etc.)
+   ========================================================================= */
+
+:root {
+  --verde-oscuro: #0f5132;
+  --verde-medio: #146c43;
+  --verde-claro: #d1e7dd;
+  --gris-950: #14181a;
+  --gris-700: #4b5560;
+  --gris-400: #99a3ab;
+  --gris-200: #e4e8ea;
+  --gris-100: #f3f5f6;
+  --blanco: #ffffff;
+  --ambar: #b45309;
+  --ambar-bg: #fdf0e1;
+
+  --fuente-texto: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fuente-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--fuente-texto);
+  color: var(--gris-950);
+  background: var(--gris-100);
+}
+
+/* --- Pantalla de login --- */
+
+.login-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    linear-gradient(180deg, var(--verde-oscuro) 0%, var(--verde-oscuro) 260px, var(--gris-100) 260px);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--blanco);
+  border-radius: 12px;
+  padding: 40px 32px 32px;
+  box-shadow: 0 20px 40px -12px rgba(15, 81, 50, 0.25);
+}
+
+.login-card h1 {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--verde-oscuro);
+  font-family: var(--fuente-mono);
+}
+
+.subtitle {
+  margin: 0 0 28px;
+  color: var(--gris-700);
+  font-size: 0.92rem;
+}
+
+#login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#login-form label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gris-700);
+  margin-top: 14px;
+}
+
+#login-form input {
+  padding: 11px 12px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: var(--fuente-texto);
+  transition: border-color 0.15s ease;
+}
+
+#login-form input:focus {
+  outline: none;
+  border-color: var(--verde-medio);
+}
+
+#login-btn {
+  margin-top: 24px;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--verde-oscuro);
+  color: var(--blanco);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+#login-btn:hover:not(:disabled) {
+  background: var(--verde-medio);
+}
+
+#login-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#login-btn:focus-visible,
+#login-form input:focus-visible {
+  outline: 2px solid var(--verde-medio);
+  outline-offset: 2px;
+}
+
+.error-msg {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  background: var(--ambar-bg);
+  color: var(--ambar);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* --- Paneles internos (admin / técnico / cliente) --- */
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 28px;
+  background: var(--verde-oscuro);
+  color: var(--blanco);
+}
+
+.panel-header h1 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-family: var(--fuente-mono);
+  font-weight: 600;
+}
+
+.panel-header button {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--blanco);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.panel-header button:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.panel-body {
+  max-width: 720px;
+  margin: 48px auto;
+  padding: 0 24px;
+}
+
+.panel-body h2 {
+  color: var(--verde-oscuro);
+  font-size: 1.1rem;
+}
+
+.panel-body p {
+  color: var(--gris-700);
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

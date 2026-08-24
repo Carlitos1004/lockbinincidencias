@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Panel Técnico</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <h1>LockBin · Técnico</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body">
+  <h2>Bienvenido, <span id="nombre-usuario">—</span></h2>
+  <p>Entraste con el rol <strong>Operario</strong>. Aquí va a vivir el flujo de reporte de campo: buscar equipo, reportar falla, cambio de componente, foto, estado final.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="sesion.js"></script>
+</body>
+</html>
