@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Equipos</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <h1>LockBin · Equipos</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body">
+  <p><a href="admin.html">← Volver al panel</a></p>
+
+  <h2>Actualizar lista de equipos</h2>
+  <p>Sube el archivo Excel que descargas de la plataforma principal. Cada equipo se identifica por su Módulo de Control — si ya existe, se actualiza; si es nuevo, se agrega. Nada se borra.</p>
+
+  <div class="import-box">
+    <input type="file" id="archivo-input" accept=".xlsx,.xls,.csv">
+    <button id="importar-btn" disabled>Subir y actualizar</button>
+  </div>
+
+  <div id="progreso" hidden>
+    <p id="progreso-texto">Procesando...</p>
+    <div class="barra-progreso"><div id="barra-relleno"></div></div>
+  </div>
+
+  <p id="resultado-msg" class="resultado-msg" hidden></p>
+
+  <h2 style="margin-top:40px;">Equipos cargados</h2>
+  <p id="total-equipos">Cargando…</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="importar-equipos.js"></script>
+</body>
+</html>
