@@ -89,6 +89,9 @@ enviarBtn.addEventListener("click", async () => {
   if (!falla) { mostrarMensajeReporte("⚠️ Selecciona la falla reportada.", true); return; }
   if (!estadoEquipoRadio) { mostrarMensajeReporte("⚠️ Selecciona el estado final del equipo.", true); return; }
 
+  const idOtActiva = otActiva();
+  if (!idOtActiva) { mostrarMensajeReporte("⚠️ No hay una OT activa — créala o elígela arriba antes de reportar.", true); return; }
+
   // --- Leer las casillas marcadas ---
   const cambioCompleto = document.getElementById("cambio-completo").checked;
   let codigosCambio = cambioCompleto
@@ -128,7 +131,8 @@ enviarBtn.addEventListener("click", async () => {
     comentarios: comentariosFinal,
     estado_equipo: estadoEquipo,
     fecha_cierre: estadoEquipo === "🟢 FUNCIONANDO" ? new Date().toISOString() : null,
-    origen: user.email
+    origen: user.email,
+    id_ot: idOtActiva
   };
 
   const { error: errorFalla } = await supabaseClient.from("historial_fallas").insert(nuevaFalla);
@@ -151,6 +155,7 @@ enviarBtn.addEventListener("click", async () => {
       tipo_componente: MAPA_COMPONENTE[codigo].nombre,
       serial_retirado: serial,
       id_registro: idRegistro,
+      id_ot: idOtActiva,
       estado: retiradoPorCliente ? "Cambiado por el cliente" : "Pendiente revisión",
       excluir_materiales: retiradoPorCliente
     });
@@ -166,6 +171,7 @@ enviarBtn.addEventListener("click", async () => {
       tipo_componente: MAPA_COMPONENTE[codigo].nombre,
       serial_retirado: serial,
       id_registro: idRegistro,
+      id_ot: idOtActiva,
       estado: "Faltante/Perdido",
       excluir_materiales: true
     });

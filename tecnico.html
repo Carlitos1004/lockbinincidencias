@@ -16,7 +16,16 @@
 <div class="panel-body">
   <h2>Hola, <span id="nombre-usuario">—</span></h2>
 
-  <div id="paso-buscar">
+  <div class="ot-activa-box">
+    <strong>OT activa:</strong> <span id="ot-activa-texto">Ninguna — crea o elige una para empezar a reportar</span>
+    <div class="ot-activa-controles">
+      <input type="text" id="ot-input" placeholder="Ej: OT-005 (para continuar una existente)">
+      <button id="ot-usar-btn">Usar esta OT</button>
+      <button id="ot-nueva-btn" class="btn-secundario">Crear OT nueva</button>
+    </div>
+  </div>
+
+  <div id="paso-buscar" hidden>
     <label for="mc-input">Código del equipo (MC)</label>
     <input type="text" id="mc-input" placeholder="MC2602048" autocomplete="off">
     <button id="buscar-btn">Buscar equipo</button>
@@ -94,6 +103,7 @@
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "operario";</script>
 <script src="sesion.js"></script>
+<script src="ot-activa.js"></script>
 <script src="reporte-tecnico.js"></script>
 </body>
 </html>

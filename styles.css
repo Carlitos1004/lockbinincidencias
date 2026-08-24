@@ -392,3 +392,102 @@ body {
   font-weight: 500;
   max-width: 460px;
 }
+
+/* --- OT activa (panel técnico) --- */
+
+.ot-activa-box {
+  background: var(--verde-claro);
+  color: var(--verde-oscuro);
+  padding: 14px 18px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+  font-size: 0.92rem;
+}
+
+.ot-activa-controles {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.ot-activa-controles input {
+  padding: 8px 10px;
+  border: 1.5px solid var(--verde-medio);
+  border-radius: 6px;
+  font-family: var(--fuente-mono);
+  font-size: 0.85rem;
+}
+
+.ot-activa-controles button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: var(--verde-oscuro);
+  color: var(--blanco);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ot-activa-controles .btn-secundario {
+  background: var(--blanco);
+  color: var(--verde-oscuro);
+  border: 1.5px solid var(--verde-medio);
+}
+
+/* --- Materiales --- */
+
+.materiales-form, .materiales-controles {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 16px 0;
+}
+
+.materiales-form input, .materiales-form select, .materiales-controles input {
+  padding: 9px 10px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.materiales-form button, .materiales-controles button {
+  padding: 9px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--verde-oscuro);
+  color: var(--blanco);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.materiales-controles .btn-secundario {
+  background: var(--gris-200);
+  color: var(--gris-700);
+}
+
+.tabla-materiales {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 0.88rem;
+}
+
+.tabla-materiales th, .tabla-materiales td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--gris-200);
+}
+
+.tabla-materiales th {
+  color: var(--gris-700);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.fila-alerta {
+  background: var(--ambar-bg);
+}
