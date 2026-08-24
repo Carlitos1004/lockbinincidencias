@@ -250,3 +250,94 @@ body {
   background: var(--ambar-bg);
   color: var(--ambar);
 }
+
+/* --- Formulario de reporte técnico --- */
+
+#paso-buscar, #paso-reporte {
+  margin-top: 16px;
+}
+
+#mc-input, #falla-select, #accion-input, #comentarios-input {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  padding: 11px 12px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: var(--fuente-texto);
+  margin: 6px 0 16px;
+}
+
+#mc-input {
+  display: inline-block;
+  width: auto;
+  margin-right: 8px;
+  font-family: var(--fuente-mono);
+}
+
+#buscar-btn, #enviar-btn, .btn-secundario {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  background: var(--verde-oscuro);
+  color: var(--blanco);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-secundario {
+  background: var(--gris-200);
+  color: var(--gris-700);
+}
+
+.equipo-encontrado {
+  background: var(--verde-claro);
+  color: var(--verde-oscuro);
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+}
+
+.panel-body label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gris-700);
+  margin-top: 12px;
+}
+
+.estado-final-opciones {
+  display: flex;
+  gap: 16px;
+  margin: 10px 0 20px;
+}
+
+.opcion-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 0.9rem;
+  color: var(--gris-950);
+}
+
+.botones-reporte {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.reporte-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--gris-200);
+  font-size: 0.9rem;
+}
+
+.reporte-fecha {
+  display: block;
+  color: var(--gris-400);
+  font-size: 0.78rem;
+  margin-top: 2px;
+}

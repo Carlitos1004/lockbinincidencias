@@ -14,13 +14,67 @@
 </div>
 
 <div class="panel-body">
-  <h2>Bienvenido, <span id="nombre-usuario">—</span></h2>
-  <p>Entraste con el rol <strong>Operario</strong>. Aquí va a vivir el flujo de reporte de campo: buscar equipo, reportar falla, cambio de componente, foto, estado final.</p>
+  <h2>Hola, <span id="nombre-usuario">—</span></h2>
+
+  <div id="paso-buscar">
+    <label for="mc-input">Código del equipo (MC)</label>
+    <input type="text" id="mc-input" placeholder="MC2602048" autocomplete="off">
+    <button id="buscar-btn">Buscar equipo</button>
+    <p id="buscar-error" class="resultado-msg resultado-error" hidden></p>
+  </div>
+
+  <div id="paso-reporte" hidden>
+    <div class="equipo-encontrado">
+      <strong>Equipo:</strong> <span id="eq-mc"></span> —
+      <strong>Cliente:</strong> <span id="eq-cliente"></span> —
+      <strong>Fracción:</strong> <span id="eq-fraccion"></span>
+    </div>
+
+    <label for="falla-select">Falla reportada</label>
+    <select id="falla-select">
+      <option value="">— Selecciona —</option>
+      <option>No comunica</option>
+      <option>Error servo</option>
+      <option>Vuelco</option>
+      <option>Incendio</option>
+      <option>Bloqueado</option>
+      <option>Sin batería</option>
+      <option>Tapa abierta</option>
+      <option>Falla de Lector</option>
+      <option>Cerradura Trancada</option>
+      <option>Vandalismo / Daño Externo</option>
+      <option>Otra (especificar en comentarios)</option>
+    </select>
+
+    <label for="accion-input">Acción aplicada en calle</label>
+    <input type="text" id="accion-input" placeholder="Ej: Reset con tarjeta, se cambió lector...">
+
+    <label for="comentarios-input">Comentarios</label>
+    <textarea id="comentarios-input" rows="3" placeholder="Observaciones del trabajo realizado"></textarea>
+
+    <label>Estado final del equipo</label>
+    <div class="estado-final-opciones">
+      <label class="opcion-radio"><input type="radio" name="estado_equipo" value="🟢 FUNCIONANDO"> 🟢 Funcionando</label>
+      <label class="opcion-radio"><input type="radio" name="estado_equipo" value="🟡 CAMBIO NECESARIO"> 🟡 Cambio necesario</label>
+      <label class="opcion-radio"><input type="radio" name="estado_equipo" value="🔴 PENDIENTE"> 🔴 Pendiente</label>
+    </div>
+
+    <div class="botones-reporte">
+      <button id="cancelar-btn" class="btn-secundario">Cancelar</button>
+      <button id="enviar-btn">Enviar reporte</button>
+    </div>
+
+    <p id="reporte-msg" class="resultado-msg" hidden></p>
+  </div>
+
+  <h2 style="margin-top:40px;">Mis últimos reportes</h2>
+  <div id="mis-reportes">Cargando…</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "operario";</script>
 <script src="sesion.js"></script>
+<script src="reporte-tecnico.js"></script>
 </body>
 </html>
