@@ -31,13 +31,37 @@ importarBtn.addEventListener("click", async () => {
 
   try {
     const filas = await leerExcel(archivo);
-    const equipos = filas.map(mapearFilaAEquipo).filter(e => e.m_control);
+    const equiposMapeados = filas.map(mapearFilaAEquipo).filter(e => e.m_control);
+
+    // Deduplicar por m_control: si el Excel trae el mismo equipo repetido en
+    // más de una fila, Postgres no permite que un solo "upsert" afecte la
+    // misma fila dos veces — nos quedamos con la última aparición de cada MC.
+    const mapaEquipos = new Map();
+    equiposMapeados.forEach(eq => mapaEquipos.set(eq.m_control, eq));
+    const equipos = Array.from(mapaEquipos.values());
+    const duplicados = equiposMapeados.length - equipos.length;
 
     let subidos = 0;
     for (let i = 0; i < equipos.length; i += TAMANO_LOTE) {
       const lote = equipos.slice(i, i + TAMANO_LOTE);
+
+      // Verificación extra: si por alguna razón un lote trae un MC repetido
+      // (no debería pasar tras el paso de arriba, pero así lo detectamos
+      // exacto en vez de un error genérico de Postgres)
+      const vistosEnLote = new Set();
+      const repetidosEnLote = [];
+      lote.forEach(eq => {
+        if (vistosEnLote.has(eq.m_control)) repetidosEnLote.push(eq.m_control);
+        vistosEnLote.add(eq.m_control);
+      });
+      if (repetidosEnLote.length > 0) {
+        throw new Error("MC repetido dentro de un mismo lote: " + repetidosEnLote.join(", "));
+      }
+
       const { error } = await supabaseClient.from("equipos").upsert(lote, { onConflict: "m_control" });
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message + " — en el lote de la fila " + (i + 1) + " a la " + (i + lote.length) + " (MCs: " + lote.map(e => e.m_control).join(", ").slice(0, 300) + "...)");
+      }
 
       subidos += lote.length;
       const porcentaje = Math.round((subidos / equipos.length) * 100);
@@ -45,7 +69,10 @@ importarBtn.addEventListener("click", async () => {
       progresoTexto.textContent = `Subiendo... ${subidos} de ${equipos.length} equipos`;
     }
 
-    mostrarResultado(`✅ Listo. ${subidos} equipos actualizados.`, false);
+    const mensajeDuplicados = duplicados > 0
+      ? ` (se encontraron ${duplicados} MC repetidos en el archivo — se usó la última fila de cada uno)`
+      : "";
+    mostrarResultado(`✅ Listo. ${subidos} equipos actualizados.${mensajeDuplicados}`, false);
   } catch (err) {
     console.error(err);
     mostrarResultado("❌ Error al importar: " + err.message, true);
