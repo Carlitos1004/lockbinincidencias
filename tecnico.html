@@ -46,9 +46,28 @@
       <option>Otra (especificar en comentarios)</option>
     </select>
 
-    <label for="accion-input">Acción aplicada en calle</label>
-    <input type="text" id="accion-input" placeholder="Ej: Reset con tarjeta, se cambió lector...">
+    <label for="accion-input">Descripción de la acción (texto libre, opcional)</label>
+    <input type="text" id="accion-input" placeholder="Ej: Reset con tarjeta, se revisó comunicación...">
 
+    <fieldset class="grupo-checkbox">
+      <legend>¿Se cambió algún componente?</legend>
+      <label class="opcion-check"><input type="checkbox" id="cambio-le"> Lector Electrónico (LE)</label>
+      <label class="opcion-check"><input type="checkbox" id="cambio-ce"> Cierre Electrónico (CE)</label>
+      <label class="opcion-check"><input type="checkbox" id="cambio-ba"> Batería (BA)</label>
+      <label class="opcion-check"><input type="checkbox" id="cambio-mc"> Módulo de Control (MC)</label>
+      <label class="opcion-check opcion-destacada"><input type="checkbox" id="cambio-completo"> Equipo completo (los 4)</label>
+      <label class="opcion-check opcion-secundaria"><input type="checkbox" id="retirado-cliente"> El cliente ya lo había retirado/cambiado por su cuenta (no cuenta como material tuyo)</label>
+    </fieldset>
+
+    <fieldset class="grupo-checkbox">
+      <legend>¿Llegó sin algún componente (faltante/perdido)?</legend>
+      <label class="opcion-check"><input type="checkbox" id="falta-le"> Falta Lector</label>
+      <label class="opcion-check"><input type="checkbox" id="falta-ce"> Falta Cierre</label>
+      <label class="opcion-check"><input type="checkbox" id="falta-ba"> Falta Batería</label>
+      <label class="opcion-check"><input type="checkbox" id="falta-mc"> Falta Módulo de Control</label>
+    </fieldset>
+
+    <label class="opcion-check opcion-alerta"><input type="checkbox" id="vandalismo-check"> Vandalismo / robo (deja registro informativo de los seriales presentes, sin contarlos como cambio)</label>
     <label for="comentarios-input">Comentarios</label>
     <textarea id="comentarios-input" rows="3" placeholder="Observaciones del trabajo realizado"></textarea>
 
