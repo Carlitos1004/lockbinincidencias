@@ -3,30 +3,52 @@
 // =========================================================================
 
 const otInput = document.getElementById("ot-input");
-const tipoSelect = document.getElementById("tipo-select");
-const llevadosInput = document.getElementById("llevados-input");
+const cargarOtBtn = document.getElementById("cargar-ot-btn");
+const tablaLlevadosWrap = document.getElementById("tabla-llevados-wrap");
 const guardarBtn = document.getElementById("guardar-btn");
 const guardarMsg = document.getElementById("guardar-msg");
 const filtroOt = document.getElementById("filtro-ot");
 const recalcularBtn = document.getElementById("recalcular-btn");
 const tbody = document.getElementById("materiales-tbody");
 
-guardarBtn.addEventListener("click", async () => {
-  const idOt = otInput.value.trim().toUpperCase();
-  const tipo = tipoSelect.value;
-  const llevados = parseInt(llevadosInput.value, 10);
+let otCargadaActual = null;
 
-  if (!idOt || isNaN(llevados)) {
-    mostrarMensaje("⚠️ Escribe la OT y una cantidad válida.", true);
-    return;
-  }
+cargarOtBtn.addEventListener("click", async () => {
+  const idOt = otInput.value.trim().toUpperCase();
+  if (!idOt) { mostrarMensaje("⚠️ Escribe un número de OT.", true); return; }
+
+  otCargadaActual = idOt;
+
+  const { data: existentes } = await supabaseClient
+    .from("materiales_ot")
+    .select("tipo_componente, llevados")
+    .eq("id_ot", idOt);
+
+  const mapaExistentes = {};
+  (existentes || []).forEach(m => { mapaExistentes[m.tipo_componente] = m.llevados; });
+
+  document.querySelectorAll(".input-llevados").forEach(input => {
+    input.value = mapaExistentes[input.dataset.tipo] ?? 0;
+  });
+
+  tablaLlevadosWrap.hidden = false;
+  guardarMsg.hidden = true;
+});
+
+guardarBtn.addEventListener("click", async () => {
+  if (!otCargadaActual) return;
 
   guardarBtn.disabled = true;
 
-  // upsert: si ya existe esa combinación OT+Tipo, actualiza "llevados"
+  const filas = [...document.querySelectorAll(".input-llevados")].map(input => ({
+    id_ot: otCargadaActual,
+    tipo_componente: input.dataset.tipo,
+    llevados: parseInt(input.value, 10) || 0
+  }));
+
   const { error } = await supabaseClient
     .from("materiales_ot")
-    .upsert({ id_ot: idOt, tipo_componente: tipo, llevados: llevados }, { onConflict: "id_ot,tipo_componente" });
+    .upsert(filas, { onConflict: "id_ot,tipo_componente" });
 
   if (error) {
     mostrarMensaje("❌ " + error.message, true);
@@ -34,13 +56,10 @@ guardarBtn.addEventListener("click", async () => {
     return;
   }
 
-  // Recalculamos de una vez para esa OT, así el listado ya sale correcto
-  await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: idOt });
+  await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: otCargadaActual });
 
   mostrarMensaje("✅ Guardado.", false);
   guardarBtn.disabled = false;
-  otInput.value = "";
-  llevadosInput.value = "";
   cargarMateriales();
 });
 
