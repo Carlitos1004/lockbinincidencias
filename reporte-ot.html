@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Reporte de OT</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <h1>LockBin · Reporte de OT</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <p><a href="admin.html">← Volver al panel</a></p>
+
+  <div class="materiales-controles">
+    <input type="text" id="ot-input" placeholder="Nº de OT (ej. OT-005)" list="lista-ots">
+    <datalist id="lista-ots"></datalist>
+    <button id="generar-btn">Generar reporte</button>
+  </div>
+
+  <p id="reporte-msg" class="resultado-msg" hidden></p>
+
+  <div id="reporte-contenido" hidden>
+    <div class="ruta-box">
+      <button id="descargar-excel-btn" class="btn-secundario">⬇️ Descargar Excel</button>
+      <button id="descargar-pdf-btn" class="btn-secundario">⬇️ Descargar PDF</button>
+    </div>
+
+    <h2 id="reporte-titulo"></h2>
+    <p id="reporte-meta" class="ot-meta"></p>
+
+    <h3>Resumen de Estado Final</h3>
+    <table class="tabla-revision" id="tabla-estado"><thead><tr><th>Estado</th><th>Cantidad</th></tr></thead><tbody></tbody></table>
+
+    <h3>Resumen de Equipos Recibidos</h3>
+    <table class="tabla-revision" id="tabla-recibidos"><thead><tr><th>Módulo</th><th>Acción en calle</th><th>Comentarios</th></tr></thead><tbody></tbody></table>
+
+    <h3>Cambios de Componentes Realizados</h3>
+    <table class="tabla-revision" id="tabla-componentes"><thead><tr><th>Módulo</th><th>Tipo</th><th>Serial</th><th>Destino</th></tr></thead><tbody></tbody></table>
+
+    <h3>Control de Materiales</h3>
+    <table class="tabla-revision" id="tabla-materiales"><thead><tr><th>Tipo</th><th>Llevados</th><th>Utilizados</th><th>Vuelven</th></tr></thead><tbody></tbody></table>
+
+    <h3>Resumen de Fallas y Revisión</h3>
+    <table class="tabla-revision" id="tabla-fallas"><thead><tr><th>Módulo</th><th>Serial</th><th>Destino</th><th>Hallazgo</th></tr></thead><tbody></tbody></table>
+
+    <h3>Control de Garantías</h3>
+    <table class="tabla-revision" id="tabla-garantias-reporte"><thead><tr><th>Módulo</th><th>Dispositivo</th><th>Falla</th><th>Garantía</th></tr></thead><tbody></tbody></table>
+
+    <h3>Control Stock de Destino</h3>
+    <table class="tabla-revision" id="tabla-destino"><thead><tr><th>Destino</th><th>Cantidad</th><th>Desglose por tipo</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="selector-ots.js"></script>
+<script src="reporte-ot.js"></script>
+</body>
+</html>

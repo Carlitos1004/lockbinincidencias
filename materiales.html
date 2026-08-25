@@ -17,18 +17,25 @@
   <p><a href="admin.html">← Volver al panel</a></p>
 
   <h2>Registrar materiales llevados</h2>
-  <p>Antes de que un operario salga a campo, anota cuántos de cada componente lleva por OT. "Utilizados" y "Vuelven" se calculan solos a partir de lo que se reporte en el campo.</p>
+  <p>Elige la OT una vez, y anota cuántos de cada componente lleva el operario — "Utilizados" y "Vuelven" se calculan solos a partir de lo que se reporte en el campo.</p>
 
   <div class="materiales-form">
-    <input type="text" id="ot-input" placeholder="Nº de OT (ej. OT-005)">
-    <select id="tipo-select">
-      <option value="Lector Electrónico">Lector Electrónico (LE)</option>
-      <option value="Cierre Electrónico">Cierre Electrónico (CE)</option>
-      <option value="Batería">Batería (BA)</option>
-      <option value="Módulo de Control">Módulo de Control (MC)</option>
-    </select>
-    <input type="number" id="llevados-input" placeholder="Cantidad llevada" min="0">
-    <button id="guardar-btn">Guardar</button>
+    <input type="text" id="ot-input" placeholder="Nº de OT (ej. OT-005)" list="lista-ots">
+    <datalist id="lista-ots"></datalist>
+    <button id="cargar-ot-btn">Cargar OT</button>
+  </div>
+
+  <div id="tabla-llevados-wrap" hidden>
+    <table class="tabla-materiales">
+      <thead><tr><th>Componente</th><th>Llevados</th></tr></thead>
+      <tbody id="llevados-tbody">
+        <tr><td>Lector Electrónico (LE)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Lector Electrónico" value="0"></td></tr>
+        <tr><td>Cierre Electrónico (CE)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Cierre Electrónico" value="0"></td></tr>
+        <tr><td>Batería (BA)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Batería" value="0"></td></tr>
+        <tr><td>Módulo de Control (MC)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Módulo de Control" value="0"></td></tr>
+      </tbody>
+    </table>
+    <button id="guardar-btn">Guardar los 4 de una vez</button>
   </div>
 
   <p id="guardar-msg" class="resultado-msg" hidden></p>
@@ -53,6 +60,7 @@
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "manager";</script>
 <script src="sesion.js"></script>
+<script src="selector-ots.js"></script>
 <script src="materiales.js"></script>
 </body>
 </html>

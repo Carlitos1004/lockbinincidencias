@@ -17,7 +17,8 @@
   <p><a href="javascript:history.back()">← Volver</a></p>
 
   <div class="materiales-controles">
-    <input type="text" id="ot-input" placeholder="Ej: OT-005">
+    <input type="text" id="ot-input" placeholder="Ej: OT-005" list="lista-ots">
+    <datalist id="lista-ots"></datalist>
     <button id="buscar-btn">Buscar OT</button>
   </div>
 
@@ -41,7 +42,7 @@
 
     <table class="tabla-revision" id="tabla-ot">
       <thead>
-        <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Acción / Comentarios</th></tr>
+        <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Serial Nuevo</th><th>Acción / Comentarios</th></tr>
       </thead>
       <tbody id="ot-tbody"></tbody>
     </table>
@@ -52,6 +53,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <script src="sesion-generica.js"></script>
+<script src="selector-ots.js"></script>
 <script src="ot-detalle.js"></script>
 </body>
 </html>

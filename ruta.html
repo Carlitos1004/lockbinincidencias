@@ -16,7 +16,8 @@
 </div>
 
 <div class="ruta-selector">
-  <input type="text" id="ot-input" placeholder="Nº de OT (ej. OT-005)">
+  <input type="text" id="ot-input" placeholder="Nº de OT (ej. OT-005)" list="lista-ots">
+  <datalist id="lista-ots"></datalist>
   <button id="cargar-ruta-btn">Cargar ruta</button>
   <a href="tecnico.html" class="link-manual">Buscar equipo manualmente en su lugar →</a>
 </div>
@@ -40,7 +41,8 @@
     <div id="modal-tickets"></div>
 
     <div id="modal-form" hidden>
-      <label for="modal-falla-select">Falla reportada (si es algo nuevo, no de la lista)</label>
+      <label for="modal-falla-select" id="modal-falla-label">Falla reportada (si es algo nuevo, no de la lista)</label>
+      <p id="modal-falla-fija" class="equipo-encontrado" hidden></p>
       <select id="modal-falla-select">
         <option value="">— Selecciona —</option>
         <option>No comunica</option>
@@ -121,8 +123,9 @@
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="config.js"></script>
-<script>const ROL_ESPERADO = "operario";</script>
-<script src="sesion.js"></script>
+<script>const ROLES_PERMITIDOS = ["manager", "operario"];</script>
+<script src="sesion-multi.js"></script>
+<script src="selector-ots.js"></script>
 <script src="ruta.js"></script>
 </body>
 </html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Garantías</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <h1>LockBin · Garantías</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <p><a href="admin.html">← Volver al panel</a></p>
+
+  <div class="materiales-controles">
+    <input type="text" id="filtro-input" placeholder="Buscar por OT, cliente o módulo...">
+    <select id="filtro-garantia">
+      <option value="todas">Todas</option>
+      <option value="SI">Con garantía (SI)</option>
+      <option value="NO">Sin garantía (NO)</option>
+    </select>
+  </div>
+
+  <table class="tabla-revision" id="tabla-garantias">
+    <thead>
+      <tr>
+        <th>OT</th><th>Cliente</th><th>Módulo</th><th>Dispositivo</th>
+        <th>Falla</th><th>Garantía</th><th>Observación</th><th>Nombre Imagen</th><th></th>
+      </tr>
+    </thead>
+    <tbody id="garantias-tbody">
+      <tr><td colspan="9">Cargando...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="garantias.js"></script>
+</body>
+</html>
