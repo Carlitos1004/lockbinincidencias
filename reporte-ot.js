@@ -135,9 +135,9 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
   const r = reporteActual;
   const filas = []; // arreglo único de filas — todo va en UNA sola hoja
 
-  const titulo = (texto) => { filas.push([texto]); };
+  const titulo = (texto) => { filas.push([limpiarIconos(texto)]); };
   const encabezados = (arr) => { filas.push(arr); };
-  const filaDatos = (arr) => { filas.push(arr); };
+  const filaDatos = (arr) => { filas.push(limpiarFila(arr)); };
   const espacio = () => { filas.push([]); };
 
   const seccion = (nombreTitulo, cabeceras, datos, mensajeVacio) => {
@@ -206,11 +206,12 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
   const seccion = (titulo, encabezados, filas) => {
     if (y > 170) { doc.addPage(); y = 15; }
     doc.setFontSize(11);
-    doc.text(titulo, 14, y);
+    doc.text(limpiarIconos(titulo), 14, y);
+    const filasLimpias = filas.length > 0 ? filas.map(limpiarFila) : [encabezados.map(() => "—")];
     doc.autoTable({
       startY: y + 3,
       head: [encabezados],
-      body: filas.length > 0 ? filas : [encabezados.map(() => "—")],
+      body: filasLimpias,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [111, 168, 39] },
       margin: { left: 14, right: 14 }
@@ -233,4 +234,21 @@ function mostrarMensaje(texto, esError) {
   reporteMsg.textContent = texto;
   reporteMsg.className = esError ? "resultado-msg resultado-error" : "resultado-msg resultado-ok";
   reporteMsg.hidden = false;
+}
+
+// Quita emojis/iconos de un texto — se usa SOLO al exportar a Excel/PDF
+// (en pantalla los iconos se ven bien y quedan a color; en los archivos
+// descargables, jsPDF no tiene esas fuentes y sale corrupto/en blanco y
+// negro, así que ahí es mejor texto limpio que un símbolo roto).
+function limpiarIconos(valor) {
+  if (valor === null || valor === undefined) return valor;
+  if (typeof valor !== "string") return valor;
+  return valor
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\uFE0F]/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function limpiarFila(fila) {
+  return fila.map(limpiarIconos);
 }

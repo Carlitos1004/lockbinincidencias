@@ -1160,6 +1160,25 @@ td[colspan] {
   background: var(--verde-claro);
 }
 
+/* --- Botón "Ver" pequeño dentro de tablas --- */
+
+.btn-ver-tabla {
+  display: inline-block;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--verde-claro);
+  color: var(--verde-oscuro);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn-ver-tabla:hover {
+  background: var(--verde-medio);
+  color: var(--blanco);
+}
+
 /* --- Footer de Formato Verde --- */
 
 .footer-fv {
