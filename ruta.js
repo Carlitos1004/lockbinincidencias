@@ -103,11 +103,10 @@ function renderMapa() {
     attribution: '&copy; OpenStreetMap'
   }).addTo(mapa);
 
-  const coordenadasRuta = [[LAT_OFICINA, LNG_OFICINA]];
+  const coordenadasRuta = ordenados.map(p => [p.lat, p.lng]); // sin la oficina — solo entre equipos
   marcadores = {};
 
   ordenados.forEach((p, idx) => {
-    coordenadasRuta.push([p.lat, p.lng]);
     const visitado = equipoVisitado(p.mc);
 
     const icono = L.divIcon({
@@ -126,24 +125,27 @@ function renderMapa() {
   // Ruta real por carretera (OSRM gratuito) en vez de línea recta.
   // Si el servicio público falla (puede pasar, es gratuito y sin garantía),
   // caemos de vuelta a una línea recta para que la app siga siendo útil.
+  // Si solo hay 1 equipo, no hay nada que conectar — nos saltamos el ruteo.
   if (rutaControl) { mapa.removeControl(rutaControl); rutaControl = null; }
 
-  try {
-    rutaControl = L.Routing.control({
-      waypoints: coordenadasRuta.map(c => L.latLng(c[0], c[1])),
-      routeWhileDragging: false,
-      addWaypoints: false,
-      draggableWaypoints: false,
-      show: false, // oculta el panel de instrucciones paso a paso, solo queremos la línea
-      createMarker: () => null, // los marcadores ya los ponemos nosotros arriba
-      lineOptions: { styles: [{ color: "#146c43", weight: 4 }] }
-    }).addTo(mapa);
+  if (coordenadasRuta.length >= 2) {
+    try {
+      rutaControl = L.Routing.control({
+        waypoints: coordenadasRuta.map(c => L.latLng(c[0], c[1])),
+        routeWhileDragging: false,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        show: false, // oculta el panel de instrucciones paso a paso, solo queremos la línea
+        createMarker: () => null, // los marcadores ya los ponemos nosotros arriba
+        lineOptions: { styles: [{ color: "#146c43", weight: 4 }] }
+      }).addTo(mapa);
 
-    rutaControl.on("routingerror", () => {
+      rutaControl.on("routingerror", () => {
+        dibujarLineaRectaDeRespaldo(coordenadasRuta);
+      });
+    } catch (e) {
       dibujarLineaRectaDeRespaldo(coordenadasRuta);
-    });
-  } catch (e) {
-    dibujarLineaRectaDeRespaldo(coordenadasRuta);
+    }
   }
 
   const bounds = L.latLngBounds(ordenados.map(p => [p.lat, p.lng]));
@@ -246,7 +248,7 @@ function cerrarModal() {
 function limpiarFormularioModal() {
   document.getElementById("modal-falla-select").value = "";
   document.getElementById("modal-falla-select").disabled = false;
-  document.getElementById("modal-accion-select").value = "";
+  document.querySelectorAll(".accion-check").forEach(c => { c.checked = false; });
   document.getElementById("modal-comentarios-input").value = "";
   document.getElementById("modal-estado-select").value = "";
   document.getElementById("modal-foto-input").value = "";
@@ -326,13 +328,13 @@ function serialViejoDe(codigo) {
 
 modalEnviarBtn.addEventListener("click", async () => {
   const falla = document.getElementById("modal-falla-select").value;
-  const accion = document.getElementById("modal-accion-select").value;
+  const accionesSeleccionadas = [...document.querySelectorAll(".accion-check:checked")].map(c => c.value);
   const comentarios = document.getElementById("modal-comentarios-input").value.trim();
   const estadoEquipo = document.getElementById("modal-estado-select").value;
   const fotoFile = document.getElementById("modal-foto-input").files[0];
 
   if (!falla) { mostrarMensaje(modalMsg, "⚠️ Selecciona la falla.", true); return; }
-  if (!accion) { mostrarMensaje(modalMsg, "⚠️ Selecciona la descripción de la acción.", true); return; }
+  if (accionesSeleccionadas.length === 0) { mostrarMensaje(modalMsg, "⚠️ Selecciona al menos una descripción de la acción.", true); return; }
   if (!estadoEquipo) { mostrarMensaje(modalMsg, "⚠️ Selecciona el estado final.", true); return; }
 
   const idOtActiva = sessionStorage.getItem("lockbin_ot_activa");
@@ -366,7 +368,7 @@ modalEnviarBtn.addEventListener("click", async () => {
   const idRegistro = ticketExistente || ("TK-" + equipoAbierto + "-" + Math.floor(Math.random() * 900 + 100));
 
   const partesResumen = [];
-  if (accion) partesResumen.push(accion);
+  if (accionesSeleccionadas.length > 0) partesResumen.push(accionesSeleccionadas.join(" + "));
   if (codigosCambio.length > 0) partesResumen.push("Cambio: " + codigosCambio.map(c => MAPA_COMPONENTE[c].nombre).join(", "));
   if (retiradoPorCliente) partesResumen.push("(retirado por el cliente)");
   if (codigosFaltantes.length > 0) partesResumen.push("Falta: " + codigosFaltantes.map(c => MAPA_COMPONENTE[c].nombre).join(", "));

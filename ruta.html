@@ -56,19 +56,18 @@
         <option>Otra (especificar en comentarios)</option>
       </select>
 
-      <label for="modal-accion-select">Descripción de la acción *</label>
-      <select id="modal-accion-select" required>
-        <option value="">— Selecciona —</option>
-        <option>Sin acción/Solo revisión</option>
-        <option>❌ No ubicado</option>
-        <option>⚙️ Requiere futuro cambio</option>
-        <option>⚡ Activación por medio de Tarjeta</option>
-        <option>💳 Reset del equipo con Tarjeta</option>
-        <option>💳 Reactivación por tarjeta check</option>
-        <option>🔋 Reset desconectando batería</option>
-        <option>🔋 Prueba con bat recargable OK</option>
-        <option>🔋 Prueba con bat recargable NO OK</option>
-      </select>
+      <fieldset class="grupo-checkbox">
+        <legend>Descripción de la acción * (puedes elegir varias)</legend>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="Sin acción/Solo revisión"> Sin acción/Solo revisión</label>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="❌ No ubicado"> ❌ No ubicado</label>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="⚙️ Requiere futuro cambio"> ⚙️ Requiere futuro cambio</label>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="⚡ Activación por medio de Tarjeta"> ⚡ Activación por medio de Tarjeta</label>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="💳 Reset del equipo con Tarjeta"> 💳 Reset del equipo con Tarjeta</label>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="💳 Reactivación por tarjeta check"> 💳 Reactivación por tarjeta check</label>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="🔋 Reset desconectando batería"> 🔋 Reset desconectando batería</label>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="🔋 Prueba con bat recargable OK"> 🔋 Prueba con bat recargable OK</label>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="🔋 Prueba con bat recargable NO OK"> 🔋 Prueba con bat recargable NO OK</label>
+      </fieldset>
       <fieldset class="grupo-checkbox">
         <legend>¿Se cambió algún componente?</legend>
         <label class="opcion-check"><input type="checkbox" id="modal-cambio-le"> Lector Electrónico (LE)</label>
