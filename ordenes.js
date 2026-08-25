@@ -88,7 +88,7 @@ function renderTabla() {
           <div class="barra-avance"><div class="barra-avance-relleno" style="width:${porcentaje}%"></div></div>
           <span class="avance-texto">${porcentaje}%</span>
         </td>
-        <td><a href="ot-detalle.html?ot=${r.ot.id_ot}" target="_blank">Ver →</a></td>
+        <td><a href="ot-detalle.html?ot=${r.ot.id_ot}">Ver →</a></td>
       </tr>
     `;
   }).join("");
