@@ -21,6 +21,7 @@ let marcadores = {}; // mc -> marcador de Leaflet
 let equiposPorMC = {}; // mc -> {equipo, tickets: [...]}
 let equipoAbierto = null; // mc actualmente mostrado en el modal
 let ticketExistente = null;
+let fallaActual = null; // falla del ticket elegido, o la seleccionada a mano si es nuevo
 let scanner = null;
 let serialesNuevos = {}; // codigo -> serial escaneado, se resetea por reporte
 
@@ -221,8 +222,8 @@ async function abrirModal(mc) {
     });
     document.getElementById("reportar-nuevo-btn").addEventListener("click", () => {
       ticketExistente = null;
+      fallaActual = null;
       limpiarFormularioModal();
-      document.getElementById("modal-falla-select").disabled = false;
       modalTickets.querySelectorAll(".ticket-btn").forEach(b => b.classList.remove("ticket-elegido"));
       modalForm.hidden = false;
     });
@@ -247,9 +248,17 @@ async function precargarTicket(idRegistro, btnElegido) {
   const info = equiposPorMC[equipoAbierto];
   const ticket = info.tickets.find(t => t.id_registro === idRegistro);
 
-  // Campos simples, directo del ticket
-  document.getElementById("modal-falla-select").value = ticket.falla || "";
-  document.getElementById("modal-falla-select").disabled = true;
+  // Campos simples, directo del ticket. La falla se muestra como texto
+  // fijo (no depende de que coincida con una opción del dropdown, que era
+  // justo el bug: fallas como "Batería Crítica" no estaban en la lista y
+  // la dejaban vacía, bloqueando el envío).
+  document.getElementById("modal-falla-label").hidden = true;
+  document.getElementById("modal-falla-select").hidden = true;
+  const fallaFija = document.getElementById("modal-falla-fija");
+  fallaFija.textContent = "Falla: " + (ticket.falla || "—");
+  fallaFija.hidden = false;
+  fallaActual = ticket.falla;
+
   document.getElementById("modal-comentarios-input").value = ticket.comentarios || "";
   document.getElementById("modal-estado-select").value = ticket.estado_equipo || "";
 
@@ -291,8 +300,10 @@ function cerrarModal() {
 }
 
 function limpiarFormularioModal() {
+  document.getElementById("modal-falla-label").hidden = false;
+  document.getElementById("modal-falla-select").hidden = false;
   document.getElementById("modal-falla-select").value = "";
-  document.getElementById("modal-falla-select").disabled = false;
+  document.getElementById("modal-falla-fija").hidden = true;
   document.querySelectorAll(".accion-check").forEach(c => { c.checked = false; });
   document.getElementById("modal-comentarios-input").value = "";
   document.getElementById("modal-estado-select").value = "";
@@ -372,7 +383,10 @@ function serialViejoDe(codigo) {
 }
 
 modalEnviarBtn.addEventListener("click", async () => {
-  const falla = document.getElementById("modal-falla-select").value;
+  const fallaSeleccionUsuario = document.getElementById("modal-falla-select").value;
+  if (!ticketExistente) fallaActual = fallaSeleccionUsuario;
+  const falla = fallaActual;
+
   const accionesSeleccionadas = [...document.querySelectorAll(".accion-check:checked")].map(c => c.value);
   const comentarios = document.getElementById("modal-comentarios-input").value.trim();
   const estadoEquipo = document.getElementById("modal-estado-select").value;
@@ -412,9 +426,15 @@ modalEnviarBtn.addEventListener("click", async () => {
 
   const idRegistro = ticketExistente || ("TK-" + equipoAbierto + "-" + Math.floor(Math.random() * 900 + 100));
 
+  // Si un componente está marcado como "cambio" Y "falta" a la vez (llegó
+  // sin el viejo, pero se instaló uno nuevo), lo tratamos solo como
+  // Faltante (con el serial nuevo adjunto) — no como un "cambio" con pieza
+  // vieja pendiente de revisar, porque esa pieza vieja nunca existió.
+  const codigosCambioReal = codigosCambio.filter(c => !codigosFaltantes.includes(c));
+
   const partesResumen = [];
   if (accionesSeleccionadas.length > 0) partesResumen.push(accionesSeleccionadas.join(" + "));
-  if (codigosCambio.length > 0) partesResumen.push("Cambio: " + codigosCambio.map(c => MAPA_COMPONENTE[c].nombre).join(", "));
+  if (codigosCambioReal.length > 0) partesResumen.push("Cambio: " + codigosCambioReal.map(c => MAPA_COMPONENTE[c].nombre).join(", "));
   if (retiradoPorCliente) partesResumen.push("(retirado por el cliente)");
   if (codigosFaltantes.length > 0) partesResumen.push("Falta: " + codigosFaltantes.map(c => MAPA_COMPONENTE[c].nombre).join(", "));
   if (esVandalismo) partesResumen.push("Vandalismo/robo");
@@ -432,6 +452,9 @@ modalEnviarBtn.addEventListener("click", async () => {
   // Solo tocamos link_foto si esta vez se subió una foto nueva —
   // si no, dejamos la que ya hubiera guardada de una edición anterior.
   if (linkFoto) datosFalla.link_foto = linkFoto;
+
+  const nuevosSeriales = Object.values(serialesNuevos).filter(Boolean);
+  if (nuevosSeriales.length > 0) datosFalla.nuevo_serial = nuevosSeriales.join(", ");
 
   let errorFalla;
   if (ticketExistente) {
@@ -462,7 +485,7 @@ modalEnviarBtn.addEventListener("click", async () => {
   const tiposYaFalta = new Set((yaRegistrados || []).filter(c => c.estado === "Faltante/Perdido").map(c => c.tipo_componente));
 
   const filasComponentes = [];
-  codigosCambio.forEach(codigo => {
+  codigosCambioReal.forEach(codigo => {
     if (tiposYaCambio.has(MAPA_COMPONENTE[codigo].nombre)) return;
     filasComponentes.push({
       cliente: equiposPorMC[equipoAbierto].equipo.cliente, m_control: equipoAbierto,
@@ -477,6 +500,7 @@ modalEnviarBtn.addEventListener("click", async () => {
     filasComponentes.push({
       cliente: equiposPorMC[equipoAbierto].equipo.cliente, m_control: equipoAbierto,
       tipo_componente: MAPA_COMPONENTE[codigo].nombre, serial_retirado: serialViejoDe(codigo),
+      serial_nuevo: serialesNuevos[codigo] || null, // si se instaló uno nuevo en su lugar
       id_registro: idRegistro, id_ot: idOtActiva, estado: "Faltante/Perdido", excluir_materiales: true
     });
   });
