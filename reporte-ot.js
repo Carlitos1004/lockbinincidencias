@@ -133,22 +133,61 @@ function llenarTabla(idTabla, filas) {
 document.getElementById("descargar-excel-btn").addEventListener("click", () => {
   if (!reporteActual) return;
   const r = reporteActual;
-  const libro = XLSX.utils.book_new();
+  const filas = []; // arreglo único de filas — todo va en UNA sola hoja
 
-  const hoja = (nombre, encabezados, filas) => {
-    const datos = [encabezados, ...filas];
-    XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(datos), nombre);
+  const titulo = (texto) => { filas.push([texto]); };
+  const encabezados = (arr) => { filas.push(arr); };
+  const filaDatos = (arr) => { filas.push(arr); };
+  const espacio = () => { filas.push([]); };
+
+  const seccion = (nombreTitulo, cabeceras, datos, mensajeVacio) => {
+    titulo(nombreTitulo);
+    if (datos.length > 0) {
+      encabezados(cabeceras);
+      datos.forEach(filaDatos);
+    } else {
+      filaDatos([mensajeVacio || "(sin datos)"]);
+    }
+    espacio();
   };
 
-  hoja("Info", ["OT", "Cliente", "Fecha", "Total equipos"], [[r.idOt, r.cliente, new Date(r.fecha).toLocaleDateString("es-ES"), r.totalEquipos]]);
-  hoja("Estado Final", ["Estado", "Cantidad"], r.estadoFinal);
-  hoja("Equipos Recibidos", ["Módulo", "Acción en calle", "Comentarios"], r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
-  hoja("Componentes Cambiados", ["Módulo", "Tipo", "Serial", "Destino"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_retirado, c.destino || ""]));
-  hoja("Materiales", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales.map(m => [m.tipo_componente, m.llevados, m.utilizados, m.vuelven]));
-  hoja("Fallas y Revisión", ["Módulo", "Serial", "Destino", "Hallazgo"], r.fallasRevision.map(c => [c.m_control, c.serial_retirado, c.destino || "", c.reparacion]));
-  hoja("Garantías", ["Módulo", "Dispositivo", "Falla", "Garantía"], r.garantias.map(g => [g.m_control, g.dispositivo_danado, g.falla, g.garantia]));
-  hoja("Stock Destino", ["Destino", "Cantidad", "Desglose"], r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
+  titulo("REPORTE DE ORDEN DE TRABAJO — " + r.idOt);
+  filaDatos(["Cliente:", r.cliente]);
+  filaDatos(["Fecha:", new Date(r.fecha).toLocaleDateString("es-ES")]);
+  filaDatos(["Total de equipos:", r.totalEquipos]);
+  espacio();
 
+  seccion("RESUMEN DE ESTADO FINAL", ["Estado", "Cantidad"], r.estadoFinal);
+
+  seccion("RESUMEN DE EQUIPOS RECIBIDOS",
+    ["Módulo", "Acción en calle", "Comentarios"],
+    r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
+
+  seccion("CAMBIOS DE COMPONENTES REALIZADOS",
+    ["Módulo", "Tipo", "Serial", "Destino"],
+    r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_retirado, c.destino || ""]));
+
+  seccion("CONTROL DE MATERIALES",
+    ["Tipo", "Llevados", "Utilizados", "Vuelven"],
+    r.materiales.map(m => [m.tipo_componente, m.llevados, m.utilizados, m.vuelven]));
+
+  seccion("RESUMEN DE FALLAS Y REVISIÓN",
+    ["Módulo", "Serial", "Destino", "Hallazgo"],
+    r.fallasRevision.map(c => [c.m_control, c.serial_retirado, c.destino || "", c.reparacion]));
+
+  seccion("CONTROL DE GARANTÍAS",
+    ["Módulo", "Dispositivo", "Falla", "Garantía"],
+    r.garantias.map(g => [g.m_control, g.dispositivo_danado, g.falla, g.garantia]));
+
+  seccion("CONTROL STOCK DE DESTINO",
+    ["Destino", "Cantidad", "Desglose"],
+    r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
+
+  const hoja = XLSX.utils.aoa_to_sheet(filas);
+  hoja["!cols"] = [{ wch: 26 }, { wch: 26 }, { wch: 22 }, { wch: 34 }];
+
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Reporte");
   XLSX.writeFile(libro, r.idOt + "_reporte.xlsx");
 });
 

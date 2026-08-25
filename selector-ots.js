@@ -1,13 +1,13 @@
 // =========================================================================
-// SELECTOR DE OT — llena un <datalist id="lista-ots"> con "OT-005 — Cliente"
-// para que cualquier <input list="lista-ots"> tenga autocompletado nativo
-// del navegador, buscable por número de OT o por cliente.
-// Se usa en varias páginas (ruta, materiales, ot-detalle, tecnico).
+// SELECTOR DE OT — autocompletado propio (no usa <datalist>, que muchos
+// navegadores de celular no muestran) para cualquier input con
+// list="lista-ots" en la página. Escribes, filtra por número de OT o
+// cliente, tocas una opción para elegirla.
 // =========================================================================
 
 async function llenarListaDeOTs() {
-  const datalist = document.getElementById("lista-ots");
-  if (!datalist) return;
+  const inputs = document.querySelectorAll('input[list="lista-ots"]');
+  if (inputs.length === 0) return;
 
   const { data: ots } = await supabaseClient
     .from("ordenes_trabajo")
@@ -25,10 +25,77 @@ async function llenarListaDeOTs() {
     clientesPorOt[t.id_ot].add(t.cliente);
   });
 
-  datalist.innerHTML = (ots || []).map(ot => {
+  const opciones = (ots || []).map(ot => {
     const clientes = clientesPorOt[ot.id_ot] ? [...clientesPorOt[ot.id_ot]].join(", ") : "";
-    return `<option value="${ot.id_ot}">${clientes ? ot.id_ot + " — " + clientes : ot.id_ot}</option>`;
-  }).join("");
+    return {
+      id_ot: ot.id_ot,
+      etiqueta: clientes ? `${ot.id_ot} — ${clientes}` : ot.id_ot,
+      busqueda: (ot.id_ot + " " + clientes).toLowerCase()
+    };
+  });
+
+  inputs.forEach(input => activarAutocompleteOT(input, opciones));
+}
+
+function activarAutocompleteOT(input, opciones) {
+  input.removeAttribute("list"); // ya no dependemos del datalist nativo
+  input.autocomplete = "off";
+
+  const lista = document.createElement("div");
+  lista.className = "autocomplete-ot-lista";
+  lista.hidden = true;
+  document.body.appendChild(lista);
+
+  function posicionar() {
+    const r = input.getBoundingClientRect();
+    lista.style.left = (r.left + window.scrollX) + "px";
+    lista.style.top = (r.bottom + window.scrollY + 4) + "px";
+    lista.style.width = Math.max(r.width, 220) + "px";
+  }
+
+  function render(filtro) {
+    const texto = filtro.trim().toLowerCase();
+    const filtradas = texto
+      ? opciones.filter(o => o.busqueda.includes(texto)).slice(0, 8)
+      : opciones.slice(0, 8);
+
+    if (filtradas.length === 0) { lista.hidden = true; return; }
+
+    posicionar();
+    lista.innerHTML = filtradas.map(o =>
+      `<div class="autocomplete-ot-item" data-valor="${escaparAtributoOT(o.id_ot)}">${escaparAtributoOT(o.etiqueta)}</div>`
+    ).join("");
+    lista.hidden = false;
+
+    lista.querySelectorAll(".autocomplete-ot-item").forEach(item => {
+      // mousedown (no click) para que dispare ANTES de que el input pierda foco
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        input.value = item.dataset.valor;
+        lista.hidden = true;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      // también soporta touch directo en móvil
+      item.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        input.value = item.dataset.valor;
+        lista.hidden = true;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    });
+  }
+
+  input.addEventListener("focus", () => render(input.value));
+  input.addEventListener("input", () => render(input.value));
+  input.addEventListener("blur", () => { setTimeout(() => { lista.hidden = true; }, 200); });
+  window.addEventListener("scroll", () => { if (!lista.hidden) posicionar(); }, true);
+  window.addEventListener("resize", () => { if (!lista.hidden) posicionar(); });
+}
+
+function escaparAtributoOT(texto) {
+  const div = document.createElement("div");
+  div.textContent = texto;
+  return div.innerHTML.replace(/"/g, "&quot;");
 }
 
 llenarListaDeOTs();

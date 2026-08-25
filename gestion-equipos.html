@@ -20,7 +20,7 @@
 </div>
 
 <div class="panel-body panel-body-ancho">
-  <p><a href="admin.html">← Volver al panel</a></p>
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
 
   <h2>1. Filtrar equipos con fallas</h2>
   <div class="materiales-controles">
@@ -35,7 +35,7 @@
     <label class="opcion-check"><input type="checkbox" id="estado-pendiente"> Pendiente (aún sin instalar)</label>
   </fieldset>
 
-  <button id="filtrar-btn">Filtrar equipos con fallas</button>
+  <button id="filtrar-btn" class="btn-primario">Filtrar equipos con fallas</button>
 
   <p id="filtrar-msg" class="resultado-msg" hidden></p>
 
@@ -58,7 +58,7 @@
     <label for="manuales-textarea"><strong>Equipos adicionales</strong> (que no salieron en el filtro — uno por línea o separados por coma)</label>
     <textarea id="manuales-textarea" rows="2" placeholder="MC2500001, MC2500002..." style="width:100%;max-width:500px;padding:9px;border:1.5px solid var(--gris-200);border-radius:8px;margin:6px 0 14px;"></textarea>
 
-    <button id="generar-btn">Generar OT con los equipos seleccionados</button>
+    <button id="generar-btn" class="btn-primario">Generar OT con los equipos seleccionados</button>
     <p id="generar-msg" class="resultado-msg" hidden></p>
   </div>
 </div>
