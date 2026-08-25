@@ -177,7 +177,17 @@ async function guardarFila(btn) {
     }
   }
 
-  // 4. Recalculamos materiales de esa OT (por si acaso)
+  // 4. Reflejamos el resultado de la revisión en el ticket de historial_fallas
+  //    correspondiente (antes esto no se estaba guardando ahí, solo en
+  //    componentes_retirados).
+  if (componente.id_registro) {
+    await supabaseClient
+      .from("historial_fallas")
+      .update({ destino: destino, estatus_revision: nuevoEstado })
+      .eq("id_registro", componente.id_registro);
+  }
+
+  // 5. Recalculamos materiales de esa OT (por si acaso)
   if (componente.id_ot) {
     await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: componente.id_ot });
   }
