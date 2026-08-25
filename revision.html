@@ -18,7 +18,8 @@
 
   <h2>Buscar por OT</h2>
   <div class="materiales-controles">
-    <input type="text" id="ot-input" placeholder="Ej: OT-005">
+    <input type="text" id="ot-input" placeholder="Ej: OT-005" list="lista-ots">
+    <datalist id="lista-ots"></datalist>
     <button id="buscar-btn">Buscar</button>
   </div>
 
@@ -44,6 +45,7 @@
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "manager";</script>
 <script src="sesion.js"></script>
+<script src="selector-ots.js"></script>
 <script src="revision.js"></script>
 </body>
 </html>

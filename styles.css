@@ -807,3 +807,26 @@ body {
   color: var(--gris-700);
   margin-left: 6px;
 }
+
+/* --- Inventario --- */
+
+.fila-clicable {
+  cursor: pointer;
+}
+
+.fila-clicable:hover {
+  background: var(--gris-100);
+}
+
+.fila-seleccionada {
+  background: var(--verde-claro) !important;
+}
+
+.input-observacion, .input-imagen {
+  width: 100%;
+  min-width: 140px;
+  padding: 6px 8px;
+  border: 1px solid var(--gris-200);
+  border-radius: 6px;
+  font-size: 0.82rem;
+}

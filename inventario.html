@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Inventario por Destino</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <h1>LockBin · Inventario por Destino</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <p><a href="admin.html">← Volver al panel</a></p>
+  <p>Todos los componentes retirados hasta ahora, agrupados por a dónde fueron — para saber cuánto stock hay en cada sitio sin tener que revisar OT por OT.</p>
+
+  <div class="materiales-controles">
+    <select id="filtro-tipo">
+      <option value="">Todos los tipos de componente</option>
+      <option value="Lector Electrónico">Lector Electrónico (LE)</option>
+      <option value="Cierre Electrónico">Cierre Electrónico (CE)</option>
+      <option value="Batería">Batería (BA)</option>
+      <option value="Módulo de Control">Módulo de Control (MC)</option>
+    </select>
+    <input type="text" id="filtro-cliente" placeholder="Filtrar por cliente...">
+  </div>
+
+  <h2 style="margin-top:24px;">Resumen por destino</h2>
+  <table class="tabla-revision" id="tabla-resumen">
+    <thead><tr><th>Destino</th><th>Cantidad</th><th>Desglose por tipo</th></tr></thead>
+    <tbody id="resumen-tbody"><tr><td colspan="3">Cargando...</td></tr></tbody>
+  </table>
+
+  <h2 style="margin-top:28px;">Detalle (haz clic en un destino arriba para filtrar)</h2>
+  <table class="tabla-revision" id="tabla-detalle">
+    <thead><tr><th>Fecha</th><th>OT</th><th>Cliente</th><th>Módulo</th><th>Tipo</th><th>Serial</th><th>Estado</th><th>Destino</th></tr></thead>
+    <tbody id="detalle-tbody"></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROLES_PERMITIDOS = ["manager", "operario"];</script>
+<script src="sesion-multi.js"></script>
+<script src="inventario.js"></script>
+</body>
+</html>

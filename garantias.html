@@ -17,7 +17,8 @@
   <p><a href="admin.html">← Volver al panel</a></p>
 
   <div class="materiales-controles">
-    <input type="text" id="filtro-input" placeholder="Buscar por OT, cliente o módulo...">
+    <input type="text" id="filtro-input" placeholder="Buscar por OT, cliente o módulo..." list="lista-ots">
+    <datalist id="lista-ots"></datalist>
     <select id="filtro-garantia">
       <option value="todas">Todas</option>
       <option value="SI">Con garantía (SI)</option>
@@ -42,6 +43,7 @@
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "manager";</script>
 <script src="sesion.js"></script>
+<script src="selector-ots.js"></script>
 <script src="garantias.js"></script>
 </body>
 </html>
