@@ -13,14 +13,32 @@
   <button id="logout-btn">Cerrar sesión</button>
 </div>
 
-<div class="panel-body">
-  <h2>Bienvenido, <span id="nombre-usuario">—</span></h2>
-  <p>Entraste con el rol <strong>Cliente</strong>. Aquí vas a poder ver el estado de tus equipos, filtrado solo a los tuyos.</p>
+<div class="panel-body panel-body-ancho">
+  <h2>Hola, <span id="nombre-usuario">—</span></h2>
+  <p id="cliente-meta" class="ot-meta"></p>
+
+  <div class="resumen-cliente" id="resumen-cliente"></div>
+
+  <h2 style="margin-top:32px;">Tus equipos</h2>
+  <div class="materiales-controles">
+    <input type="text" id="filtro-equipos" placeholder="Buscar por módulo o fracción...">
+  </div>
+  <table class="tabla-revision" id="tabla-equipos-cliente">
+    <thead><tr><th>Módulo</th><th>Fracción</th><th>Estado</th><th>Alarmas activas</th><th>Última comunicación</th></tr></thead>
+    <tbody id="equipos-cliente-tbody"><tr><td colspan="5">Cargando...</td></tr></tbody>
+  </table>
+
+  <h2 style="margin-top:32px;">Historial de fallas y reparaciones</h2>
+  <table class="tabla-revision" id="tabla-historial-cliente">
+    <thead><tr><th>Fecha</th><th>Módulo</th><th>Falla</th><th>Estado</th><th>Acción / Comentarios</th></tr></thead>
+    <tbody id="historial-cliente-tbody"><tr><td colspan="5">Cargando...</td></tr></tbody>
+  </table>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "cliente";</script>
 <script src="sesion.js"></script>
+<script src="cliente.js"></script>
 </body>
 </html>

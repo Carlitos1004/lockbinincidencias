@@ -822,6 +822,43 @@ body {
   background: var(--verde-claro) !important;
 }
 
+/* --- Panel del cliente --- */
+
+.resumen-cliente {
+  display: flex;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.tarjeta-resumen {
+  background: var(--gris-100);
+  border-radius: 10px;
+  padding: 16px 22px;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+}
+
+.tarjeta-resumen strong {
+  font-size: 1.8rem;
+  color: var(--verde-oscuro);
+  font-family: var(--fuente-mono);
+}
+
+.tarjeta-resumen span {
+  font-size: 0.8rem;
+  color: var(--gris-700);
+  margin-top: 4px;
+}
+
+.tarjeta-alerta {
+  background: var(--ambar-bg);
+}
+
+.tarjeta-alerta strong {
+  color: var(--ambar);
+}
+
 .input-observacion, .input-imagen {
   width: 100%;
   min-width: 140px;
