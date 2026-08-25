@@ -12,29 +12,89 @@
 <body>
 
 <div class="panel-header">
-  <h1>LockBin · Manager</h1>
+  <div class="panel-header-marca">
+    <img src="assets/logo-lockbin.jpg" alt="LockBin" class="panel-logo">
+    <h1>Manager</h1>
+  </div>
   <button id="logout-btn">Cerrar sesión</button>
 </div>
 
-<div class="panel-body">
-  <h2>Bienvenido, <span id="nombre-usuario">—</span></h2>
-  <p>Entraste con el rol <strong>Manager</strong>. Desde aquí vamos a construir: gestión de equipos, órdenes de trabajo, historial de fallas, componentes retirados, materiales y garantías.</p>
+<div class="panel-body panel-body-ancho">
+  <h2>Hola, <span id="nombre-usuario">—</span></h2>
 
-  <p><a href="ordenes.html">→ Todas las OT (estado y avance)</a></p>
-  <p><a href="ruta.html">→ Ruta (ver/editar como lo hace el operario)</a></p>
-  <p><a href="gestion-equipos.html">→ Gestión de Equipos (filtrar por cliente y generar OT)</a></p>
-  <p><a href="equipos.html">→ Equipos (subir/actualizar lista)</a></p>
-  <p><a href="materiales.html">→ Materiales (llevados/utilizados/vuelven por OT)</a></p>
-  <p><a href="ot-detalle.html">→ Ver detalle de una OT (instrucciones, ruta, descargar)</a></p>
-  <p><a href="reporte-ot.html">→ Reporte de Cierre de OT (PDF/Excel)</a></p>
-  <p><a href="inventario.html">→ Inventario por Destino (stock de componentes)</a></p>
-  <p><a href="garantias.html">→ Garantías (consultar y editar)</a></p>
-  <p><a href="revision.html">→ Revisión de Taller (asignar Destino a componentes)</a></p>
+  <div class="resumen-cliente" id="resumen-dashboard">
+    <div class="tarjeta-resumen"><strong>—</strong><span>OT con pendientes</span></div>
+    <div class="tarjeta-resumen"><strong>—</strong><span>Equipos con alarma activa</span></div>
+    <div class="tarjeta-resumen"><strong>—</strong><span>Componentes en Pendiente revisión</span></div>
+  </div>
+
+  <h3 class="seccion-dashboard">Operación diaria</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="ordenes.html">
+      <span class="tarjeta-nav-icono">📋</span>
+      <span class="tarjeta-nav-titulo">Todas las OT</span>
+      <span class="tarjeta-nav-desc">Estado y avance de cada orden de trabajo</span>
+    </a>
+    <a class="tarjeta-nav" href="ruta.html">
+      <span class="tarjeta-nav-icono">🗺️</span>
+      <span class="tarjeta-nav-titulo">Ruta</span>
+      <span class="tarjeta-nav-desc">Ver/editar como lo hace el operario</span>
+    </a>
+    <a class="tarjeta-nav" href="gestion-equipos.html">
+      <span class="tarjeta-nav-icono">⚙️</span>
+      <span class="tarjeta-nav-titulo">Gestión de Equipos</span>
+      <span class="tarjeta-nav-desc">Filtrar por cliente y generar una OT nueva</span>
+    </a>
+    <a class="tarjeta-nav" href="ot-detalle.html">
+      <span class="tarjeta-nav-icono">📄</span>
+      <span class="tarjeta-nav-titulo">Detalle de una OT</span>
+      <span class="tarjeta-nav-desc">Instrucciones, ruta y descarga editable</span>
+    </a>
+  </div>
+
+  <h3 class="seccion-dashboard">Datos e inventario</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="equipos.html">
+      <span class="tarjeta-nav-icono">📦</span>
+      <span class="tarjeta-nav-titulo">Equipos</span>
+      <span class="tarjeta-nav-desc">Subir/actualizar la lista completa</span>
+    </a>
+    <a class="tarjeta-nav" href="materiales.html">
+      <span class="tarjeta-nav-icono">🔩</span>
+      <span class="tarjeta-nav-titulo">Materiales</span>
+      <span class="tarjeta-nav-desc">Llevados / utilizados / vuelven por OT</span>
+    </a>
+    <a class="tarjeta-nav" href="inventario.html">
+      <span class="tarjeta-nav-icono">🗃️</span>
+      <span class="tarjeta-nav-titulo">Inventario por Destino</span>
+      <span class="tarjeta-nav-desc">Stock de componentes retirados</span>
+    </a>
+  </div>
+
+  <h3 class="seccion-dashboard">Cierre y control</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="revision.html">
+      <span class="tarjeta-nav-icono">🔍</span>
+      <span class="tarjeta-nav-titulo">Revisión de Taller</span>
+      <span class="tarjeta-nav-desc">Asignar Destino a componentes</span>
+    </a>
+    <a class="tarjeta-nav" href="garantias.html">
+      <span class="tarjeta-nav-icono">🛡️</span>
+      <span class="tarjeta-nav-titulo">Garantías</span>
+      <span class="tarjeta-nav-desc">Consultar y editar</span>
+    </a>
+    <a class="tarjeta-nav" href="reporte-ot.html">
+      <span class="tarjeta-nav-icono">🧾</span>
+      <span class="tarjeta-nav-titulo">Reporte de Cierre de OT</span>
+      <span class="tarjeta-nav-desc">Descarga en PDF o Excel</span>
+    </a>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "manager";</script>
 <script src="sesion.js"></script>
+<script src="admin.js"></script>
 </body>
 </html>
