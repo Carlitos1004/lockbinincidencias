@@ -59,6 +59,14 @@ filtrarBtn.addEventListener("click", async () => {
     return;
   }
 
+  const incluirInstalado = document.getElementById("estado-instalado").checked;
+  const incluirPendiente = document.getElementById("estado-pendiente").checked;
+
+  if (!incluirInstalado && !incluirPendiente) {
+    mostrarMensaje(filtrarMsg, "⚠️ Elige al menos un estado de montaje (Instalado y/o Pendiente).", true);
+    return;
+  }
+
   filtrarBtn.disabled = true;
   filtrarBtn.textContent = "Filtrando...";
 
@@ -78,12 +86,14 @@ filtrarBtn.addEventListener("click", async () => {
   equiposEncontrados = (data || [])
     .filter(eq => {
       const estado = String(eq.estado_montaje || "").toLowerCase();
-      return estado.includes("instala") || estado.includes("pendien");
+      const esInstalado = estado.includes("instala");
+      const esPendiente = estado.includes("pendien");
+      return (esInstalado && incluirInstalado) || (esPendiente && incluirPendiente);
     })
     .map(eq => {
       const fallas = Object.keys(MAPA_ALARMAS).filter(col => eq[col]).map(col => MAPA_ALARMAS[col]);
       if (bateriaCritica(eq.lecturas_bateria)) fallas.push("Batería Crítica (<6.4V)");
-      return { m_control: eq.m_control, fraccion: eq.fraccion, cliente: eq.cliente, fallas };
+      return { m_control: eq.m_control, fraccion: eq.fraccion, cliente: eq.cliente, estado_montaje: eq.estado_montaje, fallas };
     })
     .filter(eq => eq.fallas.length > 0);
 
@@ -110,6 +120,7 @@ function renderTabla() {
     <tr>
       <td><input type="checkbox" class="check-equipo" data-idx="${idx}" checked></td>
       <td>${eq.m_control}</td>
+      <td>${eq.estado_montaje || "—"}</td>
       <td>${eq.fraccion || "—"}</td>
       <td>${eq.fallas.join(", ")}</td>
     </tr>

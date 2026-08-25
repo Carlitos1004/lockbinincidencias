@@ -21,8 +21,15 @@
     <select id="cliente-select">
       <option value="">Cargando clientes...</option>
     </select>
-    <button id="filtrar-btn">Filtrar equipos con fallas</button>
   </div>
+
+  <fieldset class="grupo-checkbox">
+    <legend>Estado de montaje a incluir</legend>
+    <label class="opcion-check"><input type="checkbox" id="estado-instalado" checked> Instalado</label>
+    <label class="opcion-check"><input type="checkbox" id="estado-pendiente"> Pendiente (aún sin instalar)</label>
+  </fieldset>
+
+  <button id="filtrar-btn">Filtrar equipos con fallas</button>
 
   <p id="filtrar-msg" class="resultado-msg" hidden></p>
 
@@ -35,7 +42,7 @@
 
     <table class="tabla-revision" id="tabla-equipos">
       <thead>
-        <tr><th></th><th>Módulo</th><th>Fracción</th><th>Fallas detectadas</th></tr>
+        <tr><th></th><th>Módulo</th><th>Estado</th><th>Fracción</th><th>Fallas detectadas</th></tr>
       </thead>
       <tbody id="equipos-tbody"></tbody>
     </table>
