@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Gestión de Equipos</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <h1>LockBin · Gestión de Equipos</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <p><a href="admin.html">← Volver al panel</a></p>
+
+  <h2>1. Filtrar equipos con fallas</h2>
+  <div class="materiales-controles">
+    <select id="cliente-select">
+      <option value="">Cargando clientes...</option>
+    </select>
+    <button id="filtrar-btn">Filtrar equipos con fallas</button>
+  </div>
+
+  <p id="filtrar-msg" class="resultado-msg" hidden></p>
+
+  <div id="resultado-filtro" hidden>
+    <h2 style="margin-top:28px;">2. Selecciona los equipos para la OT</h2>
+    <div class="seleccion-controles">
+      <label><input type="checkbox" id="check-todos" checked> Seleccionar / deseleccionar todos</label>
+      <span id="total-encontrados"></span>
+    </div>
+
+    <table class="tabla-revision" id="tabla-equipos">
+      <thead>
+        <tr><th></th><th>Módulo</th><th>Fracción</th><th>Fallas detectadas</th></tr>
+      </thead>
+      <tbody id="equipos-tbody"></tbody>
+    </table>
+
+    <h2 style="margin-top:28px;">3. Generar la Orden de Trabajo</h2>
+    <button id="generar-btn">Generar OT con los equipos seleccionados</button>
+    <p id="generar-msg" class="resultado-msg" hidden></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="gestion-equipos.js"></script>
+</body>
+</html>

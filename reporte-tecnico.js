@@ -45,17 +45,63 @@ async function buscarEquipo() {
   document.getElementById("eq-cliente").textContent = data.cliente || "—";
   document.getElementById("eq-fraccion").textContent = data.fraccion || "—";
 
+  // Buscamos si ya hay tickets abiertos para este equipo, dentro de la OT activa
+  await mostrarTicketsAbiertos(mc);
+
   pasoBuscar.hidden = true;
   pasoReporte.hidden = false;
   reporteMsg.hidden = true;
+}
+
+let ticketExistente = null; // si el operario elige uno abierto, aquí queda su id_registro
+
+async function mostrarTicketsAbiertos(mc) {
+  const contenedor = document.getElementById("tickets-abiertos");
+  ticketExistente = null;
+  contenedor.innerHTML = "";
+  contenedor.hidden = true;
+
+  const idOt = otActiva();
+  if (!idOt) return;
+
+  const { data, error } = await supabaseClient
+    .from("historial_fallas")
+    .select("id_registro, falla")
+    .eq("m_control", mc)
+    .eq("id_ot", idOt)
+    .eq("estado", "🚨 ABIERTO");
+
+  if (error || !data || data.length === 0) return;
+
+  contenedor.hidden = false;
+  contenedor.innerHTML = `<p class="tickets-titulo">Ya hay ${data.length} ticket(s) abierto(s) para este equipo en esta OT — elige uno para cerrarlo, o reporta algo nuevo abajo:</p>` +
+    data.map(t => `
+      <button type="button" class="ticket-btn" data-id="${t.id_registro}">
+        🚨 ${t.falla} (${t.id_registro})
+      </button>
+    `).join("");
+
+  contenedor.querySelectorAll(".ticket-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      ticketExistente = btn.dataset.id;
+      contenedor.querySelectorAll(".ticket-btn").forEach(b => b.classList.remove("ticket-elegido"));
+      btn.classList.add("ticket-elegido");
+      document.getElementById("falla-select").value =
+        btn.textContent.replace("🚨", "").split("(")[0].trim();
+      document.getElementById("falla-select").disabled = true;
+    });
+  });
 }
 
 cancelarBtn.addEventListener("click", limpiarFormulario);
 
 function limpiarFormulario() {
   equipoActual = null;
+  ticketExistente = null;
   mcInput.value = "";
   document.getElementById("falla-select").value = "";
+  document.getElementById("falla-select").disabled = false;
+  document.getElementById("tickets-abiertos").hidden = true;
   document.getElementById("accion-input").value = "";
   document.getElementById("comentarios-input").value = "";
   document.querySelectorAll('input[name="estado_equipo"]').forEach(r => r.checked = false);
@@ -107,7 +153,7 @@ enviarBtn.addEventListener("click", async () => {
 
   const { data: { user } } = await supabaseClient.auth.getUser();
   const estadoEquipo = estadoEquipoRadio.value;
-  const idRegistro = "TK-" + equipoActual.m_control + "-" + Math.floor(Math.random() * 900 + 100);
+  const idRegistro = ticketExistente || ("TK-" + equipoActual.m_control + "-" + Math.floor(Math.random() * 900 + 100));
 
   // Construimos un resumen legible de la acción, para dejar registro en el ticket
   const partesResumen = [];
@@ -120,22 +166,35 @@ enviarBtn.addEventListener("click", async () => {
 
   let comentariosFinal = comentarios;
 
-  // --- 1. Crear el ticket en historial_fallas ---
-  const nuevaFalla = {
-    id_registro: idRegistro,
-    cliente: equipoActual.cliente,
-    m_control: equipoActual.m_control,
-    falla: falla,
+  // --- 1. Ticket en historial_fallas: actualiza si ya existía, o crea uno nuevo ---
+  const datosFalla = {
     estado: estadoEquipo === "🟢 FUNCIONANDO" ? "✅ CERRADO" : "🚨 ABIERTO",
     accion_calle: accionResumen,
     comentarios: comentariosFinal,
     estado_equipo: estadoEquipo,
     fecha_cierre: estadoEquipo === "🟢 FUNCIONANDO" ? new Date().toISOString() : null,
-    origen: user.email,
-    id_ot: idOtActiva
+    origen: user.email
   };
 
-  const { error: errorFalla } = await supabaseClient.from("historial_fallas").insert(nuevaFalla);
+  let errorFalla;
+  if (ticketExistente) {
+    ({ error: errorFalla } = await supabaseClient
+      .from("historial_fallas")
+      .update(datosFalla)
+      .eq("id_registro", ticketExistente));
+  } else {
+    ({ error: errorFalla } = await supabaseClient
+      .from("historial_fallas")
+      .insert({
+        id_registro: idRegistro,
+        cliente: equipoActual.cliente,
+        m_control: equipoActual.m_control,
+        falla: falla,
+        id_ot: idOtActiva,
+        ...datosFalla
+      }));
+  }
+
   if (errorFalla) {
     enviarBtn.disabled = false;
     enviarBtn.textContent = "Enviar reporte";
