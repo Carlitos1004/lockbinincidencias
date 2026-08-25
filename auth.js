@@ -56,7 +56,7 @@ async function redirigirSegunRol(userId) {
   if (perfil.rol === "manager") {
     window.location.href = "admin.html";
   } else if (perfil.rol === "operario") {
-    window.location.href = "tecnico.html";
+    window.location.href = "ruta.html";
   } else if (perfil.rol === "cliente") {
     window.location.href = "cliente.html";
   } else {

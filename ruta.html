@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Ruta</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <h1>LockBin · Ruta</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="ruta-selector">
+  <input type="text" id="ot-input" placeholder="Nº de OT (ej. OT-005)">
+  <button id="cargar-ruta-btn">Cargar ruta</button>
+  <a href="tecnico.html" class="link-manual">Buscar equipo manualmente en su lugar →</a>
+</div>
+
+<p id="ruta-msg" class="resultado-msg" hidden></p>
+
+<div id="mapa" class="mapa-contenedor"></div>
+
+<div id="leyenda" class="leyenda-mapa" hidden>
+  <span><span class="punto punto-naranja"></span> Pendiente</span>
+  <span><span class="punto punto-verde"></span> Visitado</span>
+</div>
+
+<!-- Modal de reporte, se abre al tocar un punto del mapa -->
+<div id="modal-fondo" class="modal-fondo" hidden>
+  <div class="modal-caja">
+    <button id="modal-cerrar" class="modal-cerrar">✕</button>
+    <h2 id="modal-mc"></h2>
+    <p id="modal-info" class="ot-meta"></p>
+
+    <div id="modal-tickets"></div>
+
+    <div id="modal-form" hidden>
+      <label for="modal-falla-select">Falla reportada (si es algo nuevo, no de la lista)</label>
+      <select id="modal-falla-select">
+        <option value="">— Selecciona —</option>
+        <option>No comunica</option>
+        <option>Error servo</option>
+        <option>Vuelco</option>
+        <option>Incendio</option>
+        <option>Bloqueado</option>
+        <option>Sin batería</option>
+        <option>Tapa abierta</option>
+        <option>Falla de Lector</option>
+        <option>Cerradura Trancada</option>
+        <option>Vandalismo / Daño Externo</option>
+        <option>Otra (especificar en comentarios)</option>
+      </select>
+
+      <label for="modal-accion-input">Descripción de la acción (opcional)</label>
+      <input type="text" id="modal-accion-input" placeholder="Ej: Reset con tarjeta...">
+
+      <fieldset class="grupo-checkbox">
+        <legend>¿Se cambió algún componente?</legend>
+        <label class="opcion-check"><input type="checkbox" id="modal-cambio-le"> Lector Electrónico (LE)</label>
+        <label class="opcion-check"><input type="checkbox" id="modal-cambio-ce"> Cierre Electrónico (CE)</label>
+        <label class="opcion-check"><input type="checkbox" id="modal-cambio-ba"> Batería (BA)</label>
+        <label class="opcion-check"><input type="checkbox" id="modal-cambio-mc"> Módulo de Control (MC)</label>
+        <label class="opcion-check opcion-destacada"><input type="checkbox" id="modal-cambio-completo"> Equipo completo (los 4)</label>
+        <label class="opcion-check opcion-secundaria"><input type="checkbox" id="modal-retirado-cliente"> El cliente ya lo había retirado/cambiado por su cuenta</label>
+      </fieldset>
+
+      <div id="qr-zona" class="qr-zona" hidden>
+        <p>Escanea el serial del componente NUEVO instalado (opcional, uno por cada componente marcado arriba):</p>
+        <div id="qr-botones"></div>
+        <div id="qr-lector" hidden></div>
+      </div>
+
+      <fieldset class="grupo-checkbox">
+        <legend>¿Llegó sin algún componente (faltante/perdido)?</legend>
+        <label class="opcion-check"><input type="checkbox" id="modal-falta-le"> Falta Lector</label>
+        <label class="opcion-check"><input type="checkbox" id="modal-falta-ce"> Falta Cierre</label>
+        <label class="opcion-check"><input type="checkbox" id="modal-falta-ba"> Falta Batería</label>
+        <label class="opcion-check"><input type="checkbox" id="modal-falta-mc"> Falta Módulo de Control</label>
+      </fieldset>
+
+      <label class="opcion-check opcion-alerta"><input type="checkbox" id="modal-vandalismo-check"> Vandalismo / robo</label>
+
+      <label for="modal-foto-input">Foto (opcional)</label>
+      <input type="file" id="modal-foto-input" accept="image/*" capture="environment">
+
+      <label for="modal-comentarios-input">Comentarios</label>
+      <textarea id="modal-comentarios-input" rows="3" placeholder="Observaciones del trabajo realizado"></textarea>
+
+      <label for="modal-estado-select">Estado final del equipo</label>
+      <select id="modal-estado-select">
+        <option value="">— Selecciona —</option>
+        <option value="🟢 FUNCIONANDO">🟢 Funcionando</option>
+        <option value="🟡 CAMBIO NECESARIO">🟡 Cambio necesario</option>
+        <option value="🔴 PENDIENTE">🔴 Pendiente</option>
+      </select>
+
+      <div class="botones-reporte">
+        <button id="modal-enviar-btn">Enviar reporte</button>
+      </div>
+      <p id="modal-msg" class="resultado-msg" hidden></p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "operario";</script>
+<script src="sesion.js"></script>
+<script src="ruta.js"></script>
+</body>
+</html>

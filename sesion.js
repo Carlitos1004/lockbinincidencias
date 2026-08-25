@@ -10,7 +10,7 @@
 
 const PANEL_POR_ROL = {
   manager: "admin.html",
-  operario: "tecnico.html",
+  operario: "ruta.html",
   cliente: "cliente.html"
 };
 
