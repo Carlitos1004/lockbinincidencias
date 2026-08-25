@@ -198,7 +198,7 @@ function ordenarPorCercania(puntos, origen) {
 
 // --- MODAL DE REPORTE ---
 
-function abrirModal(mc) {
+async function abrirModal(mc) {
   equipoAbierto = mc;
   ticketExistente = null;
   serialesNuevos = {};
@@ -207,37 +207,82 @@ function abrirModal(mc) {
   modalMc.textContent = mc;
   modalInfo.textContent = `Cliente: ${info.equipo.cliente || "—"} — Fracción: ${info.equipo.fraccion || "—"}`;
 
-  const abiertos = info.tickets.filter(t => t.estado === "🚨 ABIERTO");
-  if (abiertos.length > 0) {
-    modalTickets.innerHTML = `<p class="tickets-titulo">Tickets abiertos — elige uno para cerrarlo, o reporta algo nuevo abajo:</p>` +
-      abiertos.map(t => `<button type="button" class="ticket-btn" data-id="${t.id_registro}" data-falla="${escaparHtml(t.falla)}">🚨 ${escaparHtml(t.falla)} (${t.id_registro})</button>`).join("") +
+  // Mostramos TODOS los tickets de este equipo en esta OT, no solo los
+  // abiertos — así uno ya cerrado se puede revisar/editar en vez de
+  // desaparecer del modal.
+  const todos = info.tickets;
+  if (todos.length > 0) {
+    modalTickets.innerHTML = `<p class="tickets-titulo">Tickets de este equipo — elige uno para ver/editar lo ya guardado, o reporta algo nuevo abajo:</p>` +
+      todos.map(t => `<button type="button" class="ticket-btn" data-id="${t.id_registro}">${t.estado === "✅ CERRADO" ? "✅" : "🚨"} ${escaparHtml(t.falla)} (${t.id_registro})</button>`).join("") +
       `<button type="button" id="reportar-nuevo-btn" class="btn-secundario">➕ Reportar algo nuevo</button>`;
 
     modalTickets.querySelectorAll(".ticket-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        ticketExistente = btn.dataset.id;
-        document.getElementById("modal-falla-select").value = btn.dataset.falla;
-        document.getElementById("modal-falla-select").disabled = true;
-        modalTickets.querySelectorAll(".ticket-btn").forEach(b => b.classList.remove("ticket-elegido"));
-        btn.classList.add("ticket-elegido");
-        modalForm.hidden = false;
-      });
+      btn.addEventListener("click", () => precargarTicket(btn.dataset.id, btn));
     });
     document.getElementById("reportar-nuevo-btn").addEventListener("click", () => {
       ticketExistente = null;
+      limpiarFormularioModal();
       document.getElementById("modal-falla-select").disabled = false;
       modalTickets.querySelectorAll(".ticket-btn").forEach(b => b.classList.remove("ticket-elegido"));
       modalForm.hidden = false;
     });
     modalForm.hidden = true;
   } else {
-    modalTickets.innerHTML = `<p class="tickets-titulo">No hay tickets abiertos — este reporte crea uno nuevo.</p>`;
+    modalTickets.innerHTML = `<p class="tickets-titulo">Sin tickets todavía — este reporte crea uno nuevo.</p>`;
+    limpiarFormularioModal();
     modalForm.hidden = false;
   }
 
-  limpiarFormularioModal();
   configurarBotonesQR();
   modalFondo.hidden = false;
+}
+
+async function precargarTicket(idRegistro, btnElegido) {
+  ticketExistente = idRegistro;
+  modalTickets.querySelectorAll(".ticket-btn").forEach(b => b.classList.remove("ticket-elegido"));
+  btnElegido.classList.add("ticket-elegido");
+
+  limpiarFormularioModal();
+
+  const info = equiposPorMC[equipoAbierto];
+  const ticket = info.tickets.find(t => t.id_registro === idRegistro);
+
+  // Campos simples, directo del ticket
+  document.getElementById("modal-falla-select").value = ticket.falla || "";
+  document.getElementById("modal-falla-select").disabled = true;
+  document.getElementById("modal-comentarios-input").value = ticket.comentarios || "";
+  document.getElementById("modal-estado-select").value = ticket.estado_equipo || "";
+
+  // Casillas de "Descripción de la acción"
+  (ticket.acciones_descripcion || []).forEach(valor => {
+    const check = document.querySelector(`.accion-check[value="${CSS.escape(valor)}"]`);
+    if (check) check.checked = true;
+  });
+
+  // Componentes ya registrados para este ticket: reconstruimos las casillas
+  // de cambio/faltante y los seriales nuevos escaneados
+  const { data: componentes } = await supabaseClient
+    .from("componentes_retirados")
+    .select("*")
+    .eq("id_registro", idRegistro);
+
+  (componentes || []).forEach(c => {
+    const codigo = Object.keys(MAPA_COMPONENTE).find(k => MAPA_COMPONENTE[k].nombre === c.tipo_componente);
+    if (!codigo) return;
+
+    if (c.estado === "Faltante/Perdido") {
+      document.getElementById("modal-falta-" + codigo.toLowerCase()).checked = true;
+    } else {
+      document.getElementById("modal-cambio-" + codigo.toLowerCase()).checked = true;
+      if (c.estado === "Cambiado por el cliente") {
+        document.getElementById("modal-retirado-cliente").checked = true;
+      }
+      if (c.serial_nuevo) serialesNuevos[codigo] = c.serial_nuevo;
+    }
+  });
+
+  refrescarZonaQR();
+  modalForm.hidden = false;
 }
 
 function cerrarModal() {
@@ -378,12 +423,15 @@ modalEnviarBtn.addEventListener("click", async () => {
   const datosFalla = {
     estado: estadoEquipo === "🟢 FUNCIONANDO" ? "✅ CERRADO" : "🚨 ABIERTO",
     accion_calle: accionResumen,
+    acciones_descripcion: accionesSeleccionadas,
     comentarios: comentarios,
     estado_equipo: estadoEquipo,
     fecha_cierre: estadoEquipo === "🟢 FUNCIONANDO" ? new Date().toISOString() : null,
-    origen: user.email,
-    link_foto: linkFoto
+    origen: user.email
   };
+  // Solo tocamos link_foto si esta vez se subió una foto nueva —
+  // si no, dejamos la que ya hubiera guardada de una edición anterior.
+  if (linkFoto) datosFalla.link_foto = linkFoto;
 
   let errorFalla;
   if (ticketExistente) {
@@ -402,9 +450,20 @@ modalEnviarBtn.addEventListener("click", async () => {
     return;
   }
 
-  // Componentes retirados
+  // Componentes retirados: solo agregamos los que TODAVÍA no estén
+  // registrados para este ticket (evita duplicar si el operario reabre y
+  // vuelve a guardar sin cambiar nada)
+  const { data: yaRegistrados } = await supabaseClient
+    .from("componentes_retirados")
+    .select("tipo_componente, estado")
+    .eq("id_registro", idRegistro);
+
+  const tiposYaCambio = new Set((yaRegistrados || []).filter(c => c.estado !== "Faltante/Perdido").map(c => c.tipo_componente));
+  const tiposYaFalta = new Set((yaRegistrados || []).filter(c => c.estado === "Faltante/Perdido").map(c => c.tipo_componente));
+
   const filasComponentes = [];
   codigosCambio.forEach(codigo => {
+    if (tiposYaCambio.has(MAPA_COMPONENTE[codigo].nombre)) return;
     filasComponentes.push({
       cliente: equiposPorMC[equipoAbierto].equipo.cliente, m_control: equipoAbierto,
       tipo_componente: MAPA_COMPONENTE[codigo].nombre, serial_retirado: serialViejoDe(codigo),
@@ -414,6 +473,7 @@ modalEnviarBtn.addEventListener("click", async () => {
     });
   });
   codigosFaltantes.forEach(codigo => {
+    if (tiposYaFalta.has(MAPA_COMPONENTE[codigo].nombre)) return;
     filasComponentes.push({
       cliente: equiposPorMC[equipoAbierto].equipo.cliente, m_control: equipoAbierto,
       tipo_componente: MAPA_COMPONENTE[codigo].nombre, serial_retirado: serialViejoDe(codigo),
