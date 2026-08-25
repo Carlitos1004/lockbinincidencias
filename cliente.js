@@ -31,9 +31,12 @@ async function cargarPanelCliente() {
     .eq("id", user.id)
     .single();
 
-  document.getElementById("cliente-meta").textContent = perfil?.cliente_nombre
-    ? "Cliente: " + perfil.cliente_nombre
-    : "";
+  // El saludo usa cliente_nombre en vez de "nombre" — el campo "nombre" del
+  // perfil puede tener cosas como "Contacto Porto" (como lo haya escrito
+  // el Manager al crear el usuario), mientras que cliente_nombre siempre
+  // es el nombre limpio del cliente.
+  const spanSaludo = document.getElementById("nombre-usuario");
+  if (spanSaludo) spanSaludo.textContent = perfil?.cliente_nombre || "—";
 
   const { data: equipos, error: errorEquipos } = await supabaseClient
     .from("equipos")

@@ -1029,6 +1029,25 @@ td[colspan] {
   line-height: 1.35;
 }
 
+/* --- Footer de Formato Verde --- */
+
+.footer-fv {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 20px;
+  color: var(--gris-400);
+  font-size: 0.75rem;
+}
+
+.footer-fv-logo {
+  height: 18px;
+  width: auto;
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+
 .input-observacion, .input-imagen {
   width: 100%;
   min-width: 140px;
