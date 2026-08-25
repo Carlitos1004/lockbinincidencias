@@ -22,6 +22,23 @@ const MAPA_ALARMAS = {
   alarma_operacion_erratica: "Operación errática"
 };
 
+// Texto de acción por defecto según la falla, para que el operario tenga
+// una idea de qué hacer antes de llegar — se sobreescribe cuando reporta
+// de verdad en el mapa.
+function obtenerAccionPorDefecto(falla) {
+  const f = falla.toLowerCase();
+  if (f.includes("comunica")) return "Pasar tarjeta ACTIVACIÓN. Si no comunica, desconectar y reconectar batería.";
+  if (f.includes("servo")) return "Revisar cierre. Evaluar cambio de CIERRE si persiste.";
+  if (f.includes("vuelco") || f.includes("incendio")) return "⚠️ Tomar fotos obligatorio. Evaluar cambio de equipo por daños.";
+  if (f.includes("bater")) return "Revisar batería. Probar con recargable o evaluar cambio.";
+  if (f.includes("bloquead")) return "Revisar mecanismo de cerradura, forzar apertura manual si es necesario.";
+  if (f.includes("tapa")) return "Revisar y ajustar tapa/sensor de apertura.";
+  if (f.includes("ubicac")) return "Verificar y corregir la ubicación registrada del equipo.";
+  if (f.includes("erratic")) return "Inspeccionar sensores y comportamiento del equipo.";
+  if (f.includes("añadido") || f.includes("revisión general")) return "Revisión general del equipo.";
+  return "Inspeccionar físicamente por la falla reportada.";
+}
+
 let equiposEncontrados = []; // [{m_control, fraccion, cliente, fallas: [...]}]
 
 const clienteSelect = document.getElementById("cliente-select");
@@ -135,8 +152,44 @@ generarBtn.addEventListener("click", async () => {
   const seleccionados = [...document.querySelectorAll(".check-equipo:checked")]
     .map(c => equiposEncontrados[parseInt(c.dataset.idx, 10)]);
 
-  if (seleccionados.length === 0) {
-    mostrarMensaje(generarMsg, "⚠️ Selecciona al menos un equipo.", true);
+  // --- Procesar equipos manuales agregados a mano ---
+  const textoManuales = document.getElementById("manuales-textarea").value.trim();
+  const mcsManualesTexto = textoManuales
+    ? textoManuales.split(/[,\n]/).map(s => s.trim().toUpperCase()).filter(Boolean)
+    : [];
+
+  const mcsYaIncluidos = new Set(seleccionados.map(e => e.m_control));
+  const mcsManualesNuevos = mcsManualesTexto.filter(mc => !mcsYaIncluidos.has(mc));
+
+  let equiposManuales = [];
+  if (mcsManualesNuevos.length > 0) {
+    const { data: datosManuales, error: errorManuales } = await supabaseClient
+      .from("equipos")
+      .select("m_control, cliente, fraccion")
+      .in("m_control", mcsManualesNuevos);
+
+    if (errorManuales) {
+      mostrarMensaje(generarMsg, "❌ Error al buscar los equipos manuales: " + errorManuales.message, true);
+      return;
+    }
+
+    const encontrados = new Set((datosManuales || []).map(e => e.m_control));
+    const noEncontrados = mcsManualesNuevos.filter(mc => !encontrados.has(mc));
+    if (noEncontrados.length > 0) {
+      mostrarMensaje(generarMsg, "⚠️ Estos equipos no existen en la base: " + noEncontrados.join(", ") + " — corrígelos o quítalos e intenta de nuevo.", true);
+      return;
+    }
+
+    equiposManuales = (datosManuales || []).map(eq => ({
+      m_control: eq.m_control, fraccion: eq.fraccion, cliente: eq.cliente,
+      fallas: ["Revisión general (añadido manualmente)"]
+    }));
+  }
+
+  const todosLosEquipos = [...seleccionados, ...equiposManuales];
+
+  if (todosLosEquipos.length === 0) {
+    mostrarMensaje(generarMsg, "⚠️ Selecciona al menos un equipo o agrega uno manual.", true);
     return;
   }
 
@@ -165,9 +218,9 @@ generarBtn.addEventListener("click", async () => {
     return;
   }
 
-  // --- Un ticket por cada falla activa de cada equipo seleccionado ---
+  // --- Un ticket por cada falla activa de cada equipo (filtrado o manual) ---
   const nuevosTickets = [];
-  seleccionados.forEach(eq => {
+  todosLosEquipos.forEach(eq => {
     eq.fallas.forEach(falla => {
       nuevosTickets.push({
         id_registro: "TK-" + eq.m_control + "-" + Math.floor(Math.random() * 900 + 100),
@@ -175,6 +228,7 @@ generarBtn.addEventListener("click", async () => {
         m_control: eq.m_control,
         falla: falla,
         estado: "🚨 ABIERTO",
+        accion_calle: obtenerAccionPorDefecto(falla),
         origen: user.email,
         id_ot: nuevoIdOt
       });
@@ -191,7 +245,7 @@ generarBtn.addEventListener("click", async () => {
     return;
   }
 
-  generarMsg.innerHTML = `✅ ${nuevoIdOt} generada con ${nuevosTickets.length} ticket(s) para ${seleccionados.length} equipo(s). <a href="ot-detalle.html?ot=${nuevoIdOt}" target="_blank">Ver / editar esta OT →</a>`;
+  generarMsg.innerHTML = `✅ ${nuevoIdOt} generada con ${nuevosTickets.length} ticket(s) para ${todosLosEquipos.length} equipo(s) (${equiposManuales.length} manual(es)). <a href="ot-detalle.html?ot=${nuevoIdOt}" target="_blank">Ver / editar esta OT →</a>`;
   generarMsg.className = "resultado-msg resultado-ok";
   generarMsg.hidden = false;
 });

@@ -746,18 +746,21 @@ body {
   cursor: pointer;
 }
 
-.modal-caja label, .modal-caja select, .modal-caja input, .modal-caja textarea {
+.modal-caja select, .modal-caja input[type="text"], .modal-caja input[type="file"], .modal-caja textarea {
   display: block;
   width: 100%;
-  margin-top: 8px;
-}
-
-.modal-caja select, .modal-caja input[type="text"], .modal-caja textarea {
   padding: 9px 10px;
   border: 1.5px solid var(--gris-200);
   border-radius: 8px;
   font-size: 0.9rem;
+  margin-top: 8px;
   margin-bottom: 10px;
+}
+
+.modal-caja label:not(.opcion-check) {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
 }
 
 .qr-zona {

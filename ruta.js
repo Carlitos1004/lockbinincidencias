@@ -16,6 +16,7 @@ const MAPA_COMPONENTE = {
 };
 
 let mapa = null;
+let rutaControl = null;
 let marcadores = {}; // mc -> marcador de Leaflet
 let equiposPorMC = {}; // mc -> {equipo, tickets: [...]}
 let equipoAbierto = null; // mc actualmente mostrado en el modal
@@ -95,7 +96,7 @@ function renderMapa() {
 
   const ordenados = ordenarPorCercania(puntos, { lat: LAT_OFICINA, lng: LNG_OFICINA });
 
-  if (mapa) { mapa.remove(); mapa = null; }
+  if (mapa) { mapa.remove(); mapa = null; rutaControl = null; }
   mapaDiv.style.display = "block";
   mapa = L.map(mapaDiv).setView([ordenados[0].lat, ordenados[0].lng], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -122,11 +123,38 @@ function renderMapa() {
     marcadores[p.mc] = marcador;
   });
 
-  L.polyline(coordenadasRuta, { color: "#146c43", weight: 3, dashArray: "6,6" }).addTo(mapa);
-  mapa.fitBounds(coordenadasRuta);
+  // Ruta real por carretera (OSRM gratuito) en vez de línea recta.
+  // Si el servicio público falla (puede pasar, es gratuito y sin garantía),
+  // caemos de vuelta a una línea recta para que la app siga siendo útil.
+  if (rutaControl) { mapa.removeControl(rutaControl); rutaControl = null; }
+
+  try {
+    rutaControl = L.Routing.control({
+      waypoints: coordenadasRuta.map(c => L.latLng(c[0], c[1])),
+      routeWhileDragging: false,
+      addWaypoints: false,
+      draggableWaypoints: false,
+      show: false, // oculta el panel de instrucciones paso a paso, solo queremos la línea
+      createMarker: () => null, // los marcadores ya los ponemos nosotros arriba
+      lineOptions: { styles: [{ color: "#146c43", weight: 4 }] }
+    }).addTo(mapa);
+
+    rutaControl.on("routingerror", () => {
+      dibujarLineaRectaDeRespaldo(coordenadasRuta);
+    });
+  } catch (e) {
+    dibujarLineaRectaDeRespaldo(coordenadasRuta);
+  }
+
+  const bounds = L.latLngBounds(ordenados.map(p => [p.lat, p.lng]));
+  mapa.fitBounds(bounds, { padding: [40, 40] });
 
   leyenda.hidden = false;
   rutaMsg.hidden = true;
+}
+
+function dibujarLineaRectaDeRespaldo(coordenadasRuta) {
+  L.polyline(coordenadasRuta, { color: "#146c43", weight: 3, dashArray: "6,6" }).addTo(mapa);
 }
 
 function equipoVisitado(mc) {
@@ -218,7 +246,7 @@ function cerrarModal() {
 function limpiarFormularioModal() {
   document.getElementById("modal-falla-select").value = "";
   document.getElementById("modal-falla-select").disabled = false;
-  document.getElementById("modal-accion-input").value = "";
+  document.getElementById("modal-accion-select").value = "";
   document.getElementById("modal-comentarios-input").value = "";
   document.getElementById("modal-estado-select").value = "";
   document.getElementById("modal-foto-input").value = "";
@@ -298,12 +326,13 @@ function serialViejoDe(codigo) {
 
 modalEnviarBtn.addEventListener("click", async () => {
   const falla = document.getElementById("modal-falla-select").value;
-  const accion = document.getElementById("modal-accion-input").value.trim();
+  const accion = document.getElementById("modal-accion-select").value;
   const comentarios = document.getElementById("modal-comentarios-input").value.trim();
   const estadoEquipo = document.getElementById("modal-estado-select").value;
   const fotoFile = document.getElementById("modal-foto-input").files[0];
 
   if (!falla) { mostrarMensaje(modalMsg, "⚠️ Selecciona la falla.", true); return; }
+  if (!accion) { mostrarMensaje(modalMsg, "⚠️ Selecciona la descripción de la acción.", true); return; }
   if (!estadoEquipo) { mostrarMensaje(modalMsg, "⚠️ Selecciona el estado final.", true); return; }
 
   const idOtActiva = sessionStorage.getItem("lockbin_ot_activa");

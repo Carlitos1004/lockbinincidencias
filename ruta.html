@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LockBin — Ruta</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -55,9 +56,19 @@
         <option>Otra (especificar en comentarios)</option>
       </select>
 
-      <label for="modal-accion-input">Descripción de la acción (opcional)</label>
-      <input type="text" id="modal-accion-input" placeholder="Ej: Reset con tarjeta...">
-
+      <label for="modal-accion-select">Descripción de la acción *</label>
+      <select id="modal-accion-select" required>
+        <option value="">— Selecciona —</option>
+        <option>Sin acción/Solo revisión</option>
+        <option>❌ No ubicado</option>
+        <option>⚙️ Requiere futuro cambio</option>
+        <option>⚡ Activación por medio de Tarjeta</option>
+        <option>💳 Reset del equipo con Tarjeta</option>
+        <option>💳 Reactivación por tarjeta check</option>
+        <option>🔋 Reset desconectando batería</option>
+        <option>🔋 Prueba con bat recargable OK</option>
+        <option>🔋 Prueba con bat recargable NO OK</option>
+      </select>
       <fieldset class="grupo-checkbox">
         <legend>¿Se cambió algún componente?</legend>
         <label class="opcion-check"><input type="checkbox" id="modal-cambio-le"> Lector Electrónico (LE)</label>
@@ -108,6 +119,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "operario";</script>
