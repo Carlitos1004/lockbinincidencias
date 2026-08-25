@@ -784,3 +784,26 @@ body {
   border-radius: 8px;
   overflow: hidden;
 }
+
+/* --- Panel general de OT --- */
+
+.barra-avance {
+  width: 80px;
+  height: 6px;
+  background: var(--gris-200);
+  border-radius: 3px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.barra-avance-relleno {
+  height: 100%;
+  background: var(--verde-medio);
+}
+
+.avance-texto {
+  font-size: 0.75rem;
+  color: var(--gris-700);
+  margin-left: 6px;
+}

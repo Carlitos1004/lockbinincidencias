@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Todas las OT</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <h1>LockBin · Todas las OT</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <p><a href="admin.html">← Volver al panel</a></p>
+
+  <div class="materiales-controles">
+    <input type="text" id="filtro-input" placeholder="Buscar por OT o cliente...">
+    <select id="filtro-estado">
+      <option value="todas">Todas</option>
+      <option value="pendientes">Con tickets pendientes</option>
+      <option value="completas">Completas (todo cerrado)</option>
+    </select>
+  </div>
+
+  <table class="tabla-revision" id="tabla-ots">
+    <thead>
+      <tr>
+        <th>OT</th><th>Fecha</th><th>Creada por</th><th>Clientes</th>
+        <th>Equipos</th><th>Tickets abiertos</th><th>Tickets cerrados</th><th>Avance</th><th></th>
+      </tr>
+    </thead>
+    <tbody id="ots-tbody">
+      <tr><td colspan="9">Cargando...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="ordenes.js"></script>
+</body>
+</html>
