@@ -18,7 +18,7 @@ function otActiva() {
 
 function activarOT(idOt) {
   sessionStorage.setItem(CLAVE_OT_ACTIVA, idOt);
-  otActivaTexto.innerHTML = idOt + ' — puedes buscar equipos y reportar &nbsp; <a href="ot-detalle.html?ot=' + idOt + '" target="_blank" class="link-ot-detalle">Ver detalles completos de la OT →</a>';
+  otActivaTexto.innerHTML = idOt + ' — puedes buscar equipos y reportar &nbsp; <a href="ot-detalle.html?ot=' + idOt + '" class="link-ot-detalle">Ver detalles completos de la OT →</a>';
   pasoBuscarDiv.hidden = false;
 }
 
