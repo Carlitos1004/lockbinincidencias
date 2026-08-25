@@ -245,7 +245,7 @@ generarBtn.addEventListener("click", async () => {
     return;
   }
 
-  generarMsg.innerHTML = `✅ ${nuevoIdOt} generada con ${nuevosTickets.length} ticket(s) para ${todosLosEquipos.length} equipo(s) (${equiposManuales.length} manual(es)). <a href="ot-detalle.html?ot=${nuevoIdOt}" target="_blank">Ver / editar esta OT →</a>`;
+  generarMsg.innerHTML = `✅ ${nuevoIdOt} generada con ${nuevosTickets.length} ticket(s) para ${todosLosEquipos.length} equipo(s) (${equiposManuales.length} manual(es)). <a href="ot-detalle.html?ot=${nuevoIdOt}">Ver / editar esta OT →</a>`;
   generarMsg.className = "resultado-msg resultado-ok";
   generarMsg.hidden = false;
 });
