@@ -173,7 +173,7 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
       head: [encabezados],
       body: filas.length > 0 ? filas : [encabezados.map(() => "—")],
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [15, 81, 50] },
+      headStyles: { fillColor: [111, 168, 39] },
       margin: { left: 14, right: 14 }
     });
     y = doc.lastAutoTable.finalY + 12;

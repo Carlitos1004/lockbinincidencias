@@ -138,7 +138,7 @@ function renderMapa() {
         draggableWaypoints: false,
         show: false, // oculta el panel de instrucciones paso a paso, solo queremos la línea
         createMarker: () => null, // los marcadores ya los ponemos nosotros arriba
-        lineOptions: { styles: [{ color: "#146c43", weight: 4 }] }
+        lineOptions: { styles: [{ color: "#6FA827", weight: 4 }] }
       }).addTo(mapa);
 
       rutaControl.on("routingerror", () => {
@@ -157,7 +157,7 @@ function renderMapa() {
 }
 
 function dibujarLineaRectaDeRespaldo(coordenadasRuta) {
-  L.polyline(coordenadasRuta, { color: "#146c43", weight: 3, dashArray: "6,6" }).addTo(mapa);
+  L.polyline(coordenadasRuta, { color: "#6FA827", weight: 3, dashArray: "6,6" }).addTo(mapa);
 }
 
 function equipoVisitado(mc) {
