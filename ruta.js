@@ -4,9 +4,9 @@
 // cada punto (incluye escaneo de serial nuevo por QR y foto).
 // =========================================================================
 
-// TODO: ajustar a la ubicación real de tu oficina/almacén
-const LAT_OFICINA = 42.2985;
-const LNG_OFICINA = -7.8180;
+// Polígono Industrial de San Cibrao das Viñas, Ourense
+const LAT_OFICINA = 42.287136;
+const LNG_OFICINA = -7.815185;
 
 const MAPA_COMPONENTE = {
   LE: { columnaEquipo: "serie_lector", nombre: "Lector Electrónico" },
