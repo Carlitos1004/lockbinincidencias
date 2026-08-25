@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Revisión de Taller</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <h1>LockBin · Revisión de Taller</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <p><a href="admin.html">← Volver al panel</a></p>
+
+  <h2>Buscar por OT</h2>
+  <div class="materiales-controles">
+    <input type="text" id="ot-input" placeholder="Ej: OT-005">
+    <button id="buscar-btn">Buscar</button>
+  </div>
+
+  <p id="buscar-msg" class="resultado-msg" hidden></p>
+
+  <table class="tabla-revision" id="tabla-revision" hidden>
+    <thead>
+      <tr>
+        <th>Módulo</th>
+        <th>Componente</th>
+        <th>Serial</th>
+        <th>Estado</th>
+        <th>Reparación / Hallazgo</th>
+        <th>Destino</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="revision-tbody"></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="revision.js"></script>
+</body>
+</html>

@@ -491,3 +491,106 @@ body {
 .fila-alerta {
   background: var(--ambar-bg);
 }
+
+/* --- Revisión de taller --- */
+
+.panel-body-ancho {
+  max-width: 1100px;
+}
+
+.tabla-revision {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  font-size: 0.85rem;
+}
+
+.tabla-revision th, .tabla-revision td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--gris-200);
+  vertical-align: top;
+}
+
+.tabla-revision th {
+  color: var(--gris-700);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.celda-mono {
+  font-family: var(--fuente-mono);
+  font-size: 0.8rem;
+}
+
+.input-reparacion {
+  width: 100%;
+  min-width: 160px;
+  padding: 6px 8px;
+  border: 1px solid var(--gris-200);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-family: var(--fuente-texto);
+}
+
+.input-destino {
+  width: 100%;
+  min-width: 220px;
+  padding: 6px 8px;
+  border: 1px solid var(--gris-200);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.btn-guardar-fila {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  background: var(--verde-oscuro);
+  color: var(--blanco);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-guardar-fila:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* --- Tickets abiertos existentes (panel técnico) --- */
+
+.tickets-abiertos {
+  background: var(--ambar-bg);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.tickets-titulo {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: var(--ambar);
+  font-weight: 500;
+}
+
+.ticket-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  border: 1.5px solid var(--ambar);
+  border-radius: 6px;
+  background: var(--blanco);
+  color: var(--gris-950);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.ticket-btn.ticket-elegido {
+  background: var(--verde-oscuro);
+  color: var(--blanco);
+  border-color: var(--verde-oscuro);
+}
