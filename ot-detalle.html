@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Detalle de OT</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <h1>LockBin · Detalle de OT</h1>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <p><a href="javascript:history.back()">← Volver</a></p>
+
+  <div class="materiales-controles">
+    <input type="text" id="ot-input" placeholder="Ej: OT-005">
+    <button id="buscar-btn">Buscar OT</button>
+  </div>
+
+  <p id="buscar-msg" class="resultado-msg" hidden></p>
+
+  <div id="ot-contenido" hidden>
+    <h2 id="ot-titulo"></h2>
+    <p id="ot-meta" class="ot-meta"></p>
+
+    <div class="instrucciones-box">
+      <label for="instrucciones-textarea"><strong>Instrucciones para los operarios</strong></label>
+      <textarea id="instrucciones-textarea" rows="3" placeholder="Ej: Prioridad al equipo MC2500001, cliente pidió visita antes de las 12pm..."></textarea>
+      <button id="guardar-instrucciones-btn" class="btn-secundario">Guardar instrucciones</button>
+      <span id="instrucciones-msg"></span>
+    </div>
+
+    <div class="ruta-box">
+      <button id="ver-ruta-btn" class="btn-secundario">📍 Ver ruta en Google Maps</button>
+      <button id="descargar-btn" class="btn-secundario">⬇️ Descargar como Excel</button>
+    </div>
+
+    <table class="tabla-revision" id="tabla-ot">
+      <thead>
+        <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Acción / Comentarios</th></tr>
+      </thead>
+      <tbody id="ot-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script src="sesion-generica.js"></script>
+<script src="ot-detalle.js"></script>
+</body>
+</html>

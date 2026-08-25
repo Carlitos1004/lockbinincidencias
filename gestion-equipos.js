@@ -180,9 +180,9 @@ generarBtn.addEventListener("click", async () => {
     return;
   }
 
-  mostrarMensaje(generarMsg,
-    `✅ ${nuevoIdOt} generada con ${nuevosTickets.length} ticket(s) para ${seleccionados.length} equipo(s). Los operarios ya pueden usar esta OT en el panel técnico.`,
-    false);
+  generarMsg.innerHTML = `✅ ${nuevoIdOt} generada con ${nuevosTickets.length} ticket(s) para ${seleccionados.length} equipo(s). <a href="ot-detalle.html?ot=${nuevoIdOt}" target="_blank">Ver / editar esta OT →</a>`;
+  generarMsg.className = "resultado-msg resultado-ok";
+  generarMsg.hidden = false;
 });
 
 function mostrarMensaje(el, texto, esError) {

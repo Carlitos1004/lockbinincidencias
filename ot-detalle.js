@@ -1,0 +1,177 @@
+// =========================================================================
+// DETALLE DE OT
+// =========================================================================
+
+// TODO: ajustar a la ubicación real de tu oficina/almacén (usada como
+// punto de partida para calcular la ruta)
+const LAT_OFICINA = 42.2985;
+const LNG_OFICINA = -7.8180;
+const MAX_PARADAS_POR_LINK = 7; // límite práctico de Google Maps por link
+
+let otActualCargada = null;
+let ticketsCargados = [];
+
+const otInput = document.getElementById("ot-input");
+const buscarBtn = document.getElementById("buscar-btn");
+const buscarMsg = document.getElementById("buscar-msg");
+const otContenido = document.getElementById("ot-contenido");
+const instruccionesTextarea = document.getElementById("instrucciones-textarea");
+const guardarInstruccionesBtn = document.getElementById("guardar-instrucciones-btn");
+const instruccionesMsg = document.getElementById("instrucciones-msg");
+const verRutaBtn = document.getElementById("ver-ruta-btn");
+const descargarBtn = document.getElementById("descargar-btn");
+const tbody = document.getElementById("ot-tbody");
+
+// Si la URL trae ?ot=OT-005, la buscamos automáticamente al cargar
+const otEnUrl = new URLSearchParams(window.location.search).get("ot");
+if (otEnUrl) otInput.value = otEnUrl;
+
+document.addEventListener("perfil-listo", (e) => {
+  const esManager = e.detail.rol === "manager";
+  guardarInstruccionesBtn.hidden = !esManager;
+  instruccionesTextarea.readOnly = !esManager;
+  descargarBtn.hidden = !esManager;
+
+  if (otEnUrl) buscarOT();
+});
+
+buscarBtn.addEventListener("click", buscarOT);
+otInput.addEventListener("keypress", (e) => { if (e.key === "Enter") buscarOT(); });
+
+async function buscarOT() {
+  const idOt = otInput.value.trim().toUpperCase();
+  buscarMsg.hidden = true;
+  otContenido.hidden = true;
+
+  if (!idOt) {
+    mostrarMensaje(buscarMsg, "⚠️ Escribe un número de OT.", true);
+    return;
+  }
+
+  const { data: ot, error: errorOt } = await supabaseClient
+    .from("ordenes_trabajo")
+    .select("*")
+    .eq("id_ot", idOt)
+    .maybeSingle();
+
+  if (errorOt || !ot) {
+    mostrarMensaje(buscarMsg, "No se encontró esa OT.", true);
+    return;
+  }
+
+  const { data: tickets, error: errorTickets } = await supabaseClient
+    .from("historial_fallas")
+    .select("*, equipos:m_control(fraccion, latitud, longitud)")
+    .eq("id_ot", idOt)
+    .order("m_control");
+
+  if (errorTickets) {
+    mostrarMensaje(buscarMsg, "❌ " + errorTickets.message, true);
+    return;
+  }
+
+  otActualCargada = ot;
+  ticketsCargados = tickets || [];
+
+  document.getElementById("ot-titulo").textContent = idOt;
+  document.getElementById("ot-meta").textContent =
+    `Creada: ${new Date(ot.fecha).toLocaleString("es-ES")} — por ${ot.creado_por || "—"} — ${ticketsCargados.length} ticket(s)`;
+  instruccionesTextarea.value = ot.instrucciones || "";
+
+  renderTabla();
+  otContenido.hidden = false;
+}
+
+function renderTabla() {
+  tbody.innerHTML = ticketsCargados.map(t => `
+    <tr>
+      <td>${t.m_control}</td>
+      <td>${t.equipos?.fraccion || "—"}</td>
+      <td>${t.falla}</td>
+      <td>${t.estado}${t.estado_equipo ? " — " + t.estado_equipo : ""}</td>
+      <td>${[t.accion_calle, t.comentarios].filter(Boolean).join(" | ") || "—"}</td>
+    </tr>
+  `).join("");
+}
+
+guardarInstruccionesBtn.addEventListener("click", async () => {
+  if (!otActualCargada) return;
+  guardarInstruccionesBtn.disabled = true;
+
+  const { error } = await supabaseClient
+    .from("ordenes_trabajo")
+    .update({ instrucciones: instruccionesTextarea.value.trim() })
+    .eq("id_ot", otActualCargada.id_ot);
+
+  guardarInstruccionesBtn.disabled = false;
+  instruccionesMsg.textContent = error ? "❌ Error al guardar" : "✅ Guardado";
+  setTimeout(() => { instruccionesMsg.textContent = ""; }, 2000);
+});
+
+verRutaBtn.addEventListener("click", () => {
+  const puntos = ticketsCargados
+    .map(t => t.equipos)
+    .filter(eq => eq && eq.latitud && eq.longitud)
+    .map(eq => `${eq.latitud},${eq.longitud}`);
+
+  // Quitamos duplicados (varios tickets pueden ser del mismo equipo)
+  const puntosUnicos = [...new Set(puntos)];
+
+  if (puntosUnicos.length === 0) {
+    alert("Ninguno de los equipos de esta OT tiene coordenadas registradas.");
+    return;
+  }
+
+  let origen = `${LAT_OFICINA},${LNG_OFICINA}`;
+  const enlaces = [];
+
+  for (let i = 0; i < puntosUnicos.length; i += MAX_PARADAS_POR_LINK) {
+    const tramo = puntosUnicos.slice(i, i + MAX_PARADAS_POR_LINK);
+    const destino = tramo[tramo.length - 1];
+    const paradas = tramo.slice(0, -1);
+
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origen)}&destination=${encodeURIComponent(destino)}&travelmode=driving`;
+    if (paradas.length > 0) url += `&waypoints=${encodeURIComponent(paradas.join("|"))}`;
+    enlaces.push(url);
+    origen = destino;
+  }
+
+  enlaces.forEach(url => window.open(url, "_blank"));
+  if (enlaces.length > 1) {
+    alert(`Esta OT tiene más paradas de las que caben en un solo link de Google Maps — se abrieron ${enlaces.length} pestañas, una por tramo, en orden.`);
+  }
+});
+
+descargarBtn.addEventListener("click", () => {
+  if (!otActualCargada) return;
+
+  const filas = ticketsCargados.map(t => ({
+    "Módulo de Control": t.m_control,
+    "Fracción": t.equipos?.fraccion || "",
+    "Falla": t.falla,
+    "Estado": t.estado,
+    "Estado Equipo": t.estado_equipo || "",
+    "Acción en calle": t.accion_calle || "",
+    "Comentarios": t.comentarios || ""
+  }));
+
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Equipos");
+
+  // Segunda hoja con la info general + instrucciones, para que sea editable
+  const hojaInfo = XLSX.utils.aoa_to_sheet([
+    ["OT", otActualCargada.id_ot],
+    ["Fecha", new Date(otActualCargada.fecha).toLocaleString("es-ES")],
+    ["Instrucciones", instruccionesTextarea.value || ""]
+  ]);
+  XLSX.utils.book_append_sheet(libro, hojaInfo, "Info");
+
+  XLSX.writeFile(libro, otActualCargada.id_ot + ".xlsx");
+});
+
+function mostrarMensaje(el, texto, esError) {
+  el.textContent = texto;
+  el.className = esError ? "resultado-msg resultado-error" : "resultado-msg resultado-ok";
+  el.hidden = false;
+}

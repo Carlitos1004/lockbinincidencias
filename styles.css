@@ -594,3 +594,38 @@ body {
   color: var(--blanco);
   border-color: var(--verde-oscuro);
 }
+
+/* --- Detalle de OT --- */
+
+.ot-meta {
+  color: var(--gris-700);
+  font-size: 0.85rem;
+  margin-top: -8px;
+}
+
+.instrucciones-box, .ruta-box {
+  margin: 20px 0;
+}
+
+.instrucciones-box textarea {
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 8px;
+  font-family: var(--fuente-texto);
+  font-size: 0.9rem;
+  margin: 8px 0;
+}
+
+.ruta-box {
+  display: flex;
+  gap: 10px;
+}
+
+#instrucciones-msg {
+  margin-left: 10px;
+  font-size: 0.85rem;
+  color: var(--verde-oscuro);
+}
