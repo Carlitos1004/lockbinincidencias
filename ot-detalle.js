@@ -89,6 +89,7 @@ function renderTabla() {
       <td>${t.equipos?.fraccion || "—"}</td>
       <td>${t.falla}</td>
       <td>${t.estado}${t.estado_equipo ? " — " + t.estado_equipo : ""}</td>
+      <td>${t.nuevo_serial || "—"}</td>
       <td>${[t.accion_calle, t.comentarios].filter(Boolean).join(" | ") || "—"}</td>
     </tr>
   `).join("");
