@@ -720,6 +720,10 @@ body {
   padding: 24px 12px;
 }
 
+.modal-fondo[hidden] {
+  display: none !important;
+}
+
 .modal-caja {
   background: var(--blanco);
   border-radius: 12px;
