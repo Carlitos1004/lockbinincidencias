@@ -922,12 +922,12 @@ td[colspan] {
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(1),
 .tabla-garantias-reporte-wrap .tabla-revision td:nth-child(1) {
-  width: 13%; /* Módulo */
+  width: 12%; /* Módulo */
 }
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(2),
 .tabla-garantias-reporte-wrap .tabla-revision td:nth-child(2) {
-  width: 10%; /* Dispositivo */
+  width: 12%; /* Dispositivo */
 }
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(3),
@@ -952,7 +952,7 @@ td[colspan] {
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(7),
 .tabla-garantias-reporte-wrap .tabla-revision td:nth-child(7) {
-  width: 13%; /* Link Foto */
+  width: 12%; /* Link Foto */
 }
 
 .celda-truncada {
