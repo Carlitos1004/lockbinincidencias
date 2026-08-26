@@ -129,8 +129,19 @@ function renderReporte() {
 
 function llenarTabla(idTabla, filas) {
   const tbody = document.querySelector(`#${idTabla} tbody`);
+  const esGarantias = idTabla === "tabla-garantias-reporte";
+
   tbody.innerHTML = filas.length > 0
-    ? filas.map(f => `<tr>${f.map(v => `<td>${v ?? "—"}</td>`).join("")}</tr>`).join("")
+    ? filas.map(f => `<tr>${f.map((v, i) => {
+        const valor = v ?? "—";
+        // La última columna de Garantías (Link Foto) se recorta con "..."
+        // envolviéndola en un span — aplicar el recorte directo a la celda
+        // no es confiable en todos los navegadores.
+        if (esGarantias && i === f.length - 1) {
+          return `<td><span class="celda-truncada" title="${String(valor).replace(/"/g, "&quot;")}">${valor}</span></td>`;
+        }
+        return `<td>${valor}</td>`;
+      }).join("")}</tr>`).join("")
     : `<tr><td colspan="10">(sin datos)</td></tr>`;
 }
 

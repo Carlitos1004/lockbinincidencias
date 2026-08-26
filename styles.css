@@ -953,11 +953,14 @@ td[colspan] {
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(7),
 .tabla-garantias-reporte-wrap .tabla-revision td:nth-child(7) {
   width: 8%; /* Link Foto — angosta */
+}
+
+.celda-truncada {
+  display: block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  word-wrap: normal;      /* cancela el break-word general, si no, gana sobre nowrap */
-  overflow-wrap: normal;
 }
 
 /* --- Ruta interactiva --- */
