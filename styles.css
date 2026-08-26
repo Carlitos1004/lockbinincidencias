@@ -922,7 +922,7 @@ td[colspan] {
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(1),
 .tabla-garantias-reporte-wrap .tabla-revision td:nth-child(1) {
-  width: 10%; /* Módulo */
+  width: 13%; /* Módulo */
 }
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(2),
@@ -932,27 +932,27 @@ td[colspan] {
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(3),
 .tabla-garantias-reporte-wrap .tabla-revision td:nth-child(3) {
-  width: 20%; /* Falla */
+  width: 18%; /* Falla */
 }
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(4),
 .tabla-garantias-reporte-wrap .tabla-revision td:nth-child(4) {
-  width: 20%; /* Criterio Técnico */
+  width: 18%; /* Criterio Técnico */
 }
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(5),
 .tabla-garantias-reporte-wrap .tabla-revision td:nth-child(5) {
-  width: 12%; /* Garantía por Tiempo */
+  width: 10%; /* Garantía por Tiempo */
 }
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(6),
 .tabla-garantias-reporte-wrap .tabla-revision td:nth-child(6) {
-  width: 20%; /* Estado Final */
+  width: 18%; /* Estado Final */
 }
 
 .tabla-garantias-reporte-wrap .tabla-revision th:nth-child(7),
 .tabla-garantias-reporte-wrap .tabla-revision td:nth-child(7) {
-  width: 8%; /* Link Foto — angosta */
+  width: 13%; /* Link Foto */
 }
 
 .celda-truncada {
