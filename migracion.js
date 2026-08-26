@@ -252,7 +252,7 @@ importarBtn.addEventListener("click", async () => {
 
     // 4. Componentes Retirados
     actualizarProgreso("Importando Componentes Retirados...", 55);
-    resultados.componentes = await importarPorLotes("componentes_retirados", datosAnalizados.componentes, null);
+    resultados.componentes = await importarPorLotes("componentes_retirados", datosAnalizados.componentes, "id_registro,tipo_componente,serial_retirado");
 
     // 5. Materiales
     actualizarProgreso("Importando Materiales...", 75);
