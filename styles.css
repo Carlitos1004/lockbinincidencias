@@ -647,9 +647,24 @@ body {
   min-width: 1400px;
 }
 
+.tabla-garantias-wrap .tabla-revision th:nth-child(1),
+.tabla-garantias-wrap .tabla-revision td:nth-child(1) {
+  min-width: 90px; /* OT */
+}
+
+.tabla-garantias-wrap .tabla-revision th:nth-child(5),
+.tabla-garantias-wrap .tabla-revision td:nth-child(5) {
+  min-width: 260px; /* Falla — texto largo */
+}
+
 .tabla-garantias-wrap .tabla-revision th:nth-child(6),
 .tabla-garantias-wrap .tabla-revision td:nth-child(6) {
   min-width: 220px; /* Criterio (destino) — texto largo */
+}
+
+.tabla-garantias-wrap .tabla-revision th:nth-child(9),
+.tabla-garantias-wrap .tabla-revision td:nth-child(9) {
+  min-width: 260px; /* Estado Final — texto largo */
 }
 
 .tabla-garantias-wrap .tabla-revision th:nth-child(10),
@@ -830,6 +845,63 @@ td[colspan] {
 .btn-eliminar:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* --- Buscador por serial --- */
+
+.resultado-ot {
+  border: 1.5px solid var(--gris-200);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.resultado-ot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--gris-100);
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--gris-950);
+  text-align: left;
+}
+
+.resultado-ot-header:hover {
+  background: var(--verde-claro);
+}
+
+.resultado-ot-toggle {
+  color: var(--gris-400);
+}
+
+.resultado-ot-detalle {
+  padding: 14px 16px;
+}
+
+.resultado-linea {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--gris-100);
+  font-size: 0.9rem;
+}
+
+.resultado-linea:last-of-type {
+  border-bottom: none;
+}
+
+.resultado-sublinea {
+  color: var(--gris-700);
+  font-size: 0.82rem;
+  margin-top: 3px;
+}
+
+.resultado-componente {
+  padding-left: 12px;
+  color: var(--gris-700);
 }
 
 /* --- Ruta interactiva --- */
