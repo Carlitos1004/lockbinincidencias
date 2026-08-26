@@ -904,6 +904,60 @@ td[colspan] {
   color: var(--gris-700);
 }
 
+/* --- Tabla de Garantías del Reporte: anchos proporcionales fijos,
+   sin scroll horizontal — Módulo/Dispositivo normales, Falla en
+   adelante más anchas, Link Foto más angosta --- */
+
+.tabla-garantias-reporte-wrap .tabla-revision {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.tabla-garantias-reporte-wrap .tabla-revision th,
+.tabla-garantias-reporte-wrap .tabla-revision td {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.tabla-garantias-reporte-wrap .tabla-revision th:nth-child(1),
+.tabla-garantias-reporte-wrap .tabla-revision td:nth-child(1) {
+  width: 10%; /* Módulo */
+}
+
+.tabla-garantias-reporte-wrap .tabla-revision th:nth-child(2),
+.tabla-garantias-reporte-wrap .tabla-revision td:nth-child(2) {
+  width: 10%; /* Dispositivo */
+}
+
+.tabla-garantias-reporte-wrap .tabla-revision th:nth-child(3),
+.tabla-garantias-reporte-wrap .tabla-revision td:nth-child(3) {
+  width: 20%; /* Falla */
+}
+
+.tabla-garantias-reporte-wrap .tabla-revision th:nth-child(4),
+.tabla-garantias-reporte-wrap .tabla-revision td:nth-child(4) {
+  width: 20%; /* Criterio Técnico */
+}
+
+.tabla-garantias-reporte-wrap .tabla-revision th:nth-child(5),
+.tabla-garantias-reporte-wrap .tabla-revision td:nth-child(5) {
+  width: 12%; /* Garantía por Tiempo */
+}
+
+.tabla-garantias-reporte-wrap .tabla-revision th:nth-child(6),
+.tabla-garantias-reporte-wrap .tabla-revision td:nth-child(6) {
+  width: 20%; /* Estado Final */
+}
+
+.tabla-garantias-reporte-wrap .tabla-revision th:nth-child(7),
+.tabla-garantias-reporte-wrap .tabla-revision td:nth-child(7) {
+  width: 8%; /* Link Foto — angosta */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* --- Ruta interactiva --- */
 
 .ruta-selector {
@@ -1177,7 +1231,7 @@ td[colspan] {
 }
 
 .tarjeta-nav-icono {
-  font-size: 3.5rem;
+  font-size: 1.5rem;
   margin-bottom: 4px;
 }
 
@@ -1307,7 +1361,7 @@ td[colspan] {
 .footer-fv-logo {
   height: 18px;
   width: auto;
-  opacity: 0.75;
+  opacity: 0.55;
   filter: grayscale(1);
 }
 
