@@ -61,7 +61,7 @@ async function buscarOT() {
 
   const { data: tickets, error: errorTickets } = await supabaseClient
     .from("historial_fallas")
-    .select("*, equipos:m_control(fraccion, latitud, longitud)")
+    .select("*")
     .eq("id_ot", idOt)
     .order("m_control");
 
@@ -69,6 +69,20 @@ async function buscarOT() {
     mostrarMensaje(buscarMsg, "❌ " + errorTickets.message, true);
     return;
   }
+
+  // Unimos con "equipos" a mano (ya no hay relación automática desde que
+  // permitimos historial de equipos dados de baja) — un equipo puede no
+  // existir ya en la tabla, y eso está bien, solo queda sin esos datos.
+  const mcsUnicos = [...new Set((tickets || []).map(t => t.m_control).filter(Boolean))];
+  let mapaEquipos = {};
+  if (mcsUnicos.length > 0) {
+    const { data: equiposData } = await supabaseClient
+      .from("equipos")
+      .select("m_control, fraccion, latitud, longitud")
+      .in("m_control", mcsUnicos);
+    (equiposData || []).forEach(eq => { mapaEquipos[eq.m_control] = eq; });
+  }
+  (tickets || []).forEach(t => { t.equipos = mapaEquipos[t.m_control] || null; });
 
   otActualCargada = ot;
   ticketsCargados = tickets || [];

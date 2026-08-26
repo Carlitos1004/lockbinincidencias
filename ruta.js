@@ -58,7 +58,7 @@ async function cargarRuta() {
 
   const { data: tickets, error } = await supabaseClient
     .from("historial_fallas")
-    .select("*, equipos:m_control(m_control, cliente, fraccion, latitud, longitud, serie_lector, serie_cierre, serie_bateria)")
+    .select("*")
     .eq("id_ot", idOt);
 
   cargarBtn.disabled = false;
@@ -72,6 +72,21 @@ async function cargarRuta() {
     mostrarMensaje(rutaMsg, "No hay tickets para esa OT.", true);
     return;
   }
+
+  // Unimos con "equipos" a mano (ya no hay relación automática desde que
+  // permitimos historial de equipos dados de baja) — un ticket de un
+  // equipo que ya no existe en la tabla simplemente no sale en el mapa
+  // (no hay coordenadas), pero no rompe la carga del resto.
+  const mcsUnicos = [...new Set(tickets.map(t => t.m_control).filter(Boolean))];
+  let mapaEquipos = {};
+  if (mcsUnicos.length > 0) {
+    const { data: equiposData } = await supabaseClient
+      .from("equipos")
+      .select("m_control, cliente, fraccion, latitud, longitud, serie_lector, serie_cierre, serie_bateria")
+      .in("m_control", mcsUnicos);
+    (equiposData || []).forEach(eq => { mapaEquipos[eq.m_control] = eq; });
+  }
+  tickets.forEach(t => { t.equipos = mapaEquipos[t.m_control] || null; });
 
   // Agrupar por equipo
   equiposPorMC = {};
