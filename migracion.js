@@ -56,13 +56,6 @@ function aNumero(v) {
   return isNaN(n) ? 0 : n;
 }
 
-function derivarGarantiaSiNo(estadoFinal) {
-  const texto = String(estadoFinal || "").toUpperCase();
-  if (texto.includes("APLICAR")) return "SI";
-  if (texto.includes("NO APLICA")) return "NO";
-  return null;
-}
-
 // --- Lectura del Excel ---
 
 function leerExcel(archivo) {
@@ -141,18 +134,36 @@ function mapearMateriales(filas) {
 }
 
 function mapearGarantias(filas) {
-  return filas.map(f => ({
-    id_ot: limpiarTexto(f["ID OT"]),
+  return filas.map(f => {
+    const criterio = limpiarTexto(f["Criterio en revisión"]);
+    const fechaEntrega = aFechaSoloDia(f["Fecha Entrega"]);
+    return {
+      id_ot: limpiarTexto(f["ID OT"]),
+      cliente: limpiarTexto(f["Cliente"]),
+      m_control: limpiarTexto(f["Módulo / MC"]),
+      dispositivo_danado: limpiarTexto(f["Dispositivo dañado"]),
+      falla: limpiarTexto(f["Falla"]),
+      criterio_revision: criterio,
+      fecha_entrega: fechaEntrega,
+      garantia_tiempo: null, // ya no se guarda fijo, se calcula en vivo
+      garantia: esGarantiaAplicable(criterio, fechaEntrega) ? "SI" : "NO",
+      nombre_imagen: limpiarTexto(f["Nombre de la Imagen / Archivo"])
+    };
+  }).filter(r => r.id_ot);
+}
+
+function mapearFechasEntrega(filasEquiposNuevos, filasModulosSueltos) {
+  const deEquipos = filasEquiposNuevos.map(f => ({
+    identificador: limpiarTexto(f["Unidad de control"]),
     cliente: limpiarTexto(f["Cliente"]),
-    m_control: limpiarTexto(f["Módulo / MC"]),
-    dispositivo_danado: limpiarTexto(f["Dispositivo dañado"]),
-    falla: limpiarTexto(f["Falla"]),
-    criterio_revision: limpiarTexto(f["Criterio en revisión"]),
-    fecha_entrega: aFechaSoloDia(f["Fecha Entrega"]),
-    garantia_tiempo: limpiarTexto(f["Garantía por Tiempo"]),
-    garantia: derivarGarantiaSiNo(f["ESTADO FINAL GARANTÍA"]),
-    nombre_imagen: limpiarTexto(f["Nombre de la Imagen / Archivo"])
-  })).filter(r => r.id_ot);
+    fecha_entrega: aFechaSoloDia(f["Fecha de entrega"])
+  }));
+  const deModulos = filasModulosSueltos.map(f => ({
+    identificador: limpiarTexto(f["Número de serie"]),
+    cliente: limpiarTexto(f["Cliente"]),
+    fecha_entrega: aFechaSoloDia(f["Fecha de entrega"])
+  }));
+  return [...deEquipos, ...deModulos].filter(r => r.identificador && r.fecha_entrega);
 }
 
 // --- Paso 1: analizar ---
@@ -171,6 +182,10 @@ analizarBtn.addEventListener("click", async () => {
     const componentes = mapearComponentes(hojaAObjetos(libro, "Componentes_Retirados"));
     const materiales = mapearMateriales(hojaAObjetos(libro, "Gestión de Materiales"));
     const garantias = mapearGarantias(hojaAObjetos(libro, "Garantias"));
+    const fechasEntrega = mapearFechasEntrega(
+      hojaAObjetos(libro, "Equipos nuevos"),
+      hojaAObjetos(libro, "Módulos sueltos")
+    );
 
     const otsUnicas = new Map();
     const registrarOt = (id_ot, fecha) => {
@@ -183,7 +198,7 @@ analizarBtn.addEventListener("click", async () => {
     materiales.forEach(r => registrarOt(r.id_ot, null));
     garantias.forEach(r => registrarOt(r.id_ot, null));
 
-    datosAnalizados = { historial, componentes, materiales, garantias, otsUnicas };
+    datosAnalizados = { historial, componentes, materiales, garantias, fechasEntrega, otsUnicas };
 
     resumenTbody.innerHTML = `
       <tr><td>Órdenes de Trabajo (únicas encontradas)</td><td>${otsUnicas.size}</td></tr>
@@ -191,6 +206,7 @@ analizarBtn.addEventListener("click", async () => {
       <tr><td>Componentes Retirados</td><td>${componentes.length}</td></tr>
       <tr><td>Materiales</td><td>${materiales.length}</td></tr>
       <tr><td>Garantías</td><td>${garantias.length}</td></tr>
+      <tr><td>Fechas de Entrega (Equipos nuevos + Módulos sueltos)</td><td>${fechasEntrega.length}</td></tr>
     `;
     resumenAnalisis.hidden = false;
   } catch (err) {
@@ -226,21 +242,25 @@ importarBtn.addEventListener("click", async () => {
     }
     resultados.ots = filasOt.length;
 
-    // 2. Historial de Fallas
-    actualizarProgreso("Importando Historial de Fallas...", 25);
+    // 2. Fechas de Entrega (primero, porque Garantías depende de esto para el cálculo en vivo)
+    actualizarProgreso("Importando Fechas de Entrega...", 15);
+    resultados.fechasEntrega = await importarPorLotes("fechas_entrega", datosAnalizados.fechasEntrega, "identificador");
+
+    // 3. Historial de Fallas
+    actualizarProgreso("Importando Historial de Fallas...", 30);
     resultados.historial = await importarPorLotes("historial_fallas", datosAnalizados.historial, "id_registro");
 
-    // 3. Componentes Retirados
-    actualizarProgreso("Importando Componentes Retirados...", 50);
+    // 4. Componentes Retirados
+    actualizarProgreso("Importando Componentes Retirados...", 55);
     resultados.componentes = await importarPorLotes("componentes_retirados", datosAnalizados.componentes, null);
 
-    // 4. Materiales
+    // 5. Materiales
     actualizarProgreso("Importando Materiales...", 75);
     resultados.materiales = await importarPorLotes("materiales_ot", datosAnalizados.materiales, "id_ot,tipo_componente");
 
-    // 5. Garantías
+    // 6. Garantías
     actualizarProgreso("Importando Garantías...", 90);
-    resultados.garantias = await importarPorLotes("garantias", datosAnalizados.garantias, null);
+    resultados.garantias = await importarPorLotes("garantias", datosAnalizados.garantias, "id_ot,m_control,dispositivo_danado");
 
     actualizarProgreso("Listo", 100);
     mostrarResultadoFinal(resultados, null);
@@ -282,7 +302,8 @@ function mostrarResultadoFinal(resultados, error) {
     resultadoFinal.innerHTML = `
       <p class="resultado-msg resultado-ok" style="display:block;">
         ✅ Migración completa.<br>
-        OTs: ${resultados.ots ?? 0} · Historial de Fallas: ${resultados.historial ?? 0} ·
+        OTs: ${resultados.ots ?? 0} · Fechas de Entrega: ${resultados.fechasEntrega ?? 0} ·
+        Historial de Fallas: ${resultados.historial ?? 0} ·
         Componentes: ${resultados.componentes ?? 0} · Materiales: ${resultados.materiales ?? 0} ·
         Garantías: ${resultados.garantias ?? 0}
       </p>`;

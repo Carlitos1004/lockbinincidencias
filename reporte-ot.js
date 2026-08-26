@@ -117,7 +117,7 @@ function renderReporte() {
   llenarTabla("tabla-componentes", r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_retirado, c.destino || "—"]));
   llenarTabla("tabla-materiales", r.materiales.map(m => [m.tipo_componente, m.llevados, m.utilizados, m.vuelven]));
   llenarTabla("tabla-fallas", r.fallasRevision.map(c => [c.m_control, c.serial_retirado, c.destino || "—", c.reparacion]));
-  llenarTabla("tabla-garantias-reporte", r.garantias.map(g => [g.m_control, g.dispositivo_danado, g.falla, g.garantia]));
+  llenarTabla("tabla-garantias-reporte", r.garantias.map(g => [g.m_control, g.dispositivo_danado, g.falla, calcularEstadoFinalGarantia(g.criterio_revision, g.fecha_entrega)]));
   llenarTabla("tabla-destino", r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
 
   reporteContenido.hidden = false;
@@ -177,7 +177,7 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
 
   seccion("CONTROL DE GARANTÍAS",
     ["Módulo", "Dispositivo", "Falla", "Garantía"],
-    r.garantias.map(g => [g.m_control, g.dispositivo_danado, g.falla, g.garantia]));
+    r.garantias.map(g => [g.m_control, g.dispositivo_danado, g.falla, calcularEstadoFinalGarantia(g.criterio_revision, g.fecha_entrega)]));
 
   seccion("CONTROL STOCK DE DESTINO",
     ["Destino", "Cantidad", "Desglose"],
@@ -224,7 +224,7 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
   seccion("Cambios de Componentes Realizados", ["Módulo", "Tipo", "Serial", "Destino"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_retirado, c.destino || "—"]));
   seccion("Control de Materiales", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales.map(m => [m.tipo_componente, m.llevados, m.utilizados, m.vuelven]));
   seccion("Resumen de Fallas y Revisión", ["Módulo", "Serial", "Destino", "Hallazgo"], r.fallasRevision.map(c => [c.m_control, c.serial_retirado, c.destino || "—", c.reparacion]));
-  seccion("Control de Garantías", ["Módulo", "Dispositivo", "Falla", "Garantía"], r.garantias.map(g => [g.m_control, g.dispositivo_danado, g.falla, g.garantia]));
+  seccion("Control de Garantías", ["Módulo", "Dispositivo", "Falla", "Garantía"], r.garantias.map(g => [g.m_control, g.dispositivo_danado, g.falla, calcularEstadoFinalGarantia(g.criterio_revision, g.fecha_entrega)]));
   seccion("Control Stock de Destino", ["Destino", "Cantidad", "Desglose"], r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
 
   doc.save(r.idOt + "_reporte.pdf");

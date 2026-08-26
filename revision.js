@@ -33,10 +33,10 @@ const MAPA_DESTINO_A_ESTADO = {
 };
 
 // Destinos que además generan/actualizan una fila en "garantias"
-const DESTINOS_GARANTIA = {
-  "❌ Equipo dañado - Enviar a AMMI (equipo con garantía)": "SI",
-  "❌ Equipo dañado sin garantía (esperando presupuesto)": "NO"
-};
+const DESTINOS_GARANTIA = new Set([
+  "❌ Equipo dañado - Enviar a AMMI (equipo con garantía)",
+  "❌ Equipo dañado sin garantía (esperando presupuesto)"
+]);
 
 const otInput = document.getElementById("ot-input");
 const buscarBtn = document.getElementById("buscar-btn");
@@ -153,12 +153,20 @@ async function guardarFila(btn) {
   // 3. Si el destino es de garantía, creamos/actualizamos su fila en "garantias"
   //    (upsert por componente_id — nunca se toca "observacion" ni "nombre_imagen"
   //    si la fila ya existía, esos se editan a mano por separado)
-  if (DESTINOS_GARANTIA[destino]) {
+  if (DESTINOS_GARANTIA.has(destino)) {
     const { data: existente } = await supabaseClient
       .from("garantias")
-      .select("id")
+      .select("id, fecha_entrega")
       .eq("componente_id", componenteId)
       .maybeSingle();
+
+    // Solo auto-completamos la fecha de entrega si todavía no hay una
+    // guardada — si el Manager ya la puso a mano (porque no se encontró
+    // sola), no se la pisamos.
+    let fechaEntrega = existente?.fecha_entrega || null;
+    if (!fechaEntrega) {
+      fechaEntrega = await buscarFechaEntrega(componente.m_control, componente.serial_retirado);
+    }
 
     const datosGarantia = {
       componente_id: componenteId,
@@ -167,7 +175,9 @@ async function guardarFila(btn) {
       m_control: componente.m_control,
       dispositivo_danado: componente.serial_retirado,
       falla: reparacion,
-      garantia: DESTINOS_GARANTIA[destino]
+      criterio_revision: destino, // el "criterio" ES el destino elegido en la revisión
+      fecha_entrega: fechaEntrega,
+      garantia: esGarantiaAplicable(destino, fechaEntrega) ? "SI" : "NO"
     };
 
     if (existente) {

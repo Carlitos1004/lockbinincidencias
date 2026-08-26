@@ -38,29 +38,38 @@ function renderTabla() {
       (g.m_control || "").toLowerCase().includes(texto)
     );
   }
-  if (garantia !== "todas") filtradas = filtradas.filter(g => g.garantia === garantia);
+  if (garantia !== "todas") {
+    filtradas = filtradas.filter(g => {
+      const aplica = esGarantiaAplicable(g.criterio_revision, g.fecha_entrega);
+      return garantia === "SI" ? aplica : !aplica;
+    });
+  }
 
   if (filtradas.length === 0) {
     tbody.innerHTML = `<tr><td colspan="12">No hay garantías que coincidan.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = filtradas.map(g => `
+  tbody.innerHTML = filtradas.map(g => {
+    const vigencia = calcularGarantiaTiempo(g.fecha_entrega);
+    const estadoFinal = calcularEstadoFinalGarantia(g.criterio_revision, g.fecha_entrega);
+    return `
     <tr data-id="${g.id}">
       <td>${g.id_ot || "—"}</td>
       <td>${g.cliente || "—"}</td>
       <td>${g.m_control || "—"}</td>
       <td class="celda-mono">${g.dispositivo_danado || "—"}</td>
       <td>${g.falla || "—"}</td>
-      <td>${g.garantia === "SI" ? "✅ SI" : "❌ NO"}</td>
-      <td><input type="text" class="input-criterio" value="${escaparAtributo(g.criterio_revision || "")}" placeholder="Criterio en revisión..."></td>
+      <td>${g.criterio_revision || "—"}</td>
       <td><input type="date" class="input-fecha-entrega" value="${g.fecha_entrega || ""}"></td>
-      <td><input type="text" class="input-garantia-tiempo" value="${escaparAtributo(g.garantia_tiempo || "")}" placeholder="Ej: SÍ (Vigente)..."></td>
+      <td>${vigencia}</td>
+      <td>${estadoFinal || "—"}</td>
       <td><input type="text" class="input-observacion" value="${escaparAtributo(g.observacion || "")}" placeholder="Observación..."></td>
       <td><input type="text" class="input-imagen" value="${escaparAtributo(g.nombre_imagen || "")}" placeholder="Nombre/link imagen..."></td>
       <td><button class="btn-guardar-fila">Guardar</button></td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 
   tbody.querySelectorAll(".btn-guardar-fila").forEach(btn => {
     btn.addEventListener("click", () => guardarFila(btn));
@@ -70,9 +79,7 @@ function renderTabla() {
 async function guardarFila(btn) {
   const fila = btn.closest("tr");
   const id = fila.dataset.id;
-  const criterioRevision = fila.querySelector(".input-criterio").value.trim();
   const fechaEntrega = fila.querySelector(".input-fecha-entrega").value || null;
-  const garantiaTiempo = fila.querySelector(".input-garantia-tiempo").value.trim();
   const observacion = fila.querySelector(".input-observacion").value.trim();
   const nombreImagen = fila.querySelector(".input-imagen").value.trim();
 
@@ -82,16 +89,14 @@ async function guardarFila(btn) {
   const { error } = await supabaseClient
     .from("garantias")
     .update({
-      criterio_revision: criterioRevision,
       fecha_entrega: fechaEntrega,
-      garantia_tiempo: garantiaTiempo,
       observacion: observacion,
       nombre_imagen: nombreImagen
     })
     .eq("id", id);
 
   btn.textContent = error ? "❌ Error" : "✅ Guardado";
-  setTimeout(() => { btn.textContent = "Guardar"; btn.disabled = false; }, 1500);
+  setTimeout(() => { cargarGarantias(); }, 1200);
 }
 
 filtroInput.addEventListener("input", renderTabla);
