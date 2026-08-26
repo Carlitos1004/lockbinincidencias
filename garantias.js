@@ -17,7 +17,7 @@ async function cargarGarantias() {
     .order("creado_en", { ascending: false });
 
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="9">Error: ${error.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12">Error: ${error.message}</td></tr>`;
     return;
   }
 
@@ -41,7 +41,7 @@ function renderTabla() {
   if (garantia !== "todas") filtradas = filtradas.filter(g => g.garantia === garantia);
 
   if (filtradas.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9">No hay garantías que coincidan.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12">No hay garantías que coincidan.</td></tr>`;
     return;
   }
 
@@ -53,6 +53,9 @@ function renderTabla() {
       <td class="celda-mono">${g.dispositivo_danado || "—"}</td>
       <td>${g.falla || "—"}</td>
       <td>${g.garantia === "SI" ? "✅ SI" : "❌ NO"}</td>
+      <td><input type="text" class="input-criterio" value="${escaparAtributo(g.criterio_revision || "")}" placeholder="Criterio en revisión..."></td>
+      <td><input type="date" class="input-fecha-entrega" value="${g.fecha_entrega || ""}"></td>
+      <td><input type="text" class="input-garantia-tiempo" value="${escaparAtributo(g.garantia_tiempo || "")}" placeholder="Ej: SÍ (Vigente)..."></td>
       <td><input type="text" class="input-observacion" value="${escaparAtributo(g.observacion || "")}" placeholder="Observación..."></td>
       <td><input type="text" class="input-imagen" value="${escaparAtributo(g.nombre_imagen || "")}" placeholder="Nombre/link imagen..."></td>
       <td><button class="btn-guardar-fila">Guardar</button></td>
@@ -67,6 +70,9 @@ function renderTabla() {
 async function guardarFila(btn) {
   const fila = btn.closest("tr");
   const id = fila.dataset.id;
+  const criterioRevision = fila.querySelector(".input-criterio").value.trim();
+  const fechaEntrega = fila.querySelector(".input-fecha-entrega").value || null;
+  const garantiaTiempo = fila.querySelector(".input-garantia-tiempo").value.trim();
   const observacion = fila.querySelector(".input-observacion").value.trim();
   const nombreImagen = fila.querySelector(".input-imagen").value.trim();
 
@@ -75,7 +81,13 @@ async function guardarFila(btn) {
 
   const { error } = await supabaseClient
     .from("garantias")
-    .update({ observacion: observacion, nombre_imagen: nombreImagen })
+    .update({
+      criterio_revision: criterioRevision,
+      fecha_entrega: fechaEntrega,
+      garantia_tiempo: garantiaTiempo,
+      observacion: observacion,
+      nombre_imagen: nombreImagen
+    })
     .eq("id", id);
 
   btn.textContent = error ? "❌ Error" : "✅ Guardado";
