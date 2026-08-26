@@ -7,7 +7,6 @@
 // =========================================================================
 
 const MAPA_ALARMAS = {
-  alarma_no_comunica: "No comunica",
   alarma_error_servo: "Error servo",
   alarma_vuelco: "Vuelco",
   alarma_incendio: "Incendio",

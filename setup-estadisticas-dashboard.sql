@@ -20,7 +20,7 @@ as $$
   select
     (select count(distinct id_ot) from historial_fallas where estado = '🚨 ABIERTO'),
     (select count(*) from equipos where
-      alarma_no_comunica or alarma_error_servo or alarma_vuelco or alarma_incendio or
+      alarma_error_servo or alarma_vuelco or alarma_incendio or
       alarma_bloqueado or alarma_sin_bateria or alarma_tapa_abierta or alarma_cambiar_bateria or
       alarma_cambiar_ubicacion or alarma_revisar_comunicacion or alarma_operacion_erratica
     ),

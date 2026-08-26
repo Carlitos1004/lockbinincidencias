@@ -638,6 +638,27 @@ body {
   max-width: 1100px;
 }
 
+.tabla-garantias-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.tabla-garantias-wrap .tabla-revision {
+  min-width: 1400px;
+}
+
+.tabla-garantias-wrap .tabla-revision th:nth-child(6),
+.tabla-garantias-wrap .tabla-revision td:nth-child(6) {
+  min-width: 220px; /* Criterio (destino) — texto largo */
+}
+
+.tabla-garantias-wrap .tabla-revision th:nth-child(10),
+.tabla-garantias-wrap .tabla-revision td:nth-child(10),
+.tabla-garantias-wrap .tabla-revision th:nth-child(11),
+.tabla-garantias-wrap .tabla-revision td:nth-child(11) {
+  min-width: 200px; /* Observación / Nombre Imagen */
+}
+
 .tabla-revision {
   width: 100%;
   border-collapse: collapse;
@@ -789,6 +810,26 @@ td[colspan] {
   margin-left: 10px;
   font-size: 0.85rem;
   color: var(--verde-oscuro);
+}
+
+.btn-eliminar {
+  padding: 13px 20px;
+  border: 1.5px solid #dc2626;
+  border-radius: 10px;
+  background: var(--blanco);
+  color: #dc2626;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-eliminar:hover:not(:disabled) {
+  background: #dc2626;
+  color: var(--blanco);
+}
+
+.btn-eliminar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* --- Ruta interactiva --- */

@@ -8,8 +8,9 @@
 // =========================================================================
 
 // Mapa columna booleana en "equipos" -> nombre de Falla legible
+// "No comunica" se quitó a propósito — todavía no tienen un criterio
+// confiable para esa alarma (según indicó el equipo el 26/08/2026).
 const MAPA_ALARMAS = {
-  alarma_no_comunica: "No comunica",
   alarma_error_servo: "Error servo",
   alarma_vuelco: "Vuelco",
   alarma_incendio: "Incendio",

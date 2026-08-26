@@ -31,6 +31,7 @@ document.addEventListener("perfil-listo", (e) => {
   guardarInstruccionesBtn.hidden = !esManager;
   instruccionesTextarea.readOnly = !esManager;
   descargarBtn.hidden = !esManager;
+  document.getElementById("eliminar-ot-btn").hidden = !esManager;
 
   if (otEnUrl) buscarOT();
 });
@@ -190,3 +191,38 @@ function mostrarMensaje(el, texto, esError) {
   el.className = esError ? "resultado-msg resultado-error" : "resultado-msg resultado-ok";
   el.hidden = false;
 }
+
+document.getElementById("eliminar-ot-btn").addEventListener("click", async () => {
+  if (!otActualCargada) return;
+  const idOt = otActualCargada.id_ot;
+
+  const escrito = prompt(
+    `Esto borra la OT ${idOt} y TODO lo relacionado (tickets, componentes, materiales, garantías) — no se puede deshacer.\n\nEscribe "${idOt}" para confirmar:`
+  );
+  if (escrito !== idOt) {
+    if (escrito !== null) alert("No coincide, no se eliminó nada.");
+    return;
+  }
+
+  const btn = document.getElementById("eliminar-ot-btn");
+  btn.disabled = true;
+  btn.textContent = "Eliminando...";
+
+  try {
+    // Orden importa: primero lo que depende de historial_fallas/componentes,
+    // al final la propia OT.
+    await supabaseClient.from("garantias").delete().eq("id_ot", idOt);
+    await supabaseClient.from("componentes_retirados").delete().eq("id_ot", idOt);
+    await supabaseClient.from("materiales_ot").delete().eq("id_ot", idOt);
+    await supabaseClient.from("historial_fallas").delete().eq("id_ot", idOt);
+    const { error } = await supabaseClient.from("ordenes_trabajo").delete().eq("id_ot", idOt);
+    if (error) throw error;
+
+    alert(`${idOt} eliminada por completo.`);
+    window.location.href = "ordenes.html";
+  } catch (err) {
+    alert("Error al eliminar: " + err.message);
+    btn.disabled = false;
+    btn.textContent = "🗑️ Eliminar esta OT";
+  }
+});
