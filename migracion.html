@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Migración Histórica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Migración Histórica</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">⚠️ Esta herramienta es para <strong>una migración única</strong> de tus datos viejos de Sheets — no está pensada para usarse repetidamente. Sube el Excel completo de tu Google Sheet (con todas las pestañas) y voy a leer solo las que importan: Historial de Fallas, Componentes_Retirados, Gestión de Materiales y Garantias.</p>
+
+  <div class="import-box">
+    <input type="file" id="archivo-input" accept=".xlsx,.xls">
+    <button id="analizar-btn" disabled class="btn-primario">Analizar archivo</button>
+  </div>
+
+  <div id="resumen-analisis" hidden>
+    <h2>Vista previa antes de importar</h2>
+    <table class="tabla-revision">
+      <thead><tr><th>Origen</th><th>Filas encontradas</th></tr></thead>
+      <tbody id="resumen-tbody"></tbody>
+    </table>
+    <p class="resultado-msg resultado-ok" style="display:block;">Se van a crear también las OTs que falten en "ordenes_trabajo" (sin pisar las que ya existan).</p>
+    <button id="importar-btn" class="btn-primario">Importar todo a la base de datos</button>
+  </div>
+
+  <div id="progreso" hidden>
+    <p id="progreso-texto">Procesando...</p>
+    <div class="barra-progreso"><div id="barra-relleno"></div></div>
+  </div>
+
+  <div id="resultado-final" hidden></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="migracion.js"></script>
+</body>
+</html>
