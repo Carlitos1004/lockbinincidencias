@@ -956,6 +956,8 @@ td[colspan] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  word-wrap: normal;      /* cancela el break-word general, si no, gana sobre nowrap */
+  overflow-wrap: normal;
 }
 
 /* --- Ruta interactiva --- */
