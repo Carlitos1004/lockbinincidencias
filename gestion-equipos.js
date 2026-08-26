@@ -39,6 +39,25 @@ function obtenerAccionPorDefecto(falla) {
   return "Inspeccionar físicamente por la falla reportada.";
 }
 
+// Trae TODAS las filas de una consulta, sin toparse con el límite de 1000
+// filas por página que aplica Supabase por defecto. Se usa en cualquier
+// consulta a "equipos" que pueda devolver más de eso (ya pasamos los 5000).
+async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
+  const TAM_PAGINA = 1000;
+  let desde = 0;
+  let todas = [];
+  while (true) {
+    let query = supabaseClient.from(tabla).select(columnas).range(desde, desde + TAM_PAGINA - 1);
+    if (aplicarFiltro) query = aplicarFiltro(query);
+    const { data, error } = await query;
+    if (error) throw error;
+    todas = todas.concat(data || []);
+    if (!data || data.length < TAM_PAGINA) break;
+    desde += TAM_PAGINA;
+  }
+  return todas;
+}
+
 let equiposEncontrados = []; // [{m_control, fraccion, cliente, fallas: [...]}]
 
 const clienteSelect = document.getElementById("cliente-select");
@@ -54,8 +73,10 @@ const generarMsg = document.getElementById("generar-msg");
 cargarClientes();
 
 async function cargarClientes() {
-  const { data, error } = await supabaseClient.from("equipos").select("cliente");
-  if (error || !data) {
+  let data;
+  try {
+    data = await traerTodasLasFilas("equipos", "cliente");
+  } catch (err) {
     clienteSelect.innerHTML = `<option value="">Error al cargar</option>`;
     return;
   }
@@ -87,18 +108,18 @@ filtrarBtn.addEventListener("click", async () => {
   filtrarBtn.disabled = true;
   filtrarBtn.textContent = "Filtrando...";
 
-  let query = supabaseClient.from("equipos").select("*");
-  if (cliente !== "TODOS") query = query.eq("cliente", cliente);
-
-  const { data, error } = await query;
+  let data;
+  try {
+    data = await traerTodasLasFilas("equipos", "*", (q) => cliente !== "TODOS" ? q.eq("cliente", cliente) : q);
+  } catch (err) {
+    filtrarBtn.disabled = false;
+    filtrarBtn.textContent = "Filtrar equipos con fallas";
+    mostrarMensaje(filtrarMsg, "❌ " + err.message, true);
+    return;
+  }
 
   filtrarBtn.disabled = false;
   filtrarBtn.textContent = "Filtrar equipos con fallas";
-
-  if (error) {
-    mostrarMensaje(filtrarMsg, "❌ " + error.message, true);
-    return;
-  }
 
   equiposEncontrados = (data || [])
     .filter(eq => {

@@ -1,29 +1,22 @@
 // =========================================================================
 // DASHBOARD DEL MANAGER — 3 estadísticas rápidas al entrar
+// Se calculan en la base de datos (función estadisticas_dashboard), no
+// trayendo filas al navegador — las consultas normales de Supabase se
+// limitan a 1000 filas, y con miles de equipos eso daba un conteo mal.
 // =========================================================================
 
-const MAPA_ALARMAS_DASH = [
-  "alarma_no_comunica", "alarma_error_servo", "alarma_vuelco", "alarma_incendio",
-  "alarma_bloqueado", "alarma_sin_bateria", "alarma_tapa_abierta", "alarma_cambiar_bateria",
-  "alarma_cambiar_ubicacion", "alarma_revisar_comunicacion", "alarma_operacion_erratica"
-];
-
 async function cargarDashboard() {
-  const [{ data: tickets }, { data: equipos }, { data: componentes }] = await Promise.all([
-    supabaseClient.from("historial_fallas").select("id_ot, estado"),
-    supabaseClient.from("equipos").select(MAPA_ALARMAS_DASH.join(",")),
-    supabaseClient.from("componentes_retirados").select("estado")
-  ]);
+  const { data, error } = await supabaseClient.rpc("estadisticas_dashboard");
 
-  const otsConPendientes = new Set(
-    (tickets || []).filter(t => t.estado === "🚨 ABIERTO").map(t => t.id_ot)
-  ).size;
+  if (error || !data || data.length === 0) {
+    console.error("Error cargando estadísticas del dashboard:", error);
+    return;
+  }
 
-  const equiposConAlarma = (equipos || []).filter(eq =>
-    MAPA_ALARMAS_DASH.some(col => eq[col])
-  ).length;
-
-  const componentesPendientes = (componentes || []).filter(c => c.estado === "Pendiente revisión").length;
+  const stats = data[0];
+  const otsConPendientes = stats.ots_con_pendientes ?? 0;
+  const equiposConAlarma = stats.equipos_con_alarma ?? 0;
+  const componentesPendientes = stats.componentes_pendientes ?? 0;
 
   const tarjetas = document.querySelectorAll("#resumen-dashboard .tarjeta-resumen strong");
   if (tarjetas[0]) tarjetas[0].textContent = otsConPendientes;

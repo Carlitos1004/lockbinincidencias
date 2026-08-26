@@ -22,6 +22,24 @@ const MAPA_ALARMAS = {
 
 let equiposCliente = [];
 
+// Trae TODAS las filas sin toparse con el límite de 1000 por página que
+// aplica Supabase por defecto — necesario porque "equipos" ya pasa de 5000.
+async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
+  const TAM_PAGINA = 1000;
+  let desde = 0;
+  let todas = [];
+  while (true) {
+    let query = supabaseClient.from(tabla).select(columnas).range(desde, desde + TAM_PAGINA - 1);
+    if (aplicarFiltro) query = aplicarFiltro(query);
+    const { data, error } = await query;
+    if (error) throw error;
+    todas = todas.concat(data || []);
+    if (!data || data.length < TAM_PAGINA) break;
+    desde += TAM_PAGINA;
+  }
+  return todas;
+}
+
 async function cargarPanelCliente() {
   const { data: { user } } = await supabaseClient.auth.getUser();
 
@@ -38,18 +56,13 @@ async function cargarPanelCliente() {
   const spanSaludo = document.getElementById("nombre-usuario");
   if (spanSaludo) spanSaludo.textContent = perfil?.cliente_nombre || "—";
 
-  const { data: equipos, error: errorEquipos } = await supabaseClient
-    .from("equipos")
-    .select("*")
-    .order("m_control");
-
   const tbodyEquipos = document.getElementById("equipos-cliente-tbody");
-  if (errorEquipos) {
-    tbodyEquipos.innerHTML = `<tr><td colspan="5">Error: ${errorEquipos.message}</td></tr>`;
-  } else {
-    equiposCliente = equipos || [];
+  try {
+    equiposCliente = await traerTodasLasFilas("equipos", "*", (q) => q.order("m_control"));
     renderResumen();
     renderEquipos();
+  } catch (err) {
+    tbodyEquipos.innerHTML = `<tr><td colspan="5">Error: ${err.message}</td></tr>`;
   }
 
   const { data: historial, error: errorHistorial } = await supabaseClient
