@@ -56,6 +56,21 @@ async function cargarRuta() {
   cargarBtn.disabled = true;
   cargarBtn.textContent = "Cargando...";
 
+  // Instrucciones de la oficina para esta OT
+  const { data: otData } = await supabaseClient
+    .from("ordenes_trabajo")
+    .select("instrucciones")
+    .eq("id_ot", idOt)
+    .maybeSingle();
+
+  const instruccionesDiv = document.getElementById("instrucciones-ruta");
+  if (otData?.instrucciones) {
+    document.getElementById("instrucciones-ruta-texto").textContent = otData.instrucciones;
+    instruccionesDiv.hidden = false;
+  } else {
+    instruccionesDiv.hidden = true;
+  }
+
   const { data: tickets, error } = await supabaseClient
     .from("historial_fallas")
     .select("*")
@@ -512,11 +527,13 @@ modalEnviarBtn.addEventListener("click", async () => {
   });
   codigosFaltantes.forEach(codigo => {
     if (tiposYaFalta.has(MAPA_COMPONENTE[codigo].nombre)) return;
+    const huboReemplazo = !!serialesNuevos[codigo]; // se instaló algo nuevo en su lugar, aunque faltara el original
     filasComponentes.push({
       cliente: equiposPorMC[equipoAbierto].equipo.cliente, m_control: equipoAbierto,
       tipo_componente: MAPA_COMPONENTE[codigo].nombre, serial_retirado: serialViejoDe(codigo),
       serial_nuevo: serialesNuevos[codigo] || null, // si se instaló uno nuevo en su lugar
-      id_registro: idRegistro, id_ot: idOtActiva, estado: "Faltante/Perdido", excluir_materiales: true
+      id_registro: idRegistro, id_ot: idOtActiva, estado: "Faltante/Perdido",
+      excluir_materiales: !huboReemplazo // solo se excluye si de verdad no se usó material
     });
   });
   if (filasComponentes.length > 0) {

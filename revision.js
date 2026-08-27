@@ -97,6 +97,10 @@ function renderTabla(componentes) {
             ${opciones}
           </select>
         </td>
+        <td>
+          <input type="file" class="input-foto-revision" accept="image/*" capture="environment">
+          ${c.foto_revision ? `<a href="${c.foto_revision}" target="_blank" rel="noopener" class="link-foto-existente">Ver foto actual →</a>` : ""}
+        </td>
         <td><button class="btn-guardar-fila" ${bloqueado ? "disabled" : ""}>Guardar</button></td>
       </tr>
     `;
@@ -121,6 +125,21 @@ async function guardarFila(btn) {
   btn.disabled = true;
   btn.textContent = "Guardando...";
 
+  // Subir foto de revisión, si se eligió una
+  let fotoRevisionUrl = null;
+  const archivoFoto = fila.querySelector(".input-foto-revision").files[0];
+  if (archivoFoto) {
+    try {
+      const nombreArchivo = `revision_${Date.now()}_${archivoFoto.name}`;
+      const { error: errorSubida } = await supabaseClient.storage.from("fotos-reportes").upload(nombreArchivo, archivoFoto);
+      if (errorSubida) throw errorSubida;
+      const { data: urlData } = supabaseClient.storage.from("fotos-reportes").getPublicUrl(nombreArchivo);
+      fotoRevisionUrl = urlData.publicUrl;
+    } catch (err) {
+      alert("⚠️ No se pudo subir la foto, se sigue guardando el resto: " + err.message);
+    }
+  }
+
   const nuevoEstado = MAPA_DESTINO_A_ESTADO[destino];
 
   // 1. Traemos el componente completo (para tener cliente, m_control, id_ot, serial)
@@ -137,10 +156,13 @@ async function guardarFila(btn) {
     return;
   }
 
+  const datosActualizacion = { destino: destino, reparacion: reparacion, estado: nuevoEstado };
+  if (fotoRevisionUrl) datosActualizacion.foto_revision = fotoRevisionUrl;
+
   // 2. Actualizamos el componente
   const { error: errorUpdate } = await supabaseClient
     .from("componentes_retirados")
-    .update({ destino: destino, reparacion: reparacion, estado: nuevoEstado })
+    .update(datosActualizacion)
     .eq("id", componenteId);
 
   if (errorUpdate) {

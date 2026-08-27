@@ -98,16 +98,54 @@ async function buscarOT() {
 }
 
 function renderTabla() {
-  tbody.innerHTML = ticketsCargados.map(t => `
-    <tr>
-      <td>${t.m_control}</td>
-      <td>${t.equipos?.fraccion || "—"}</td>
-      <td>${t.falla}</td>
-      <td>${t.estado}${t.estado_equipo ? " — " + t.estado_equipo : ""}</td>
-      <td>${t.nuevo_serial || "—"}</td>
-      <td>${[t.accion_calle, t.comentarios].filter(Boolean).join(" | ") || "—"}</td>
-    </tr>
-  `).join("");
+  const esManager = window.perfilActual?.rol === "manager";
+
+  tbody.innerHTML = ticketsCargados.map(t => {
+    const abierto = t.estado === "🚨 ABIERTO";
+    const puedeEditar = esManager && abierto;
+
+    const celdaAccionComentarios = puedeEditar
+      ? `<textarea class="input-accion-comentarios" rows="2" data-id="${t.id_registro}">${[t.accion_calle, t.comentarios].filter(Boolean).join("\n") || ""}</textarea>
+         <button class="btn-guardar-ticket" data-id="${t.id_registro}">Guardar</button>`
+      : ([t.accion_calle, t.comentarios].filter(Boolean).join(" | ") || "—");
+
+    const celdaFoto = t.link_foto
+      ? `<a href="${t.link_foto}" target="_blank" rel="noopener">Ver foto →</a>`
+      : "—";
+
+    return `
+      <tr>
+        <td>${t.m_control}</td>
+        <td>${t.equipos?.fraccion || "—"}</td>
+        <td>${t.falla}</td>
+        <td>${t.estado}${t.estado_equipo ? " — " + t.estado_equipo : ""}</td>
+        <td>${t.nuevo_serial || "—"}</td>
+        <td>${celdaFoto}</td>
+        <td>${celdaAccionComentarios}</td>
+      </tr>
+    `;
+  }).join("");
+
+  tbody.querySelectorAll(".btn-guardar-ticket").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idRegistro = btn.dataset.id;
+      const textarea = tbody.querySelector(`.input-accion-comentarios[data-id="${idRegistro}"]`);
+      btn.disabled = true;
+      btn.textContent = "Guardando...";
+
+      const { error } = await supabaseClient
+        .from("historial_fallas")
+        .update({ comentarios: textarea.value.trim(), accion_calle: null })
+        .eq("id_registro", idRegistro);
+
+      btn.textContent = error ? "❌ Error" : "✅ Guardado";
+      if (!error) {
+        const ticketLocal = ticketsCargados.find(t => t.id_registro === idRegistro);
+        if (ticketLocal) { ticketLocal.comentarios = textarea.value.trim(); ticketLocal.accion_calle = null; }
+      }
+      setTimeout(() => { btn.textContent = "Guardar"; btn.disabled = false; }, 1200);
+    });
+  });
 }
 
 guardarInstruccionesBtn.addEventListener("click", async () => {
@@ -210,13 +248,25 @@ document.getElementById("eliminar-ot-btn").addEventListener("click", async () =>
 
   try {
     // Orden importa: primero lo que depende de historial_fallas/componentes,
-    // al final la propia OT.
+    // al final la propia OT. Pedimos ".select()" en cada borrado para poder
+    // confirmar cuántas filas se borraron de verdad — si los permisos de
+    // Supabase bloquean el borrado, no da error, simplemente borra 0 filas
+    // en silencio, y sin este chequeo pareciera que "no pasó nada".
     await supabaseClient.from("garantias").delete().eq("id_ot", idOt);
     await supabaseClient.from("componentes_retirados").delete().eq("id_ot", idOt);
     await supabaseClient.from("materiales_ot").delete().eq("id_ot", idOt);
     await supabaseClient.from("historial_fallas").delete().eq("id_ot", idOt);
-    const { error } = await supabaseClient.from("ordenes_trabajo").delete().eq("id_ot", idOt);
+
+    const { data: filasBorradas, error } = await supabaseClient
+      .from("ordenes_trabajo")
+      .delete()
+      .eq("id_ot", idOt)
+      .select();
     if (error) throw error;
+
+    if (!filasBorradas || filasBorradas.length === 0) {
+      throw new Error("No se borró nada — probablemente falten los permisos de borrado en Supabase (corre 15-permisos-borrado.sql).");
+    }
 
     alert(`${idOt} eliminada por completo.`);
     window.location.href = "ordenes.html";
