@@ -560,7 +560,18 @@ modalEnviarBtn.addEventListener("click", async () => {
   const huboAlgunCambio = filasAInsertar.length > 0 || idsABorrar.length > 0 || actualizaciones.length > 0;
 
   if (idsABorrar.length > 0) {
-    await supabaseClient.from("componentes_retirados").delete().in("id", idsABorrar);
+    // Si alguno de estos componentes tiene una garantía asociada, hay que
+    // borrarla primero — si no, Postgres rechaza borrar el componente
+    // porque la garantía todavía lo referencia.
+    await supabaseClient.from("garantias").delete().in("componente_id", idsABorrar);
+
+    const { error: errorBorrado } = await supabaseClient.from("componentes_retirados").delete().in("id", idsABorrar);
+    if (errorBorrado) {
+      modalEnviarBtn.disabled = false;
+      modalEnviarBtn.textContent = "Enviar reporte";
+      mostrarMensaje(modalMsg, "⚠️ El ticket se guardó, pero no se pudo quitar el componente desmarcado: " + errorBorrado.message, true);
+      return;
+    }
   }
   for (const act of actualizaciones) {
     await supabaseClient.from("componentes_retirados").update(act.cambios).eq("id", act.id);

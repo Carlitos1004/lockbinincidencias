@@ -99,7 +99,7 @@ function renderTabla(componentes) {
         </td>
         <td>
           <input type="file" class="input-foto-revision" accept="image/*" capture="environment">
-          ${c.foto_revision ? `<a href="${c.foto_revision}" target="_blank" rel="noopener" class="link-foto-existente">Ver foto actual →</a>` : ""}
+          ${c.foto_revision ? `<a href="${c.foto_revision}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto actual →</a>` : ""}
         </td>
         <td><button class="btn-guardar-fila" ${bloqueado ? "disabled" : ""}>Guardar</button></td>
       </tr>
