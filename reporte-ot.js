@@ -56,6 +56,7 @@ async function generarReporte() {
     const componente = g.componente_id ? mapaComponentesPorId[g.componente_id] : null;
     g.foto_real = componente?.foto_revision
       || (componente?.id_registro ? mapaHistorialPorRegistro[componente.id_registro]?.link_foto : null)
+      || (typeof g.nombre_imagen === "string" && /^https?:\/\//i.test(g.nombre_imagen.trim()) ? g.nombre_imagen : null)
       || null;
   });
   if (!tickets || tickets.length === 0) {

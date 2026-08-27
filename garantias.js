@@ -51,6 +51,7 @@ async function cargarGarantias() {
     const componente = g.componente_id ? mapaComponentes[g.componente_id] : null;
     g.foto_real = componente?.foto_revision
       || (componente?.id_registro ? mapaHistorial[componente.id_registro]?.link_foto : null)
+      || (esUrlValida(g.nombre_imagen) ? g.nombre_imagen : null) // ej. links de Drive migrados de Sheets
       || null;
   });
 
@@ -135,6 +136,10 @@ async function guardarFila(btn) {
 
 filtroInput.addEventListener("input", renderTabla);
 filtroGarantia.addEventListener("change", renderTabla);
+
+function esUrlValida(texto) {
+  return typeof texto === "string" && /^https?:\/\//i.test(texto.trim());
+}
 
 function escaparAtributo(texto) {
   const div = document.createElement("div");
