@@ -565,11 +565,20 @@ modalEnviarBtn.addEventListener("click", async () => {
     // porque la garantía todavía lo referencia.
     await supabaseClient.from("garantias").delete().in("componente_id", idsABorrar);
 
-    const { error: errorBorrado } = await supabaseClient.from("componentes_retirados").delete().in("id", idsABorrar);
-    if (errorBorrado) {
+    // Pedimos ".select()" para poder confirmar cuántas filas se borraron
+    // de verdad — un bloqueo de permisos no siempre da error, a veces
+    // simplemente "borra 0 filas" en silencio.
+    const { data: borrados, error: errorBorrado } = await supabaseClient
+      .from("componentes_retirados")
+      .delete()
+      .in("id", idsABorrar)
+      .select();
+
+    if (errorBorrado || !borrados || borrados.length < idsABorrar.length) {
       modalEnviarBtn.disabled = false;
       modalEnviarBtn.textContent = "Enviar reporte";
-      mostrarMensaje(modalMsg, "⚠️ El ticket se guardó, pero no se pudo quitar el componente desmarcado: " + errorBorrado.message, true);
+      const detalle = errorBorrado ? errorBorrado.message : `se intentó borrar ${idsABorrar.length} y se borraron ${borrados?.length || 0} — probable bloqueo de permisos`;
+      mostrarMensaje(modalMsg, "⚠️ El ticket se guardó, pero no se pudo quitar el componente desmarcado: " + detalle, true);
       return;
     }
   }
