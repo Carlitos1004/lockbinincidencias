@@ -503,41 +503,76 @@ modalEnviarBtn.addEventListener("click", async () => {
     return;
   }
 
-  // Componentes retirados: solo agregamos los que TODAVÍA no estén
-  // registrados para este ticket (evita duplicar si el operario reabre y
-  // vuelve a guardar sin cambiar nada)
+  // Sincronizamos de verdad contra lo que ya existía para este ticket:
+  // si desmarcaste algo que estaba guardado, se borra; si cambiaste de
+  // categoría (de "falta" a "cambio" o viceversa) o el serial nuevo, se
+  // actualiza; si es nuevo, se crea. Antes solo se creaba, nunca se
+  // borraba ni actualizaba — por eso una casilla desmarcada seguía
+  // apareciendo marcada al volver a abrir el ticket.
   const { data: yaRegistrados } = await supabaseClient
     .from("componentes_retirados")
-    .select("tipo_componente, estado")
+    .select("*")
     .eq("id_registro", idRegistro);
 
-  const tiposYaCambio = new Set((yaRegistrados || []).filter(c => c.estado !== "Faltante/Perdido").map(c => c.tipo_componente));
-  const tiposYaFalta = new Set((yaRegistrados || []).filter(c => c.estado === "Faltante/Perdido").map(c => c.tipo_componente));
+  const filasAInsertar = [];
+  const idsABorrar = [];
+  const actualizaciones = [];
 
-  const filasComponentes = [];
-  codigosCambioReal.forEach(codigo => {
-    if (tiposYaCambio.has(MAPA_COMPONENTE[codigo].nombre)) return;
-    filasComponentes.push({
+  Object.keys(MAPA_COMPONENTE).forEach(codigo => {
+    const nombreTipo = MAPA_COMPONENTE[codigo].nombre;
+    const filaExistente = (yaRegistrados || []).find(c => c.tipo_componente === nombreTipo);
+    const deseaCambio = codigosCambioReal.includes(codigo);
+    const deseaFalta = codigosFaltantes.includes(codigo);
+
+    if (!deseaCambio && !deseaFalta) {
+      // Ya no se quiere nada de este componente — si existía, se borra
+      if (filaExistente) idsABorrar.push(filaExistente.id);
+      return;
+    }
+
+    const huboReemplazo = !!serialesNuevos[codigo];
+    const estadoDeseado = deseaFalta
+      ? "Faltante/Perdido"
+      : (retiradoPorCliente ? "Cambiado por el cliente" : "Pendiente revisión");
+    const excluirDeseado = deseaFalta ? !huboReemplazo : retiradoPorCliente;
+    const serialNuevoDeseado = serialesNuevos[codigo] || null;
+
+    if (filaExistente) {
+      const cambioDeCategoria = filaExistente.estado !== estadoDeseado;
+      const cambioDeSerial = serialNuevoDeseado && filaExistente.serial_nuevo !== serialNuevoDeseado;
+      if (cambioDeCategoria || cambioDeSerial) {
+        actualizaciones.push({
+          id: filaExistente.id,
+          cambios: { estado: estadoDeseado, excluir_materiales: excluirDeseado, serial_nuevo: serialNuevoDeseado || filaExistente.serial_nuevo }
+        });
+      }
+      return;
+    }
+
+    filasAInsertar.push({
       cliente: equiposPorMC[equipoAbierto].equipo.cliente, m_control: equipoAbierto,
-      tipo_componente: MAPA_COMPONENTE[codigo].nombre, serial_retirado: serialViejoDe(codigo),
-      serial_nuevo: serialesNuevos[codigo] || null, id_registro: idRegistro, id_ot: idOtActiva,
-      estado: retiradoPorCliente ? "Cambiado por el cliente" : "Pendiente revisión",
-      excluir_materiales: retiradoPorCliente
+      tipo_componente: nombreTipo, serial_retirado: serialViejoDe(codigo),
+      serial_nuevo: serialNuevoDeseado, id_registro: idRegistro, id_ot: idOtActiva,
+      estado: estadoDeseado, excluir_materiales: excluirDeseado
     });
   });
-  codigosFaltantes.forEach(codigo => {
-    if (tiposYaFalta.has(MAPA_COMPONENTE[codigo].nombre)) return;
-    const huboReemplazo = !!serialesNuevos[codigo]; // se instaló algo nuevo en su lugar, aunque faltara el original
-    filasComponentes.push({
-      cliente: equiposPorMC[equipoAbierto].equipo.cliente, m_control: equipoAbierto,
-      tipo_componente: MAPA_COMPONENTE[codigo].nombre, serial_retirado: serialViejoDe(codigo),
-      serial_nuevo: serialesNuevos[codigo] || null, // si se instaló uno nuevo en su lugar
-      id_registro: idRegistro, id_ot: idOtActiva, estado: "Faltante/Perdido",
-      excluir_materiales: !huboReemplazo // solo se excluye si de verdad no se usó material
-    });
-  });
-  if (filasComponentes.length > 0) {
-    await supabaseClient.from("componentes_retirados").insert(filasComponentes);
+
+  const huboAlgunCambio = filasAInsertar.length > 0 || idsABorrar.length > 0 || actualizaciones.length > 0;
+
+  if (idsABorrar.length > 0) {
+    await supabaseClient.from("componentes_retirados").delete().in("id", idsABorrar);
+  }
+  for (const act of actualizaciones) {
+    await supabaseClient.from("componentes_retirados").update(act.cambios).eq("id", act.id);
+  }
+  if (filasAInsertar.length > 0) {
+    await supabaseClient.from("componentes_retirados").insert(filasAInsertar);
+  }
+  if (huboAlgunCambio) {
+    // Sin esto, "Utilizados"/"Vuelven" en Materiales se quedan con el
+    // número viejo hasta que alguien pase por Revisión de Taller o por
+    // Materiales — el reporte de campo también debe disparar el recálculo.
+    await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: idOtActiva });
   }
 
   modalEnviarBtn.disabled = false;

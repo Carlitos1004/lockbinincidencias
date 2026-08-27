@@ -250,6 +250,8 @@ enviarBtn.addEventListener("click", async () => {
     const { error: errorComponentes } = await supabaseClient.from("componentes_retirados").insert(filasComponentes);
     if (errorComponentes) {
       mostrarMensajeReporte("⚠️ El ticket se guardó, pero hubo un error al registrar los componentes: " + errorComponentes.message, true);
+    } else {
+      await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: idOtActiva });
     }
   }
 
