@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Estadísticas de Fallas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Estadísticas de Fallas</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Calculado a partir de los reportes de campo que ya se están registrando — se actualiza solo con cada OT nueva, sin ningún paso manual.</p>
+
+  <div class="resumen-cliente" id="tarjetas-resumen">
+    <div class="tarjeta-resumen"><strong>—</strong><span>Fallas reportadas</span></div>
+    <div class="tarjeta-resumen"><strong>—</strong><span>Resueltas (funcionando)</span></div>
+    <div class="tarjeta-resumen"><strong>—</strong><span>Pendientes</span></div>
+  </div>
+
+  <h2 style="margin-top:32px;">Fallas más comunes</h2>
+  <div id="lista-fallas-comunes"></div>
+
+  <h2 style="margin-top:32px;">Tasa de fallo por cliente</h2>
+  <p style="color:var(--gris-700); font-size:0.85rem; margin-top:-8px;">De los equipos instalados, cuántos han tenido al menos una falla reportada.</p>
+  <table class="tabla-revision">
+    <thead><tr><th>Cliente</th><th>Equipos instalados</th><th>Con falla reportada</th><th>Tasa de fallo</th></tr></thead>
+    <tbody id="tabla-cliente-tbody"><tr><td colspan="4">Cargando...</td></tr></tbody>
+  </table>
+
+  <h2 style="margin-top:32px;">Tendencia mensual</h2>
+  <div id="tendencia-mensual"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="estadisticas.js"></script>
+</body>
+</html>

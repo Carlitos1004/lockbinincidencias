@@ -1068,6 +1068,48 @@ td[colspan] {
   cursor: pointer;
 }
 
+/* --- Estadísticas de fallas: filas con barra horizontal --- */
+
+.fila-barra {
+  display: grid;
+  grid-template-columns: 200px 1fr 40px;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  font-size: 0.85rem;
+}
+
+.fila-barra-etiqueta {
+  color: var(--gris-950);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fila-barra-pista {
+  background: var(--gris-100);
+  border-radius: 6px;
+  height: 14px;
+  overflow: hidden;
+}
+
+.fila-barra-relleno {
+  height: 100%;
+  background: var(--verde-medio);
+  border-radius: 6px;
+}
+
+.fila-barra-relleno-mes {
+  background: var(--gris-400);
+}
+
+.fila-barra-cantidad {
+  text-align: right;
+  font-family: var(--fuente-mono);
+  color: var(--gris-700);
+  font-size: 0.8rem;
+}
+
 .marcador-numero {
   width: 28px;
   height: 28px;
