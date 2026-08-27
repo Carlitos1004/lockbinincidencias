@@ -43,6 +43,21 @@ async function generarReporte() {
     mostrarMensaje("No se encontró esa OT.", true);
     return;
   }
+
+  // Foto real de cada garantía: primero la de Revisión de Taller
+  // (componentes_retirados.foto_revision), si no, la del reporte de campo
+  // (historial_fallas.link_foto) — usando los datos ya cargados arriba.
+  const mapaComponentesPorId = {};
+  (componentes || []).forEach(c => { mapaComponentesPorId[c.id] = c; });
+  const mapaHistorialPorRegistro = {};
+  (tickets || []).forEach(t => { mapaHistorialPorRegistro[t.id_registro] = t; });
+
+  (garantiasOt || []).forEach(g => {
+    const componente = g.componente_id ? mapaComponentesPorId[g.componente_id] : null;
+    g.foto_real = componente?.foto_revision
+      || (componente?.id_registro ? mapaHistorialPorRegistro[componente.id_registro]?.link_foto : null)
+      || null;
+  });
   if (!tickets || tickets.length === 0) {
     mostrarMensaje("Esa OT no tiene equipos/tickets registrados.", true);
     return;
@@ -120,7 +135,7 @@ function renderReporte() {
   llenarTabla("tabla-garantias-reporte", r.garantias.map(g => [
     g.m_control, g.dispositivo_danado, g.falla, g.criterio_revision || "—",
     calcularGarantiaTiempo(g.fecha_entrega), calcularEstadoFinalGarantia(g.criterio_revision, g.fecha_entrega),
-    g.nombre_imagen || "—"
+    g.foto_real || g.nombre_imagen || "—"
   ]));
   llenarTabla("tabla-destino", r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
 
@@ -195,7 +210,7 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
     r.garantias.map(g => [
       g.m_control, g.dispositivo_danado, g.falla, g.criterio_revision || "—",
       calcularGarantiaTiempo(g.fecha_entrega), calcularEstadoFinalGarantia(g.criterio_revision, g.fecha_entrega),
-      g.nombre_imagen || "—"
+      g.foto_real || g.nombre_imagen || "—"
     ]));
 
   seccion("CONTROL STOCK DE DESTINO",
@@ -248,7 +263,7 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
     r.garantias.map(g => [
       g.m_control, g.dispositivo_danado, g.falla, g.criterio_revision || "—",
       calcularGarantiaTiempo(g.fecha_entrega), calcularEstadoFinalGarantia(g.criterio_revision, g.fecha_entrega),
-      g.nombre_imagen || "—"
+      g.foto_real || g.nombre_imagen || "—"
     ]));
   seccion("Control Stock de Destino", ["Destino", "Cantidad", "Desglose"], r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
 

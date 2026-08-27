@@ -110,7 +110,7 @@ function renderTabla() {
       : ([t.accion_calle, t.comentarios].filter(Boolean).join(" | ") || "—");
 
     const celdaFoto = t.link_foto
-      ? `<a href="${t.link_foto}" target="_blank" rel="noopener">Ver foto →</a>`
+      ? `<a href="${t.link_foto}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>`
       : "—";
 
     return `

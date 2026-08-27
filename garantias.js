@@ -22,6 +22,38 @@ async function cargarGarantias() {
   }
 
   garantiasCargadas = data || [];
+
+  // Traemos la foto real: primero la de Revisión de Taller
+  // (componentes_retirados.foto_revision), y si no hay, la que subió el
+  // operario en campo (historial_fallas.link_foto) — uniendo a mano, ya
+  // que no hay relación automática configurada entre estas tablas.
+  const componenteIds = [...new Set(garantiasCargadas.map(g => g.componente_id).filter(Boolean))];
+  let mapaComponentes = {};
+  if (componenteIds.length > 0) {
+    const { data: componentesData } = await supabaseClient
+      .from("componentes_retirados")
+      .select("id, foto_revision, id_registro")
+      .in("id", componenteIds);
+    (componentesData || []).forEach(c => { mapaComponentes[c.id] = c; });
+  }
+
+  const idsRegistro = [...new Set(Object.values(mapaComponentes).map(c => c.id_registro).filter(Boolean))];
+  let mapaHistorial = {};
+  if (idsRegistro.length > 0) {
+    const { data: historialData } = await supabaseClient
+      .from("historial_fallas")
+      .select("id_registro, link_foto")
+      .in("id_registro", idsRegistro);
+    (historialData || []).forEach(h => { mapaHistorial[h.id_registro] = h; });
+  }
+
+  garantiasCargadas.forEach(g => {
+    const componente = g.componente_id ? mapaComponentes[g.componente_id] : null;
+    g.foto_real = componente?.foto_revision
+      || (componente?.id_registro ? mapaHistorial[componente.id_registro]?.link_foto : null)
+      || null;
+  });
+
   renderTabla();
 }
 
@@ -65,7 +97,10 @@ function renderTabla() {
       <td>${vigencia}</td>
       <td>${estadoFinal || "—"}</td>
       <td><input type="text" class="input-observacion" value="${escaparAtributo(g.observacion || "")}" placeholder="Observación..."></td>
-      <td><input type="text" class="input-imagen" value="${escaparAtributo(g.nombre_imagen || "")}" placeholder="Nombre/link imagen..."></td>
+      <td>${g.foto_real
+        ? `<a href="${g.foto_real}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>`
+        : `<input type="text" class="input-imagen" value="${escaparAtributo(g.nombre_imagen || "")}" placeholder="Nombre/link imagen...">`
+      }</td>
       <td><button class="btn-guardar-fila">Guardar</button></td>
     </tr>
   `;
@@ -81,18 +116,17 @@ async function guardarFila(btn) {
   const id = fila.dataset.id;
   const fechaEntrega = fila.querySelector(".input-fecha-entrega").value || null;
   const observacion = fila.querySelector(".input-observacion").value.trim();
-  const nombreImagen = fila.querySelector(".input-imagen").value.trim();
+  const nombreImagen = fila.querySelector(".input-imagen")?.value.trim() ?? undefined;
 
   btn.disabled = true;
   btn.textContent = "Guardando...";
 
+  const datosGuardar = { fecha_entrega: fechaEntrega, observacion: observacion };
+  if (nombreImagen !== undefined) datosGuardar.nombre_imagen = nombreImagen;
+
   const { error } = await supabaseClient
     .from("garantias")
-    .update({
-      fecha_entrega: fechaEntrega,
-      observacion: observacion,
-      nombre_imagen: nombreImagen
-    })
+    .update(datosGuardar)
     .eq("id", id);
 
   btn.textContent = error ? "❌ Error" : "✅ Guardado";
