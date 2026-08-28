@@ -108,10 +108,12 @@ async function buscarOT() {
 
 function renderTabla() {
   const esManager = window.perfilActual?.rol === "manager";
+  const filtroModulo = document.getElementById("filtro-modulo").value.trim().toLowerCase();
   const filtroFalla = document.getElementById("filtro-falla-select").value;
   const filtroEstado = document.getElementById("filtro-estado-ticket").value;
 
   const filasFiltradas = ticketsCargados.filter(t =>
+    (!filtroModulo || t.m_control.toLowerCase().includes(filtroModulo)) &&
     (!filtroFalla || t.falla === filtroFalla) &&
     (!filtroEstado || t.estado === filtroEstado)
   );
@@ -386,8 +388,6 @@ document.getElementById("agregar-equipo-btn").addEventListener("click", async ()
   buscarOT();
 });
 
-// --- Filtro modal ---
-inicializarFiltroModal("toggle-filtros-btn", [
-  { clave: "falla", etiqueta: "Falla", elementoId: "filtro-falla-select", tipo: "select", valorPorDefecto: "" },
-  { clave: "estado", etiqueta: "Estado", elementoId: "filtro-estado-ticket", tipo: "select", valorPorDefecto: "" }
-], renderTabla);
+document.getElementById("filtro-modulo").addEventListener("input", renderTabla);
+document.getElementById("filtro-falla-select").addEventListener("change", renderTabla);
+document.getElementById("filtro-estado-ticket").addEventListener("change", renderTabla);

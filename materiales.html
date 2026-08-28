@@ -47,25 +47,24 @@
   <p id="guardar-msg" class="resultado-msg" hidden></p>
 
   <h2 style="margin-top:32px;">Control de materiales</h2>
-
-  <button id="toggle-filtros-btn" class="btn-toggle-filtros">🔽 Filtros</button>
-  <div class="panel-filtros" id="panel-filtros" hidden>
-    <div class="materiales-controles">
-      <input type="text" id="filtro-ot" placeholder="Filtrar por OT...">
-      <select id="filtro-tipo-componente">
-        <option value="">Todos los componentes</option>
-        <option value="Lector Electrónico">Lector Electrónico (LE)</option>
-        <option value="Cierre Electrónico">Cierre Electrónico (CE)</option>
-        <option value="Batería">Batería (BA)</option>
-        <option value="Módulo de Control">Módulo de Control (MC)</option>
-      </select>
-    </div>
-  </div>
-  <p style="margin-top:12px;"><button id="recalcular-btn" class="btn-secundario">Recalcular todo</button></p>
+  <p><button id="recalcular-btn" class="btn-secundario">Recalcular todo</button></p>
 
   <table class="tabla-materiales">
     <thead>
       <tr><th>OT</th><th>Tipo</th><th>Llevados</th><th>Utilizados</th><th>Vuelven</th></tr>
+      <tr class="fila-filtros">
+        <th><input type="text" id="filtro-ot-tabla" placeholder="Filtrar..."></th>
+        <th>
+          <select id="filtro-tipo-componente">
+            <option value="">Todos</option>
+            <option value="Lector Electrónico">Lector Electrónico</option>
+            <option value="Cierre Electrónico">Cierre Electrónico</option>
+            <option value="Batería">Batería</option>
+            <option value="Módulo de Control">Módulo de Control</option>
+          </select>
+        </th>
+        <th></th><th></th><th></th>
+      </tr>
     </thead>
     <tbody id="materiales-tbody">
       <tr><td colspan="5">Cargando...</td></tr>
@@ -78,7 +77,6 @@
 <script>const ROL_ESPERADO = "manager";</script>
 <script src="sesion.js"></script>
 <script src="selector-ots.js"></script>
-<script src="filtro-modal.js"></script>
 <script src="materiales.js"></script>
 
 <footer class="footer-fv">

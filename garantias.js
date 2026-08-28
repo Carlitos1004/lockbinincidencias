@@ -4,7 +4,6 @@
 
 let garantiasCargadas = [];
 
-const filtroInput = document.getElementById("filtro-input");
 const filtroGarantia = document.getElementById("filtro-garantia");
 const filtroVigencia = document.getElementById("filtro-vigencia");
 const tbody = document.getElementById("garantias-tbody");
@@ -60,19 +59,17 @@ async function cargarGarantias() {
 }
 
 function renderTabla() {
-  const texto = filtroInput.value.trim().toLowerCase();
+  const fOt = document.getElementById("filtro-ot").value.trim().toLowerCase();
+  const fCliente = document.getElementById("filtro-cliente").value.trim().toLowerCase();
+  const fModulo = document.getElementById("filtro-modulo").value.trim().toLowerCase();
   const garantia = filtroGarantia.value;
   const vigencia = filtroVigencia.value;
 
   let filtradas = garantiasCargadas;
 
-  if (texto) {
-    filtradas = filtradas.filter(g =>
-      (g.id_ot || "").toLowerCase().includes(texto) ||
-      (g.cliente || "").toLowerCase().includes(texto) ||
-      (g.m_control || "").toLowerCase().includes(texto)
-    );
-  }
+  if (fOt) filtradas = filtradas.filter(g => (g.id_ot || "").toLowerCase().includes(fOt));
+  if (fCliente) filtradas = filtradas.filter(g => (g.cliente || "").toLowerCase().includes(fCliente));
+  if (fModulo) filtradas = filtradas.filter(g => (g.m_control || "").toLowerCase().includes(fModulo));
   if (garantia !== "todas") {
     filtradas = filtradas.filter(g => {
       const aplica = esGarantiaAplicable(g.criterio_revision, g.fecha_entrega);
@@ -139,7 +136,9 @@ async function guardarFila(btn) {
   setTimeout(() => { cargarGarantias(); }, 1200);
 }
 
-filtroInput.addEventListener("input", renderTabla);
+["filtro-ot", "filtro-cliente", "filtro-modulo"].forEach(id => {
+  document.getElementById(id).addEventListener("input", renderTabla);
+});
 filtroGarantia.addEventListener("change", renderTabla);
 filtroVigencia.addEventListener("change", renderTabla);
 
@@ -154,8 +153,4 @@ function escaparAtributo(texto) {
 }
 
 // --- Filtro modal ---
-inicializarFiltroModal("toggle-filtros-btn", [
-  { clave: "texto", etiqueta: "OT, cliente o módulo", elementoId: "filtro-input", tipo: "texto" },
-  { clave: "garantia", etiqueta: "Garantía", elementoId: "filtro-garantia", tipo: "select", valorPorDefecto: "todas" },
-  { clave: "vigencia", etiqueta: "Vigencia", elementoId: "filtro-vigencia", tipo: "select", valorPorDefecto: "todas" }
-], renderTabla);
+

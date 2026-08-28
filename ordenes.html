@@ -22,29 +22,28 @@
 <div class="panel-body panel-body-ancho">
   <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
 
-  <button id="toggle-filtros-btn" class="btn-toggle-filtros">🔽 Filtros</button>
-
-  <div class="panel-filtros" id="panel-filtros" hidden>
-    <div class="materiales-controles">
-      <input type="text" id="filtro-input" placeholder="Buscar por OT o cliente...">
-      <input type="text" id="filtro-creado-por" placeholder="Filtrar por Creada por...">
-      <select id="filtro-estado">
-        <option value="todas">Todas</option>
-        <option value="pendientes">Con tickets pendientes</option>
-        <option value="completas">Completas (todo cerrado)</option>
-      </select>
-    </div>
-    <div class="materiales-controles">
-      <label class="filtro-fecha-label">Desde <input type="date" id="filtro-fecha-desde"></label>
-      <label class="filtro-fecha-label">Hasta <input type="date" id="filtro-fecha-hasta"></label>
-    </div>
-  </div>
-
   <table class="tabla-revision" id="tabla-ots">
     <thead>
       <tr>
         <th>OT</th><th>Fecha</th><th>Creada por</th><th>Clientes</th>
         <th>Equipos</th><th>Tickets abiertos</th><th>Tickets cerrados</th><th>Avance</th><th></th>
+      </tr>
+      <tr class="fila-filtros">
+        <th><input type="text" id="filtro-ot" placeholder="Filtrar..."></th>
+        <th></th>
+        <th><input type="text" id="filtro-creado-por" placeholder="Filtrar..."></th>
+        <th><input type="text" id="filtro-cliente" placeholder="Filtrar..."></th>
+        <th></th>
+        <th></th>
+        <th></th>
+        <th>
+          <select id="filtro-estado">
+            <option value="todas">Todas</option>
+            <option value="pendientes">Pendientes</option>
+            <option value="completas">Completas</option>
+          </select>
+        </th>
+        <th></th>
       </tr>
     </thead>
     <tbody id="ots-tbody">
@@ -57,7 +56,6 @@
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "manager";</script>
 <script src="sesion.js"></script>
-<script src="filtro-modal.js"></script>
 <script src="ordenes.js"></script>
 
 <footer class="footer-fv">

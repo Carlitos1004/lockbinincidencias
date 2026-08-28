@@ -72,21 +72,22 @@
       <p id="agregar-equipo-msg" class="resultado-msg" hidden></p>
     </div>
 
-    <button id="toggle-filtros-btn" class="btn-toggle-filtros">🔽 Filtros</button>
-    <div class="panel-filtros" id="panel-filtros" hidden>
-      <div class="materiales-controles">
-        <select id="filtro-falla-select"><option value="">Todas las fallas</option></select>
-        <select id="filtro-estado-ticket">
-          <option value="">Todos los estados</option>
-          <option value="🚨 ABIERTO">Abierto</option>
-          <option value="✅ CERRADO">Cerrado</option>
-        </select>
-      </div>
-    </div>
-
     <table class="tabla-revision" id="tabla-ot">
       <thead>
         <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Serial Nuevo</th><th>Foto</th><th>Acción / Comentarios</th><th></th></tr>
+        <tr class="fila-filtros">
+          <th><input type="text" id="filtro-modulo" placeholder="Filtrar..."></th>
+          <th></th>
+          <th><select id="filtro-falla-select"><option value="">Todas</option></select></th>
+          <th>
+            <select id="filtro-estado-ticket">
+              <option value="">Todos</option>
+              <option value="🚨 ABIERTO">Abierto</option>
+              <option value="✅ CERRADO">Cerrado</option>
+            </select>
+          </th>
+          <th></th><th></th><th></th><th></th>
+        </tr>
       </thead>
       <tbody id="ot-tbody"></tbody>
     </table>
@@ -98,7 +99,6 @@
 <script src="config.js"></script>
 <script src="sesion-generica.js"></script>
 <script src="selector-ots.js"></script>
-<script src="filtro-modal.js"></script>
 <script src="ot-detalle.js"></script>
 
 <footer class="footer-fv">

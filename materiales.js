@@ -7,7 +7,7 @@ const cargarOtBtn = document.getElementById("cargar-ot-btn");
 const tablaLlevadosWrap = document.getElementById("tabla-llevados-wrap");
 const guardarBtn = document.getElementById("guardar-btn");
 const guardarMsg = document.getElementById("guardar-msg");
-const filtroOt = document.getElementById("filtro-ot");
+const filtroOt = document.getElementById("filtro-ot-tabla");
 const recalcularBtn = document.getElementById("recalcular-btn");
 const tbody = document.getElementById("materiales-tbody");
 
@@ -84,7 +84,7 @@ filtroOt.addEventListener("input", cargarMateriales);
 async function cargarMateriales() {
   let query = supabaseClient.from("materiales_ot").select("*").order("id_ot", { ascending: false });
 
-  const filtro = filtroOt.value.trim().toUpperCase();
+  const filtro = document.getElementById("filtro-ot-tabla").value.trim().toUpperCase();
   if (filtro) query = query.ilike("id_ot", `%${filtro}%`);
 
   const tipoComponente = document.getElementById("filtro-tipo-componente").value;
@@ -124,7 +124,4 @@ cargarMateriales();
 document.getElementById("filtro-tipo-componente").addEventListener("change", cargarMateriales);
 
 // --- Filtro modal ---
-inicializarFiltroModal("toggle-filtros-btn", [
-  { clave: "ot", etiqueta: "OT", elementoId: "filtro-ot", tipo: "texto" },
-  { clave: "componente", etiqueta: "Componente", elementoId: "filtro-tipo-componente", tipo: "select", valorPorDefecto: "" }
-], cargarMateriales);
+

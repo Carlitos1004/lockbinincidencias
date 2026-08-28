@@ -1,14 +1,10 @@
 // =========================================================================
-// PANEL GENERAL DE OT
+// PANEL GENERAL DE OT — filtro simple, un input/select por columna,
+// siempre visible, sin pasos extra.
 // =========================================================================
 
 let otsConDatos = []; // [{ot, tickets, clientes, equipos, abiertos, cerrados}]
 
-const filtroInput = document.getElementById("filtro-input");
-const filtroEstado = document.getElementById("filtro-estado");
-const filtroCreadoPor = document.getElementById("filtro-creado-por");
-const filtroFechaDesde = document.getElementById("filtro-fecha-desde");
-const filtroFechaHasta = document.getElementById("filtro-fecha-hasta");
 const tbody = document.getElementById("ots-tbody");
 
 cargarOTs();
@@ -33,7 +29,6 @@ async function cargarOTs() {
     return;
   }
 
-  // Agrupar tickets por OT
   const ticketsPorOt = {};
   (tickets || []).forEach(t => {
     if (!t.id_ot) return;
@@ -54,35 +49,18 @@ async function cargarOTs() {
 }
 
 function renderTabla() {
-  const texto = filtroInput.value.trim().toLowerCase();
-  const estado = filtroEstado.value;
-  const creadoPor = filtroCreadoPor.value.trim().toLowerCase();
-  const desde = filtroFechaDesde.value;
-  const hasta = filtroFechaHasta.value;
+  const fOt = document.getElementById("filtro-ot").value.trim().toLowerCase();
+  const fCreadoPor = document.getElementById("filtro-creado-por").value.trim().toLowerCase();
+  const fCliente = document.getElementById("filtro-cliente").value.trim().toLowerCase();
+  const fEstado = document.getElementById("filtro-estado").value;
 
   let filtradas = otsConDatos;
 
-  if (texto) {
-    filtradas = filtradas.filter(r =>
-      r.ot.id_ot.toLowerCase().includes(texto) ||
-      r.clientes.some(c => c.toLowerCase().includes(texto))
-    );
-  }
-
-  if (creadoPor) {
-    filtradas = filtradas.filter(r => (r.ot.creado_por || "").toLowerCase().includes(creadoPor));
-  }
-
-  if (desde) {
-    filtradas = filtradas.filter(r => new Date(r.ot.fecha) >= new Date(desde));
-  }
-  if (hasta) {
-    const finDia = new Date(hasta); finDia.setHours(23, 59, 59, 999);
-    filtradas = filtradas.filter(r => new Date(r.ot.fecha) <= finDia);
-  }
-
-  if (estado === "pendientes") filtradas = filtradas.filter(r => r.abiertos > 0);
-  if (estado === "completas") filtradas = filtradas.filter(r => r.abiertos === 0 && r.totalTickets > 0);
+  if (fOt) filtradas = filtradas.filter(r => r.ot.id_ot.toLowerCase().includes(fOt));
+  if (fCreadoPor) filtradas = filtradas.filter(r => (r.ot.creado_por || "").toLowerCase().includes(fCreadoPor));
+  if (fCliente) filtradas = filtradas.filter(r => r.clientes.some(c => c.toLowerCase().includes(fCliente)));
+  if (fEstado === "pendientes") filtradas = filtradas.filter(r => r.abiertos > 0);
+  if (fEstado === "completas") filtradas = filtradas.filter(r => r.abiertos === 0 && r.totalTickets > 0);
 
   if (filtradas.length === 0) {
     tbody.innerHTML = `<tr><td colspan="9">No hay OT que coincidan.</td></tr>`;
@@ -112,16 +90,7 @@ function renderTabla() {
   }).join("");
 }
 
-filtroInput.addEventListener("input", renderTabla);
-filtroEstado.addEventListener("change", renderTabla);
-filtroCreadoPor.addEventListener("input", renderTabla);
-filtroFechaDesde.addEventListener("change", renderTabla);
-filtroFechaHasta.addEventListener("change", renderTabla);
-// --- Filtro modal ---
-inicializarFiltroModal("toggle-filtros-btn", [
-  { clave: "texto", etiqueta: "OT o cliente", elementoId: "filtro-input", tipo: "texto" },
-  { clave: "creado_por", etiqueta: "Creada por", elementoId: "filtro-creado-por", tipo: "texto" },
-  { clave: "estado", etiqueta: "Estado", elementoId: "filtro-estado", tipo: "select", valorPorDefecto: "todas" },
-  { clave: "desde", etiqueta: "Fecha desde", elementoId: "filtro-fecha-desde", tipo: "fecha" },
-  { clave: "hasta", etiqueta: "Fecha hasta", elementoId: "filtro-fecha-hasta", tipo: "fecha" }
-], renderTabla);
+["filtro-ot", "filtro-creado-por", "filtro-cliente"].forEach(id => {
+  document.getElementById(id).addEventListener("input", renderTabla);
+});
+document.getElementById("filtro-estado").addEventListener("change", renderTabla);
