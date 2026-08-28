@@ -71,6 +71,8 @@ async function cargarRuta() {
     instruccionesDiv.hidden = true;
   }
 
+  document.getElementById("agregar-equipo-ruta").hidden = false;
+
   const { data: tickets, error } = await supabaseClient
     .from("historial_fallas")
     .select("*")
@@ -628,3 +630,60 @@ function escaparHtml(texto) {
     cargarRuta();
   }
 })();
+
+// --- Agregar un equipo nuevo a la OT activa, directo desde el mapa ---
+document.getElementById("agregar-equipo-btn").addEventListener("click", async () => {
+  const mc = document.getElementById("agregar-mc-input").value.trim().toUpperCase();
+  const falla = document.getElementById("agregar-falla-select").value;
+  const msg = document.getElementById("agregar-equipo-msg");
+  const idOt = otInput.value.trim().toUpperCase();
+
+  if (!mc || !falla) {
+    mostrarMensaje(msg, "⚠️ Escribe el Módulo de Control y elige una falla.", true);
+    return;
+  }
+  if (!idOt) return;
+
+  const btn = document.getElementById("agregar-equipo-btn");
+  btn.disabled = true;
+  btn.textContent = "Agregando...";
+
+  const { data: equipo } = await supabaseClient
+    .from("equipos")
+    .select("m_control, cliente")
+    .eq("m_control", mc)
+    .maybeSingle();
+
+  if (!equipo) {
+    mostrarMensaje(msg, "❌ No existe ningún equipo con ese Módulo de Control.", true);
+    btn.disabled = false;
+    btn.textContent = "Agregar";
+    return;
+  }
+
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  const idRegistro = "TK-" + mc + "-" + Math.floor(Math.random() * 900 + 100);
+
+  const { error } = await supabaseClient.from("historial_fallas").insert({
+    id_registro: idRegistro,
+    cliente: equipo.cliente,
+    m_control: mc,
+    falla: falla,
+    estado: "🚨 ABIERTO",
+    origen: user.email,
+    id_ot: idOt
+  });
+
+  btn.disabled = false;
+  btn.textContent = "Agregar";
+
+  if (error) {
+    mostrarMensaje(msg, "❌ " + error.message, true);
+    return;
+  }
+
+  mostrarMensaje(msg, `✅ ${mc} agregado — actualizando el mapa...`, false);
+  document.getElementById("agregar-mc-input").value = "";
+  document.getElementById("agregar-falla-select").value = "";
+  setTimeout(() => cargarRuta(), 800); // recarga el mapa para que salga el nuevo punto
+});

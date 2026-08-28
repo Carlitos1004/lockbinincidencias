@@ -1146,6 +1146,21 @@ td[colspan] {
   background: var(--ambar-bg);
 }
 
+.filtro-fecha-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--gris-700);
+}
+
+.filtro-fecha-label input {
+  padding: 7px 8px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
 .marcador-numero {
   width: 28px;
   height: 28px;

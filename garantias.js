@@ -6,6 +6,7 @@ let garantiasCargadas = [];
 
 const filtroInput = document.getElementById("filtro-input");
 const filtroGarantia = document.getElementById("filtro-garantia");
+const filtroVigencia = document.getElementById("filtro-vigencia");
 const tbody = document.getElementById("garantias-tbody");
 
 cargarGarantias();
@@ -61,6 +62,7 @@ async function cargarGarantias() {
 function renderTabla() {
   const texto = filtroInput.value.trim().toLowerCase();
   const garantia = filtroGarantia.value;
+  const vigencia = filtroVigencia.value;
 
   let filtradas = garantiasCargadas;
 
@@ -76,6 +78,9 @@ function renderTabla() {
       const aplica = esGarantiaAplicable(g.criterio_revision, g.fecha_entrega);
       return garantia === "SI" ? aplica : !aplica;
     });
+  }
+  if (vigencia !== "todas") {
+    filtradas = filtradas.filter(g => calcularGarantiaTiempo(g.fecha_entrega) === vigencia);
   }
 
   if (filtradas.length === 0) {
@@ -136,6 +141,7 @@ async function guardarFila(btn) {
 
 filtroInput.addEventListener("input", renderTabla);
 filtroGarantia.addEventListener("change", renderTabla);
+filtroVigencia.addEventListener("change", renderTabla);
 
 function esUrlValida(texto) {
   return typeof texto === "string" && /^https?:\/\//i.test(texto.trim());

@@ -72,6 +72,15 @@
       <p id="agregar-equipo-msg" class="resultado-msg" hidden></p>
     </div>
 
+    <div class="materiales-controles">
+      <select id="filtro-falla-select"><option value="">Todas las fallas</option></select>
+      <select id="filtro-estado-ticket">
+        <option value="">Todos los estados</option>
+        <option value="🚨 ABIERTO">Abierto</option>
+        <option value="✅ CERRADO">Cerrado</option>
+      </select>
+    </div>
+
     <table class="tabla-revision" id="tabla-ot">
       <thead>
         <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Serial Nuevo</th><th>Foto</th><th>Acción / Comentarios</th><th></th></tr>

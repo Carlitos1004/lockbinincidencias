@@ -35,6 +35,31 @@
   <p id="instrucciones-ruta-texto"></p>
 </div>
 
+<div class="agregar-equipo-box" id="agregar-equipo-ruta" hidden>
+  <label for="agregar-mc-input"><strong>➕ Agregar un equipo a esta OT</strong></label>
+  <div class="agregar-equipo-controles">
+    <input type="text" id="agregar-mc-input" placeholder="Ej: MC2500642">
+    <select id="agregar-falla-select">
+      <option value="">— Falla —</option>
+      <option>No comunica</option>
+      <option>Error servo</option>
+      <option>Vuelco</option>
+      <option>Incendio</option>
+      <option>Bloqueado</option>
+      <option>Sin batería</option>
+      <option>Batería Crítica</option>
+      <option>Tapa abierta</option>
+      <option>Falla de Lector</option>
+      <option>Cerradura Trancada</option>
+      <option>Vandalismo / Daño Externo</option>
+      <option>Revisión general</option>
+      <option>Otra</option>
+    </select>
+    <button id="agregar-equipo-btn" class="btn-primario">Agregar</button>
+  </div>
+  <p id="agregar-equipo-msg" class="resultado-msg" hidden></p>
+</div>
+
 <div id="mapa" class="mapa-contenedor"></div>
 
 <div id="leyenda" class="leyenda-mapa" hidden>

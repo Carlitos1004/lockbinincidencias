@@ -6,6 +6,9 @@ let otsConDatos = []; // [{ot, tickets, clientes, equipos, abiertos, cerrados}]
 
 const filtroInput = document.getElementById("filtro-input");
 const filtroEstado = document.getElementById("filtro-estado");
+const filtroCreadoPor = document.getElementById("filtro-creado-por");
+const filtroFechaDesde = document.getElementById("filtro-fecha-desde");
+const filtroFechaHasta = document.getElementById("filtro-fecha-hasta");
 const tbody = document.getElementById("ots-tbody");
 
 cargarOTs();
@@ -53,6 +56,9 @@ async function cargarOTs() {
 function renderTabla() {
   const texto = filtroInput.value.trim().toLowerCase();
   const estado = filtroEstado.value;
+  const creadoPor = filtroCreadoPor.value.trim().toLowerCase();
+  const desde = filtroFechaDesde.value;
+  const hasta = filtroFechaHasta.value;
 
   let filtradas = otsConDatos;
 
@@ -61,6 +67,18 @@ function renderTabla() {
       r.ot.id_ot.toLowerCase().includes(texto) ||
       r.clientes.some(c => c.toLowerCase().includes(texto))
     );
+  }
+
+  if (creadoPor) {
+    filtradas = filtradas.filter(r => (r.ot.creado_por || "").toLowerCase().includes(creadoPor));
+  }
+
+  if (desde) {
+    filtradas = filtradas.filter(r => new Date(r.ot.fecha) >= new Date(desde));
+  }
+  if (hasta) {
+    const finDia = new Date(hasta); finDia.setHours(23, 59, 59, 999);
+    filtradas = filtradas.filter(r => new Date(r.ot.fecha) <= finDia);
   }
 
   if (estado === "pendientes") filtradas = filtradas.filter(r => r.abiertos > 0);
@@ -96,3 +114,14 @@ function renderTabla() {
 
 filtroInput.addEventListener("input", renderTabla);
 filtroEstado.addEventListener("change", renderTabla);
+filtroCreadoPor.addEventListener("input", renderTabla);
+filtroFechaDesde.addEventListener("change", renderTabla);
+filtroFechaHasta.addEventListener("change", renderTabla);
+document.getElementById("limpiar-filtros-btn").addEventListener("click", () => {
+  filtroInput.value = "";
+  filtroEstado.value = "todas";
+  filtroCreadoPor.value = "";
+  filtroFechaDesde.value = "";
+  filtroFechaHasta.value = "";
+  renderTabla();
+});

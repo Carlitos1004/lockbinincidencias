@@ -90,6 +90,13 @@ async function buscarOT() {
   otActualCargada = ot;
   ticketsCargados = tickets || [];
 
+  const fallasUnicas = [...new Set(ticketsCargados.map(t => t.falla).filter(Boolean))].sort();
+  document.getElementById("filtro-falla-select").innerHTML =
+    `<option value="">Todas las fallas</option>` +
+    fallasUnicas.map(f => `<option value="${f}">${f}</option>`).join("");
+  document.getElementById("filtro-falla-select").value = "";
+  document.getElementById("filtro-estado-ticket").value = "";
+
   document.getElementById("ot-titulo").textContent = idOt;
   document.getElementById("ot-meta").textContent =
     `Creada: ${new Date(ot.fecha).toLocaleString("es-ES")} — por ${ot.creado_por || "—"} — ${ticketsCargados.length} ticket(s)`;
@@ -101,8 +108,15 @@ async function buscarOT() {
 
 function renderTabla() {
   const esManager = window.perfilActual?.rol === "manager";
+  const filtroFalla = document.getElementById("filtro-falla-select").value;
+  const filtroEstado = document.getElementById("filtro-estado-ticket").value;
 
-  tbody.innerHTML = ticketsCargados.map(t => {
+  const filasFiltradas = ticketsCargados.filter(t =>
+    (!filtroFalla || t.falla === filtroFalla) &&
+    (!filtroEstado || t.estado === filtroEstado)
+  );
+
+  tbody.innerHTML = filasFiltradas.map(t => {
     const abierto = t.estado === "🚨 ABIERTO";
     const puedeEditar = esManager && abierto;
 
@@ -371,3 +385,6 @@ document.getElementById("agregar-equipo-btn").addEventListener("click", async ()
   document.getElementById("agregar-falla-select").value = "";
   buscarOT();
 });
+
+document.getElementById("filtro-falla-select").addEventListener("change", renderTabla);
+document.getElementById("filtro-estado-ticket").addEventListener("change", renderTabla);
