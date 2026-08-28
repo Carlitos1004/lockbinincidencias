@@ -87,6 +87,9 @@ async function cargarMateriales() {
   const filtro = filtroOt.value.trim().toUpperCase();
   if (filtro) query = query.ilike("id_ot", `%${filtro}%`);
 
+  const tipoComponente = document.getElementById("filtro-tipo-componente").value;
+  if (tipoComponente) query = query.eq("tipo_componente", tipoComponente);
+
   const { data, error } = await query;
 
   if (error) {
@@ -117,3 +120,11 @@ function mostrarMensaje(texto, esError) {
 }
 
 cargarMateriales();
+
+document.getElementById("filtro-tipo-componente").addEventListener("change", cargarMateriales);
+
+// --- Filtro modal ---
+inicializarFiltroModal("toggle-filtros-btn", [
+  { clave: "ot", etiqueta: "OT", elementoId: "filtro-ot", tipo: "texto" },
+  { clave: "componente", etiqueta: "Componente", elementoId: "filtro-tipo-componente", tipo: "select", valorPorDefecto: "" }
+], cargarMateriales);

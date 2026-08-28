@@ -386,12 +386,8 @@ document.getElementById("agregar-equipo-btn").addEventListener("click", async ()
   buscarOT();
 });
 
-document.getElementById("filtro-falla-select").addEventListener("change", renderTabla);
-document.getElementById("filtro-estado-ticket").addEventListener("change", renderTabla);
-
-// --- Mostrar/ocultar el panel de filtros ---
-document.getElementById("toggle-filtros-btn").addEventListener("click", () => {
-  const panel = document.getElementById("panel-filtros");
-  panel.hidden = !panel.hidden;
-  document.getElementById("toggle-filtros-btn").textContent = panel.hidden ? "🔽 Filtros" : "🔼 Filtros";
-});
+// --- Filtro modal ---
+inicializarFiltroModal("toggle-filtros-btn", [
+  { clave: "falla", etiqueta: "Falla", elementoId: "filtro-falla-select", tipo: "select", valorPorDefecto: "" },
+  { clave: "estado", etiqueta: "Estado", elementoId: "filtro-estado-ticket", tipo: "select", valorPorDefecto: "" }
+], renderTabla);

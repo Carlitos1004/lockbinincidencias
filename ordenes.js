@@ -117,18 +117,11 @@ filtroEstado.addEventListener("change", renderTabla);
 filtroCreadoPor.addEventListener("input", renderTabla);
 filtroFechaDesde.addEventListener("change", renderTabla);
 filtroFechaHasta.addEventListener("change", renderTabla);
-document.getElementById("limpiar-filtros-btn").addEventListener("click", () => {
-  filtroInput.value = "";
-  filtroEstado.value = "todas";
-  filtroCreadoPor.value = "";
-  filtroFechaDesde.value = "";
-  filtroFechaHasta.value = "";
-  renderTabla();
-});
-
-// --- Mostrar/ocultar el panel de filtros ---
-document.getElementById("toggle-filtros-btn").addEventListener("click", () => {
-  const panel = document.getElementById("panel-filtros");
-  panel.hidden = !panel.hidden;
-  document.getElementById("toggle-filtros-btn").textContent = panel.hidden ? "🔽 Filtros" : "🔼 Filtros";
-});
+// --- Filtro modal ---
+inicializarFiltroModal("toggle-filtros-btn", [
+  { clave: "texto", etiqueta: "OT o cliente", elementoId: "filtro-input", tipo: "texto" },
+  { clave: "creado_por", etiqueta: "Creada por", elementoId: "filtro-creado-por", tipo: "texto" },
+  { clave: "estado", etiqueta: "Estado", elementoId: "filtro-estado", tipo: "select", valorPorDefecto: "todas" },
+  { clave: "desde", etiqueta: "Fecha desde", elementoId: "filtro-fecha-desde", tipo: "fecha" },
+  { clave: "hasta", etiqueta: "Fecha hasta", elementoId: "filtro-fecha-hasta", tipo: "fecha" }
+], renderTabla);

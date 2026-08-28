@@ -1201,6 +1201,135 @@ td[colspan] {
   margin-top: 0;
 }
 
+/* --- Modal de filtro genérico --- */
+
+.filtro-modal-fondo {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 24, 26, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 20px;
+}
+
+.filtro-modal-fondo[hidden] {
+  display: none !important;
+}
+
+.filtro-modal-caja {
+  background: var(--blanco);
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.3);
+}
+
+.filtro-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.filtro-modal-header h3 {
+  margin: 0;
+  font-family: var(--fuente-titulo);
+  font-size: 1.05rem;
+}
+
+.filtro-modal-cerrar {
+  border: none;
+  background: var(--gris-100);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.filtro-modal-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gris-700);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.filtro-modal-campo, .filtro-modal-input-temp {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  margin-bottom: 14px;
+  background: var(--blanco);
+}
+
+.filtro-modal-campo:focus, .filtro-modal-input-temp:focus {
+  outline: none;
+  border-color: var(--verde-medio);
+}
+
+.filtro-modal-activos {
+  min-height: 24px;
+  margin-bottom: 16px;
+}
+
+.filtro-modal-titulo-activos {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--gris-700);
+  margin: 0 0 8px;
+}
+
+.filtro-modal-sinactivos {
+  font-size: 0.82rem;
+  color: var(--gris-400);
+  margin: 0;
+}
+
+.filtro-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--verde-claro);
+  color: var(--verde-oscuro);
+  padding: 5px 6px 5px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  margin: 0 6px 6px 0;
+}
+
+.filtro-chip-quitar {
+  border: none;
+  background: rgba(255,255,255,0.6);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--verde-oscuro);
+}
+
+.filtro-modal-botones {
+  display: flex;
+  gap: 10px;
+}
+
+.filtro-modal-botones button {
+  flex: 1;
+}
+
+.btn-toggle-filtros-activo {
+  background: var(--verde-claro) !important;
+  color: var(--verde-oscuro) !important;
+  border-color: var(--verde-medio) !important;
+}
+
 .marcador-numero {
   width: 28px;
   height: 28px;
