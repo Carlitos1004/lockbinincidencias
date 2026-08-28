@@ -72,13 +72,16 @@
       <p id="agregar-equipo-msg" class="resultado-msg" hidden></p>
     </div>
 
-    <div class="materiales-controles">
-      <select id="filtro-falla-select"><option value="">Todas las fallas</option></select>
-      <select id="filtro-estado-ticket">
-        <option value="">Todos los estados</option>
-        <option value="🚨 ABIERTO">Abierto</option>
-        <option value="✅ CERRADO">Cerrado</option>
-      </select>
+    <button id="toggle-filtros-btn" class="btn-toggle-filtros">🔽 Filtros</button>
+    <div class="panel-filtros" id="panel-filtros" hidden>
+      <div class="materiales-controles">
+        <select id="filtro-falla-select"><option value="">Todas las fallas</option></select>
+        <select id="filtro-estado-ticket">
+          <option value="">Todos los estados</option>
+          <option value="🚨 ABIERTO">Abierto</option>
+          <option value="✅ CERRADO">Cerrado</option>
+        </select>
+      </div>
     </div>
 
     <table class="tabla-revision" id="tabla-ot">

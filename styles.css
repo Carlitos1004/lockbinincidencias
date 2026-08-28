@@ -1161,6 +1161,46 @@ td[colspan] {
   font-size: 0.85rem;
 }
 
+/* --- Panel de filtros tipo Excel: botón toggle + panel pegado a la tabla --- */
+
+.btn-toggle-filtros {
+  padding: 9px 16px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 10px 10px 0 0;
+  background: var(--gris-100);
+  color: var(--gris-700);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 16px;
+}
+
+.btn-toggle-filtros:hover {
+  background: var(--verde-claro);
+  color: var(--verde-oscuro);
+}
+
+.panel-filtros {
+  background: var(--gris-100);
+  border: 1.5px solid var(--gris-200);
+  border-top: none;
+  border-radius: 0 10px 10px 10px;
+  padding: 14px 16px;
+}
+
+.panel-filtros .materiales-controles {
+  margin: 0 0 8px;
+}
+
+.panel-filtros .materiales-controles:last-child {
+  margin-bottom: 0;
+}
+
+.panel-filtros + .tabla-revision,
+.panel-filtros ~ .tabla-garantias-wrap {
+  margin-top: 0;
+}
+
 .marcador-numero {
   width: 28px;
   height: 28px;

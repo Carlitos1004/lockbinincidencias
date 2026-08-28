@@ -125,3 +125,10 @@ document.getElementById("limpiar-filtros-btn").addEventListener("click", () => {
   filtroFechaHasta.value = "";
   renderTabla();
 });
+
+// --- Mostrar/ocultar el panel de filtros ---
+document.getElementById("toggle-filtros-btn").addEventListener("click", () => {
+  const panel = document.getElementById("panel-filtros");
+  panel.hidden = !panel.hidden;
+  document.getElementById("toggle-filtros-btn").textContent = panel.hidden ? "🔽 Filtros" : "🔼 Filtros";
+});

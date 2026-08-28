@@ -152,3 +152,10 @@ function escaparAtributo(texto) {
   div.textContent = texto;
   return div.innerHTML.replace(/"/g, "&quot;");
 }
+
+// --- Mostrar/ocultar el panel de filtros ---
+document.getElementById("toggle-filtros-btn").addEventListener("click", () => {
+  const panel = document.getElementById("panel-filtros");
+  panel.hidden = !panel.hidden;
+  document.getElementById("toggle-filtros-btn").textContent = panel.hidden ? "🔽 Filtros" : "🔼 Filtros";
+});

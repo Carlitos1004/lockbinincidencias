@@ -22,20 +22,24 @@
 <div class="panel-body panel-body-ancho">
   <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
 
-  <div class="materiales-controles">
-    <input type="text" id="filtro-input" placeholder="Buscar por OT, cliente o módulo..." list="lista-ots">
-    <datalist id="lista-ots"></datalist>
-    <select id="filtro-garantia">
-      <option value="todas">Todas</option>
-      <option value="SI">Con garantía (SI)</option>
-      <option value="NO">Sin garantía (NO)</option>
-    </select>
-    <select id="filtro-vigencia">
-      <option value="todas">Cualquier vigencia</option>
-      <option value="SÍ (Vigente)">Vigente</option>
-      <option value="NO (Vencida)">Vencida</option>
-      <option value="Sin Registro">Sin registro de fecha</option>
-    </select>
+  <button id="toggle-filtros-btn" class="btn-toggle-filtros">🔽 Filtros</button>
+
+  <div class="panel-filtros" id="panel-filtros" hidden>
+    <div class="materiales-controles">
+      <input type="text" id="filtro-input" placeholder="Buscar por OT, cliente o módulo..." list="lista-ots">
+      <datalist id="lista-ots"></datalist>
+      <select id="filtro-garantia">
+        <option value="todas">Todas</option>
+        <option value="SI">Con garantía (SI)</option>
+        <option value="NO">Sin garantía (NO)</option>
+      </select>
+      <select id="filtro-vigencia">
+        <option value="todas">Cualquier vigencia</option>
+        <option value="SÍ (Vigente)">Vigente</option>
+        <option value="NO (Vencida)">Vencida</option>
+        <option value="Sin Registro">Sin registro de fecha</option>
+      </select>
+    </div>
   </div>
 
   <div class="tabla-garantias-wrap">
