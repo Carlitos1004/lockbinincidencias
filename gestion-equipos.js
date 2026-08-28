@@ -17,7 +17,7 @@ const MAPA_ALARMAS = {
   alarma_bloqueado: "Bloqueado",
   alarma_sin_bateria: "Sin batería",
   alarma_tapa_abierta: "Tapa abierta",
-  alarma_cambiar_bateria: "Cambiar batería",
+  alarma_cambiar_bateria: "Batería Crítica",
   alarma_cambiar_ubicacion: "Cambiar ubicación",
   alarma_revisar_comunicacion: "Revisar comunicación",
   alarma_operacion_erratica: "Operación errática"
@@ -131,7 +131,6 @@ filtrarBtn.addEventListener("click", async () => {
     })
     .map(eq => {
       const fallas = Object.keys(MAPA_ALARMAS).filter(col => eq[col]).map(col => MAPA_ALARMAS[col]);
-      if (bateriaCritica(eq.lecturas_bateria)) fallas.push("Batería Crítica (<6.4V)");
       return { m_control: eq.m_control, fraccion: eq.fraccion, cliente: eq.cliente, estado_montaje: eq.estado_montaje, fallas };
     })
     .filter(eq => eq.fallas.length > 0);
@@ -144,14 +143,6 @@ filtrarBtn.addEventListener("click", async () => {
   renderTabla();
   resultadoFiltro.hidden = false;
 });
-
-// Las 3 lecturas MÁS RECIENTES (posición 0,1,2 del arreglo, que ya viene
-// ordenado de más nueva a más vieja) tienen que estar TODAS por debajo de 6.4V
-function bateriaCritica(lecturas) {
-  if (!Array.isArray(lecturas) || lecturas.length < 3) return false;
-  const primeras3 = lecturas.slice(0, 3);
-  return primeras3.every(l => typeof l.valor === "number" && l.valor < 6.4);
-}
 
 function renderTabla() {
   totalEncontrados.textContent = `${equiposEncontrados.length} equipos encontrados`;

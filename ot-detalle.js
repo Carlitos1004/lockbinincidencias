@@ -28,10 +28,12 @@ if (otEnUrl) otInput.value = otEnUrl;
 
 document.addEventListener("perfil-listo", (e) => {
   const esManager = e.detail.rol === "manager";
+  const esCliente = e.detail.rol === "cliente";
   guardarInstruccionesBtn.hidden = !esManager;
   instruccionesTextarea.readOnly = !esManager;
   descargarBtn.hidden = !esManager;
   document.getElementById("eliminar-ot-btn").hidden = !esManager;
+  document.querySelector(".agregar-equipo-box").hidden = esCliente;
 
   if (otEnUrl) buscarOT();
 });
@@ -113,6 +115,10 @@ function renderTabla() {
       ? `<a href="${t.link_foto}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>`
       : "—";
 
+    const celdaEliminar = esManager
+      ? `<button class="btn-eliminar-ticket" data-id="${t.id_registro}" title="Quitar este equipo de la OT">🗑️</button>`
+      : "";
+
     return `
       <tr>
         <td>${t.m_control}</td>
@@ -122,9 +128,14 @@ function renderTabla() {
         <td>${t.nuevo_serial || "—"}</td>
         <td>${celdaFoto}</td>
         <td>${celdaAccionComentarios}</td>
+        <td>${celdaEliminar}</td>
       </tr>
     `;
   }).join("");
+
+  tbody.querySelectorAll(".btn-eliminar-ticket").forEach(btn => {
+    btn.addEventListener("click", () => eliminarTicketDeOT(btn.dataset.id));
+  });
 
   tbody.querySelectorAll(".btn-guardar-ticket").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -275,4 +286,88 @@ document.getElementById("eliminar-ot-btn").addEventListener("click", async () =>
     btn.disabled = false;
     btn.textContent = "🗑️ Eliminar esta OT";
   }
+});
+
+async function eliminarTicketDeOT(idRegistro) {
+  if (!confirm(`¿Quitar el equipo de esta OT? Esto borra también sus componentes y garantías asociadas (si tiene). No se puede deshacer.`)) return;
+
+  // Borramos en cascada, en el mismo orden que usamos para eliminar una OT
+  // completa: primero garantías, luego componentes, y al final el ticket.
+  const { data: componentesDelTicket } = await supabaseClient
+    .from("componentes_retirados")
+    .select("id")
+    .eq("id_registro", idRegistro);
+
+  const idsComponentes = (componentesDelTicket || []).map(c => c.id);
+  if (idsComponentes.length > 0) {
+    await supabaseClient.from("garantias").delete().in("componente_id", idsComponentes);
+    await supabaseClient.from("componentes_retirados").delete().in("id", idsComponentes);
+  }
+
+  const { error } = await supabaseClient.from("historial_fallas").delete().eq("id_registro", idRegistro);
+  if (error) {
+    alert("Error al quitar el equipo: " + error.message);
+    return;
+  }
+
+  if (otActualCargada?.id_ot) {
+    await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: otActualCargada.id_ot });
+  }
+
+  buscarOT();
+}
+
+document.getElementById("agregar-equipo-btn").addEventListener("click", async () => {
+  const mc = document.getElementById("agregar-mc-input").value.trim().toUpperCase();
+  const falla = document.getElementById("agregar-falla-select").value;
+  const msg = document.getElementById("agregar-equipo-msg");
+
+  if (!mc || !falla) {
+    mostrarMensaje(msg, "⚠️ Escribe el Módulo de Control y elige una falla.", true);
+    return;
+  }
+  if (!otActualCargada) return;
+
+  const btn = document.getElementById("agregar-equipo-btn");
+  btn.disabled = true;
+  btn.textContent = "Agregando...";
+
+  const { data: equipo } = await supabaseClient
+    .from("equipos")
+    .select("m_control, cliente")
+    .eq("m_control", mc)
+    .maybeSingle();
+
+  if (!equipo) {
+    mostrarMensaje(msg, "❌ No existe ningún equipo con ese Módulo de Control.", true);
+    btn.disabled = false;
+    btn.textContent = "Agregar";
+    return;
+  }
+
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  const idRegistro = "TK-" + mc + "-" + Math.floor(Math.random() * 900 + 100);
+
+  const { error } = await supabaseClient.from("historial_fallas").insert({
+    id_registro: idRegistro,
+    cliente: equipo.cliente,
+    m_control: mc,
+    falla: falla,
+    estado: "🚨 ABIERTO",
+    origen: user.email,
+    id_ot: otActualCargada.id_ot
+  });
+
+  btn.disabled = false;
+  btn.textContent = "Agregar";
+
+  if (error) {
+    mostrarMensaje(msg, "❌ " + error.message, true);
+    return;
+  }
+
+  mostrarMensaje(msg, `✅ ${mc} agregado a la OT.`, false);
+  document.getElementById("agregar-mc-input").value = "";
+  document.getElementById("agregar-falla-select").value = "";
+  buscarOT();
 });

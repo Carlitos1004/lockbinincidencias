@@ -1110,6 +1110,42 @@ td[colspan] {
   font-size: 0.8rem;
 }
 
+/* --- Agregar/quitar equipo en Detalle de OT --- */
+
+.agregar-equipo-box {
+  background: var(--gris-100);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 20px 0;
+}
+
+.agregar-equipo-controles {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.agregar-equipo-controles input, .agregar-equipo-controles select {
+  padding: 9px 10px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.btn-eliminar-ticket {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.btn-eliminar-ticket:hover {
+  background: var(--ambar-bg);
+}
+
 .marcador-numero {
   width: 28px;
   height: 28px;

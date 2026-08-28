@@ -13,7 +13,7 @@ const MAPA_ALARMAS = {
   alarma_bloqueado: "Bloqueado",
   alarma_sin_bateria: "Sin batería",
   alarma_tapa_abierta: "Tapa abierta",
-  alarma_cambiar_bateria: "Cambiar batería",
+  alarma_cambiar_bateria: "Batería Crítica",
   alarma_cambiar_ubicacion: "Cambiar ubicación",
   alarma_revisar_comunicacion: "Revisar comunicación",
   alarma_operacion_erratica: "Operación errática"
