@@ -59,17 +59,21 @@ async function generarReporte() {
       || (typeof g.nombre_imagen === "string" && /^https?:\/\//i.test(g.nombre_imagen.trim()) ? g.nombre_imagen : null)
       || null;
   });
-  if (!tickets || tickets.length === 0) {
-    mostrarMensaje("Esa OT no tiene equipos/tickets registrados.", true);
-    return;
-  }
+  // Ya no bloqueamos si no hay tickets — las OT libres (actuaciones sin
+  // falla, como un cambio masivo de materiales) no tienen ninguno, y aun
+  // así se debe poder generar un reporte con lo que sí exista
+  // (materiales, componentes registrados manualmente, etc.)
+  const ticketsSeguro = tickets || [];
 
-  const cliente = tickets.find(t => t.cliente)?.cliente || "—";
-  const mcsUnicos = [...new Set(tickets.map(t => t.m_control).filter(Boolean))];
+  const cliente = ot.cliente || ticketsSeguro.find(t => t.cliente)?.cliente || "—";
+  const mcsUnicos = [...new Set([
+    ...ticketsSeguro.map(t => t.m_control),
+    ...(componentes || []).map(c => c.m_control)
+  ].filter(Boolean))];
 
   // --- Estado final por equipo ---
   const estadosPorMC = {};
-  mcsUnicos.forEach(mc => { estadosPorMC[mc] = tickets.filter(t => t.m_control === mc).map(t => t.estado_equipo).filter(Boolean); });
+  mcsUnicos.forEach(mc => { estadosPorMC[mc] = ticketsSeguro.filter(t => t.m_control === mc).map(t => t.estado_equipo).filter(Boolean); });
 
   let funcionando = 0, cambioNecesario = 0, pendiente = 0, sinEstado = 0;
   mcsUnicos.forEach(mc => {
@@ -82,7 +86,7 @@ async function generarReporte() {
   });
 
   // --- Equipos recibidos (acción/comentarios de cada ticket) ---
-  const equiposRecibidos = tickets
+  const equiposRecibidos = ticketsSeguro
     .filter(t => t.accion_calle || t.comentarios)
     .map(t => ({ mc: t.m_control, accion: t.accion_calle || "", comentarios: t.comentarios || "" }));
 

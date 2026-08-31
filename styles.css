@@ -1217,6 +1217,57 @@ td[colspan] {
   cursor: help;
 }
 
+/* --- Estilo global para <select> y "Seleccionar archivo" en toda la app,
+   para las pantallas que no tenían una regla más específica ya puesta --- */
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--blanco);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23566052' stroke-width='2'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding: 9px 36px 9px 14px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  color: var(--gris-950);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+select:hover {
+  border-color: var(--verde-medio);
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--verde-medio);
+  box-shadow: 0 0 0 3px var(--verde-claro);
+}
+
+input[type="file"] {
+  font-size: 0.85rem;
+  color: var(--gris-700);
+}
+
+input[type="file"]::file-selector-button {
+  padding: 9px 16px;
+  margin-right: 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--verde-medio);
+  color: var(--blanco);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: var(--verde-hover);
+}
+
 .crear-ot-libre-box {
   background: var(--gris-100);
   border-radius: 10px;
