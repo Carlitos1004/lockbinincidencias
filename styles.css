@@ -141,6 +141,12 @@ body {
   width: auto;
 }
 
+@media (max-width: 600px) {
+  .panel-logo-fv {
+    height: 24px;
+  }
+}
+
 .subtitle {
   margin: 0 0 28px;
   color: var(--gris-700);
