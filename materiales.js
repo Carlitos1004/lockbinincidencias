@@ -70,7 +70,16 @@ recalcularBtn.addEventListener("click", async () => {
   const { data: otsUnicas } = await supabaseClient.from("materiales_ot").select("id_ot");
   const idsUnicos = [...new Set((otsUnicas || []).map(o => o.id_ot))];
 
-  for (const idOt of idsUnicos) {
+  // Las OT libres se editan a mano — nunca deben recalcularse solas, o se
+  // pierde lo que se escribió (por eso las excluimos de este recorrido).
+  const { data: otsData } = await supabaseClient
+    .from("ordenes_trabajo")
+    .select("id_ot, origen")
+    .in("id_ot", idsUnicos);
+  const idsLibres = new Set((otsData || []).filter(o => o.origen === "libre").map(o => o.id_ot));
+  const idsARecalcular = idsUnicos.filter(id => !idsLibres.has(id));
+
+  for (const idOt of idsARecalcular) {
     await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: idOt });
   }
 
@@ -178,4 +187,3 @@ cargarMateriales();
 document.getElementById("filtro-tipo-componente").addEventListener("change", cargarMateriales);
 
 // --- Filtro modal ---
-
