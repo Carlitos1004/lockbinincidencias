@@ -104,6 +104,11 @@ async function buscarOT() {
     `${ot.cliente ? "Cliente: " + ot.cliente + " — " : ""}Creada: ${new Date(ot.fecha).toLocaleString("es-ES")} — por ${ot.creado_por || "—"} — ${ticketsCargados.length} ticket(s)`;
   instruccionesTextarea.value = ot.instrucciones || "";
 
+  const cajaCompletada = document.getElementById("completada-libre-box");
+  const esManagerActual = window.perfilActual?.rol === "manager";
+  cajaCompletada.hidden = !(ot.origen === "libre" && esManagerActual);
+  document.getElementById("completada-checkbox").checked = !!ot.completada;
+
   renderTabla();
   otContenido.hidden = false;
 }
@@ -504,4 +509,20 @@ document.getElementById("agregar-componente-btn").addEventListener("click", asyn
   document.getElementById("agregar-comp-tipo").value = "";
   document.getElementById("agregar-comp-serial").value = "";
   document.getElementById("agregar-comp-hallazgo").value = "";
+});
+
+// --- Marcar/desmarcar una OT libre como completada ---
+document.getElementById("completada-checkbox").addEventListener("change", async (e) => {
+  if (!otActualCargada) return;
+  const { error } = await supabaseClient
+    .from("ordenes_trabajo")
+    .update({ completada: e.target.checked })
+    .eq("id_ot", otActualCargada.id_ot);
+
+  if (error) {
+    alert("No se pudo guardar: " + error.message);
+    e.target.checked = !e.target.checked; // revertir visualmente
+  } else {
+    otActualCargada.completada = e.target.checked;
+  }
 });

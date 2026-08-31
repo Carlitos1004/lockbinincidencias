@@ -1230,6 +1230,18 @@ td[colspan] {
   color: var(--gris-700);
 }
 
+.completada-libre-box {
+  background: var(--verde-claro);
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+}
+
+.completada-libre-box .opcion-check {
+  font-weight: 600;
+  color: var(--verde-oscuro);
+}
+
 #nueva-ot-cliente {
   appearance: none;
   -webkit-appearance: none;
