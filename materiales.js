@@ -93,23 +93,49 @@ async function cargarMateriales() {
   const { data, error } = await query;
 
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="5">Error: ${error.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${error.message}</td></tr>`;
     return;
   }
   if (!data || data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5">No hay materiales registrados todavía.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">No hay materiales registrados todavía.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = data.map(m => `
-    <tr class="${m.vuelven < 0 ? 'fila-alerta' : ''}">
+    <tr class="${m.vuelven < 0 ? 'fila-alerta' : ''}" data-id="${m.id}">
       <td>${m.id_ot}</td>
       <td>${m.tipo_componente}</td>
-      <td>${m.llevados}</td>
-      <td>${m.utilizados}</td>
-      <td>${m.vuelven}</td>
+      <td><input type="number" min="0" class="input-mat-llevados" value="${m.llevados}"></td>
+      <td><input type="number" min="0" class="input-mat-utilizados" value="${m.utilizados}"></td>
+      <td><input type="number" class="input-mat-vuelven" value="${m.vuelven}"></td>
+      <td><button class="btn-guardar-material">Guardar</button></td>
     </tr>
   `).join("");
+
+  tbody.querySelectorAll(".btn-guardar-material").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const fila = btn.closest("tr");
+      const id = fila.dataset.id;
+      const llevados = parseInt(fila.querySelector(".input-mat-llevados").value, 10) || 0;
+      const utilizados = parseInt(fila.querySelector(".input-mat-utilizados").value, 10) || 0;
+      const vuelven = parseInt(fila.querySelector(".input-mat-vuelven").value, 10) || 0;
+
+      btn.disabled = true;
+      btn.textContent = "Guardando...";
+
+      // Guardado manual y directo — no vuelve a calcular Utilizados solo,
+      // así sirve tanto para lo que reporta el operario en campo (donde
+      // sí conviene "Recalcular todo") como para actuaciones sin ticket
+      // donde no se serializa cada unidad, solo se cuenta.
+      const { error } = await supabaseClient
+        .from("materiales_ot")
+        .update({ llevados, utilizados, vuelven })
+        .eq("id", id);
+
+      btn.textContent = error ? "❌ Error" : "✅ Guardado";
+      setTimeout(() => { btn.textContent = "Guardar"; btn.disabled = false; }, 1200);
+    });
+  });
 }
 
 function mostrarMensaje(texto, esError) {

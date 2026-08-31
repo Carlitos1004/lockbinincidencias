@@ -33,6 +33,16 @@
 
   <p id="buscar-msg" class="resultado-msg" hidden></p>
 
+  <div class="crear-ot-libre-box" id="crear-ot-libre-box" hidden>
+    <p><strong>¿No hay ninguna falla o cliente específico?</strong> Crea una OT libre — para actuaciones sin reporte, como un cambio masivo de materiales.</p>
+    <div class="materiales-controles">
+      <input type="text" id="nueva-ot-cliente" placeholder="Cliente (ej: OURIQUE)">
+      <input type="text" id="nueva-ot-motivo" placeholder="Motivo (ej: Cambio de 50 baterías no recargables a recargables)">
+      <button id="crear-ot-libre-btn" class="btn-primario">Crear OT nueva</button>
+    </div>
+    <p id="crear-ot-libre-msg" class="resultado-msg" hidden></p>
+  </div>
+
   <div id="ot-contenido" hidden>
     <h2 id="ot-titulo"></h2>
     <p id="ot-meta" class="ot-meta"></p>
@@ -73,6 +83,25 @@
         <button id="agregar-equipo-btn" class="btn-primario">Agregar</button>
       </div>
       <p id="agregar-equipo-msg" class="resultado-msg" hidden></p>
+    </div>
+
+    <div class="agregar-equipo-box" id="agregar-componente-box" hidden>
+      <label><strong>Registrar un componente sin ticket</strong> — para defectuosos encontrados en un lote (ej. revisando baterías de un cambio masivo), sin necesidad de crear un ticket por cada uno.</label>
+      <div class="agregar-equipo-controles">
+        <input type="text" id="agregar-comp-mc" placeholder="Módulo de Control (opcional)">
+        <select id="agregar-comp-tipo">
+          <option value="">— Componente —</option>
+          <option>Lector Electrónico</option>
+          <option>Cierre Electrónico</option>
+          <option>Batería Recargable</option>
+          <option>Batería No Recargable</option>
+          <option>Módulo de Control</option>
+        </select>
+        <input type="text" id="agregar-comp-serial" placeholder="Serial">
+        <input type="text" id="agregar-comp-hallazgo" placeholder="Qué se encontró (ej: no carga, 3.1V)">
+        <button id="agregar-componente-btn" class="btn-primario">Registrar</button>
+      </div>
+      <p id="agregar-componente-msg" class="resultado-msg" hidden></p>
     </div>
 
     <table class="tabla-revision" id="tabla-ot">

@@ -1192,6 +1192,38 @@ td[colspan] {
   border-color: var(--verde-medio);
 }
 
+.tabla-materiales input[type="number"] {
+  width: 70px;
+  padding: 6px 8px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.btn-guardar-material {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--verde-medio);
+  color: var(--blanco);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.crear-ot-libre-box {
+  background: var(--gris-100);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 8px 0 20px;
+}
+
+.crear-ot-libre-box p {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  color: var(--gris-700);
+}
+
 
 .marcador-numero {
   width: 28px;

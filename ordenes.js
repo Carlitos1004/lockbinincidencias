@@ -38,7 +38,7 @@ async function cargarOTs() {
 
   otsConDatos = (ots || []).map(ot => {
     const suyos = ticketsPorOt[ot.id_ot] || [];
-    const clientes = [...new Set(suyos.map(t => t.cliente).filter(Boolean))];
+    const clientes = [...new Set([ot.cliente, ...suyos.map(t => t.cliente)].filter(Boolean))];
     const equipos = [...new Set(suyos.map(t => t.m_control).filter(Boolean))];
     const abiertos = suyos.filter(t => t.estado === "🚨 ABIERTO").length;
     const cerrados = suyos.filter(t => t.estado === "✅ CERRADO").length;

@@ -34,6 +34,8 @@ document.addEventListener("perfil-listo", (e) => {
   descargarBtn.hidden = !esManager;
   document.getElementById("eliminar-ot-btn").hidden = !esManager;
   document.querySelector(".agregar-equipo-box").hidden = esCliente;
+  document.getElementById("crear-ot-libre-box").hidden = !esManager;
+  document.getElementById("agregar-componente-box").hidden = !esManager;
 
   if (otEnUrl) buscarOT();
 });
@@ -99,7 +101,7 @@ async function buscarOT() {
 
   document.getElementById("ot-titulo").textContent = idOt;
   document.getElementById("ot-meta").textContent =
-    `Creada: ${new Date(ot.fecha).toLocaleString("es-ES")} — por ${ot.creado_por || "—"} — ${ticketsCargados.length} ticket(s)`;
+    `${ot.cliente ? "Cliente: " + ot.cliente + " — " : ""}Creada: ${new Date(ot.fecha).toLocaleString("es-ES")} — por ${ot.creado_por || "—"} — ${ticketsCargados.length} ticket(s)`;
   instruccionesTextarea.value = ot.instrucciones || "";
 
   renderTabla();
@@ -391,3 +393,93 @@ document.getElementById("agregar-equipo-btn").addEventListener("click", async ()
 document.getElementById("filtro-modulo").addEventListener("input", renderTabla);
 document.getElementById("filtro-falla-select").addEventListener("change", renderTabla);
 document.getElementById("filtro-estado-ticket").addEventListener("change", renderTabla);
+
+// --- Crear una OT libre, sin filtrar por alarmas ni ticket ---
+document.getElementById("crear-ot-libre-btn").addEventListener("click", async () => {
+  const cliente = document.getElementById("nueva-ot-cliente").value.trim();
+  const motivo = document.getElementById("nueva-ot-motivo").value.trim();
+  const msg = document.getElementById("crear-ot-libre-msg");
+
+  if (!cliente || !motivo) {
+    mostrarMensaje(msg, "⚠️ Escribe el cliente y el motivo de la actuación.", true);
+    return;
+  }
+
+  const btn = document.getElementById("crear-ot-libre-btn");
+  btn.disabled = true;
+  btn.textContent = "Creando...";
+
+  const { data: otsExistentes } = await supabaseClient.from("ordenes_trabajo").select("id_ot");
+  let maxNum = 0;
+  (otsExistentes || []).forEach(o => {
+    const m = String(o.id_ot).match(/OT-(\d+)/);
+    if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+  });
+  const nuevoIdOt = "OT-" + String(maxNum + 1).padStart(3, "0");
+
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  const { error } = await supabaseClient.from("ordenes_trabajo").insert({
+    id_ot: nuevoIdOt,
+    cliente: cliente,
+    instrucciones: motivo,
+    creado_por: user.email
+  });
+
+  btn.disabled = false;
+  btn.textContent = "Crear OT nueva";
+
+  if (error) {
+    mostrarMensaje(msg, "❌ " + error.message, true);
+    return;
+  }
+
+  document.getElementById("nueva-ot-cliente").value = "";
+  document.getElementById("nueva-ot-motivo").value = "";
+  otInput.value = nuevoIdOt;
+  buscarOT();
+});
+
+// --- Registrar un componente defectuoso sin ticket, tipo "lote sin serializar" ---
+document.getElementById("agregar-componente-btn").addEventListener("click", async () => {
+  const mc = document.getElementById("agregar-comp-mc").value.trim().toUpperCase();
+  const tipo = document.getElementById("agregar-comp-tipo").value;
+  const serial = document.getElementById("agregar-comp-serial").value.trim().toUpperCase();
+  const hallazgo = document.getElementById("agregar-comp-hallazgo").value.trim();
+  const msg = document.getElementById("agregar-componente-msg");
+
+  if (!tipo || !serial) {
+    mostrarMensaje(msg, "⚠️ Elige el tipo de componente y escribe el serial.", true);
+    return;
+  }
+  if (!otActualCargada) return;
+
+  const btn = document.getElementById("agregar-componente-btn");
+  btn.disabled = true;
+  btn.textContent = "Registrando...";
+
+  const { error } = await supabaseClient.from("componentes_retirados").insert({
+    cliente: otActualCargada.cliente || null,
+    m_control: mc || null,
+    tipo_componente: tipo,
+    serial_retirado: serial,
+    reparacion: hallazgo,
+    id_registro: null, // no viene de ningún ticket
+    id_ot: otActualCargada.id_ot,
+    estado: "Pendiente revisión",
+    excluir_materiales: true // no se serializó como parte del conteo normal de materiales
+  });
+
+  btn.disabled = false;
+  btn.textContent = "Registrar";
+
+  if (error) {
+    mostrarMensaje(msg, "❌ " + error.message, true);
+    return;
+  }
+
+  mostrarMensaje(msg, `✅ ${serial} registrado — ya puedes asignarle Destino en Revisión de Taller.`, false);
+  document.getElementById("agregar-comp-mc").value = "";
+  document.getElementById("agregar-comp-tipo").value = "";
+  document.getElementById("agregar-comp-serial").value = "";
+  document.getElementById("agregar-comp-hallazgo").value = "";
+});

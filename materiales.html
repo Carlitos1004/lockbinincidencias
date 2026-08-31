@@ -40,7 +40,8 @@
       <tbody id="llevados-tbody">
         <tr><td>Lector Electrónico (LE)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Lector Electrónico" value="0"></td></tr>
         <tr><td>Cierre Electrónico (CE)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Cierre Electrónico" value="0"></td></tr>
-        <tr><td>Batería (BA)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Batería" value="0"></td></tr>
+        <tr><td>Batería Recargable</td><td><input type="number" min="0" class="input-llevados" data-tipo="Batería Recargable" value="0"></td></tr>
+        <tr><td>Batería No Recargable</td><td><input type="number" min="0" class="input-llevados" data-tipo="Batería No Recargable" value="0"></td></tr>
         <tr><td>Módulo de Control (MC)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Módulo de Control" value="0"></td></tr>
       </tbody>
     </table>
@@ -54,7 +55,7 @@
 
   <table class="tabla-materiales">
     <thead>
-      <tr><th>OT</th><th>Tipo</th><th>Llevados</th><th>Utilizados</th><th>Vuelven</th></tr>
+      <tr><th>OT</th><th>Tipo</th><th>Llevados</th><th>Utilizados</th><th>Vuelven</th><th></th></tr>
       <tr class="fila-filtros">
         <th><input type="text" id="filtro-ot-tabla" placeholder="Filtrar..."></th>
         <th>
@@ -62,7 +63,8 @@
             <option value="">Todos</option>
             <option value="Lector Electrónico">Lector Electrónico</option>
             <option value="Cierre Electrónico">Cierre Electrónico</option>
-            <option value="Batería">Batería</option>
+            <option value="Batería Recargable">Batería Recargable</option>
+        <option value="Batería No Recargable">Batería No Recargable</option>
             <option value="Módulo de Control">Módulo de Control</option>
           </select>
         </th>
@@ -70,7 +72,7 @@
       </tr>
     </thead>
     <tbody id="materiales-tbody">
-      <tr><td colspan="5">Cargando...</td></tr>
+      <tr><td colspan="6">Cargando...</td></tr>
     </tbody>
   </table>
 </div>
