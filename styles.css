@@ -1211,6 +1211,12 @@ td[colspan] {
   cursor: pointer;
 }
 
+.candado-materiales {
+  color: var(--gris-400);
+  font-size: 0.9rem;
+  cursor: help;
+}
+
 .crear-ot-libre-box {
   background: var(--gris-100);
   border-radius: 10px;

@@ -443,7 +443,8 @@ document.getElementById("crear-ot-libre-btn").addEventListener("click", async ()
     id_ot: nuevoIdOt,
     cliente: cliente,
     instrucciones: motivo,
-    creado_por: user.email
+    creado_por: user.email,
+    origen: "libre"
   });
 
   btn.disabled = false;

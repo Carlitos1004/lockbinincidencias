@@ -11,7 +11,7 @@ async function llenarListaDeOTs() {
 
   const { data: ots } = await supabaseClient
     .from("ordenes_trabajo")
-    .select("id_ot")
+    .select("id_ot, cliente")
     .order("fecha", { ascending: false });
 
   const { data: tickets } = await supabaseClient
@@ -23,6 +23,13 @@ async function llenarListaDeOTs() {
     if (!t.id_ot || !t.cliente) return;
     if (!clientesPorOt[t.id_ot]) clientesPorOt[t.id_ot] = new Set();
     clientesPorOt[t.id_ot].add(t.cliente);
+  });
+  // También el cliente guardado directo en la OT (para las OT libres, que
+  // no tienen ningún ticket del que sacarlo)
+  (ots || []).forEach(ot => {
+    if (!ot.cliente) return;
+    if (!clientesPorOt[ot.id_ot]) clientesPorOt[ot.id_ot] = new Set();
+    clientesPorOt[ot.id_ot].add(ot.cliente);
   });
 
   const opciones = (ots || []).map(ot => {

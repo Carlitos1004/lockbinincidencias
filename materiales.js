@@ -101,16 +101,44 @@ async function cargarMateriales() {
     return;
   }
 
-  tbody.innerHTML = data.map(m => `
-    <tr class="${m.vuelven < 0 ? 'fila-alerta' : ''}" data-id="${m.id}">
-      <td>${m.id_ot}</td>
-      <td>${m.tipo_componente}</td>
-      <td><input type="number" min="0" class="input-mat-llevados" value="${m.llevados}"></td>
-      <td><input type="number" min="0" class="input-mat-utilizados" value="${m.utilizados}"></td>
-      <td><input type="number" class="input-mat-vuelven" value="${m.vuelven}"></td>
-      <td><button class="btn-guardar-material">Guardar</button></td>
-    </tr>
-  `).join("");
+  // Solo las OT "libres" (creadas para actuaciones sin falla) se pueden
+  // editar a mano — las normales siguen calculándose solo desde los
+  // componentes reales que reporta el operario en campo.
+  const idsOt = [...new Set(data.map(m => m.id_ot))];
+  const { data: otsData } = await supabaseClient
+    .from("ordenes_trabajo")
+    .select("id_ot, origen")
+    .in("id_ot", idsOt);
+  const mapaOrigen = {};
+  (otsData || []).forEach(o => { mapaOrigen[o.id_ot] = o.origen; });
+
+  tbody.innerHTML = data.map(m => {
+    const esLibre = mapaOrigen[m.id_ot] === "libre";
+
+    if (!esLibre) {
+      return `
+        <tr class="${m.vuelven < 0 ? 'fila-alerta' : ''}">
+          <td>${m.id_ot}</td>
+          <td>${m.tipo_componente}</td>
+          <td>${m.llevados}</td>
+          <td>${m.utilizados}</td>
+          <td>${m.vuelven}</td>
+          <td><span class="candado-materiales" title="Se calcula solo, desde los componentes reales de campo">🔒</span></td>
+        </tr>
+      `;
+    }
+
+    return `
+      <tr class="${m.vuelven < 0 ? 'fila-alerta' : ''}" data-id="${m.id}">
+        <td>${m.id_ot}</td>
+        <td>${m.tipo_componente}</td>
+        <td><input type="number" min="0" class="input-mat-llevados" value="${m.llevados}"></td>
+        <td><input type="number" min="0" class="input-mat-utilizados" value="${m.utilizados}"></td>
+        <td><input type="number" class="input-mat-vuelven" value="${m.vuelven}"></td>
+        <td><button class="btn-guardar-material">Guardar</button></td>
+      </tr>
+    `;
+  }).join("");
 
   tbody.querySelectorAll(".btn-guardar-material").forEach(btn => {
     btn.addEventListener("click", async () => {
