@@ -394,6 +394,27 @@ document.getElementById("filtro-modulo").addEventListener("input", renderTabla);
 document.getElementById("filtro-falla-select").addEventListener("change", renderTabla);
 document.getElementById("filtro-estado-ticket").addEventListener("change", renderTabla);
 
+async function cargarClientesParaSelect() {
+  const select = document.getElementById("nueva-ot-cliente");
+  const TAM_PAGINA = 1000;
+  let desde = 0;
+  let todos = [];
+  while (true) {
+    const { data, error } = await supabaseClient
+      .from("equipos")
+      .select("cliente")
+      .range(desde, desde + TAM_PAGINA - 1);
+    if (error) break;
+    todos = todos.concat(data || []);
+    if (!data || data.length < TAM_PAGINA) break;
+    desde += TAM_PAGINA;
+  }
+  const clientesUnicos = [...new Set(todos.map(e => e.cliente).filter(Boolean))].sort();
+  select.innerHTML = `<option value="">— Selecciona un cliente —</option>` +
+    clientesUnicos.map(c => `<option value="${c}">${c}</option>`).join("");
+}
+cargarClientesParaSelect();
+
 // --- Crear una OT libre, sin filtrar por alarmas ni ticket ---
 document.getElementById("crear-ot-libre-btn").addEventListener("click", async () => {
   const cliente = document.getElementById("nueva-ot-cliente").value.trim();
