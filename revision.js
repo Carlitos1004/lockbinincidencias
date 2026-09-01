@@ -86,9 +86,9 @@ function renderTabla(componentes) {
 
     return `
       <tr data-id="${c.id}">
-        <td>${c.m_control}</td>
+        <td><input type="text" class="input-mc-fila" value="${c.m_control || ""}" placeholder="Ej: MC2500642"></td>
         <td>${c.tipo_componente}</td>
-        <td class="celda-mono">${c.serial_retirado}</td>
+        <td><input type="text" class="input-serial-fila celda-mono" value="${c.serial_retirado || ""}"></td>
         <td>${c.estado}</td>
         <td><textarea class="input-reparacion" rows="2" ${bloqueado ? "disabled" : ""}>${c.reparacion || ""}</textarea></td>
         <td>
@@ -102,9 +102,26 @@ function renderTabla(componentes) {
           ${c.foto_revision ? `<a href="${c.foto_revision}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto actual →</a>` : ""}
         </td>
         <td><button class="btn-guardar-fila" ${bloqueado ? "disabled" : ""}>Guardar</button></td>
+        <td><button class="btn-eliminar-ticket btn-eliminar-componente" data-id="${c.id}" title="Eliminar este componente">🗑️</button></td>
       </tr>
     `;
   }).join("");
+
+  tbody.querySelectorAll(".btn-eliminar-componente").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("¿Eliminar este componente? No se puede deshacer.")) return;
+      const id = btn.dataset.id;
+      // Si tiene garantía asociada, hay que borrarla primero (la relación
+      // entre las dos tablas no deja borrar el componente si no)
+      await supabaseClient.from("garantias").delete().eq("componente_id", id);
+      const { error } = await supabaseClient.from("componentes_retirados").delete().eq("id", id);
+      if (error) {
+        alert("Error al eliminar: " + error.message);
+        return;
+      }
+      buscarComponentes();
+    });
+  });
 
   tbody.querySelectorAll(".btn-guardar-fila").forEach(btn => {
     btn.addEventListener("click", () => guardarFila(btn));
@@ -116,6 +133,8 @@ async function guardarFila(btn) {
   const componenteId = fila.dataset.id;
   const destino = fila.querySelector(".input-destino").value;
   const reparacion = fila.querySelector(".input-reparacion").value.trim();
+  const mcEditado = fila.querySelector(".input-mc-fila").value.trim().toUpperCase();
+  const serialEditado = fila.querySelector(".input-serial-fila").value.trim().toUpperCase();
 
   if (!destino) {
     alert("Elige un Destino antes de guardar.");
@@ -156,7 +175,10 @@ async function guardarFila(btn) {
     return;
   }
 
-  const datosActualizacion = { destino: destino, reparacion: reparacion, estado: nuevoEstado };
+  const datosActualizacion = {
+    destino: destino, reparacion: reparacion, estado: nuevoEstado,
+    m_control: mcEditado || null, serial_retirado: serialEditado || null
+  };
   if (fotoRevisionUrl) datosActualizacion.foto_revision = fotoRevisionUrl;
 
   // 2. Actualizamos el componente
@@ -187,15 +209,15 @@ async function guardarFila(btn) {
     // sola), no se la pisamos.
     let fechaEntrega = existente?.fecha_entrega || null;
     if (!fechaEntrega) {
-      fechaEntrega = await buscarFechaEntrega(componente.m_control, componente.serial_retirado);
+      fechaEntrega = await buscarFechaEntrega(mcEditado || componente.m_control, serialEditado || componente.serial_retirado);
     }
 
     const datosGarantia = {
       componente_id: componenteId,
       id_ot: componente.id_ot,
       cliente: componente.cliente,
-      m_control: componente.m_control,
-      dispositivo_danado: componente.serial_retirado,
+      m_control: mcEditado || componente.m_control,
+      dispositivo_danado: serialEditado || componente.serial_retirado,
       falla: reparacion,
       criterio_revision: destino, // el "criterio" ES el destino elegido en la revisión
       fecha_entrega: fechaEntrega,
