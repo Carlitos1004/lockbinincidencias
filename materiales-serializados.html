@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Materiales Serializados</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Materiales Serializados</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Registra qué serial específico de cada componente sale del almacén para una OT. En cuanto el operario reporte en campo un componente nuevo con ese mismo serial, esta lista se actualiza sola — lo que quede sin usar es lo que hay que devolver a stock.</p>
+
+  <div class="materiales-controles">
+    <input type="text" id="ot-input" placeholder="Nº de OT (ej. OT-005)" list="lista-ots">
+    <datalist id="lista-ots"></datalist>
+    <button id="cargar-btn">Cargar</button>
+  </div>
+  <p id="cargar-msg" class="resultado-msg" hidden></p>
+
+  <div id="contenido" hidden>
+    <h2 style="margin-top:28px;">Registrar seriales que salen (uno por línea)</h2>
+    <div class="agregar-equipo-box">
+      <textarea id="pegar-textarea" rows="6" placeholder="Batería Recargable, BA2500320
+Cierre Electrónico, CE2500914
+Lector Electrónico, LE2500642"></textarea>
+      <p style="font-size:0.8rem; color:var(--gris-700); margin:6px 0;">Formato: <span class="celda-mono">Tipo, Serial</span> — un componente por línea. Tipo acepta nombre completo o código corto (LE, CE, BA-R, BA-NR, MC).</p>
+      <button id="registrar-pegados-btn" class="btn-primario">Registrar estos seriales</button>
+    </div>
+
+    <h2 style="margin-top:28px;">O sube un Excel</h2>
+    <p style="font-size:0.85rem; color:var(--gris-700);">2 columnas: <strong>Tipo</strong> y <strong>Serial</strong> (encabezados exactos en la primera fila).</p>
+    <input type="file" id="excel-input" accept=".xlsx,.xls">
+    <button id="subir-excel-btn" class="btn-primario">Subir Excel</button>
+    <p id="registro-msg" class="resultado-msg" hidden></p>
+
+    <h2 style="margin-top:32px;">Seriales de esta OT</h2>
+    <table class="tabla-revision">
+      <thead><tr><th>Tipo</th><th>Serial</th><th>Estado</th><th>Sacado</th><th></th></tr></thead>
+      <tbody id="seriales-tbody"><tr><td colspan="5">Carga una OT arriba.</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script>const ROLES_PERMITIDOS = ["manager", "operario"];</script>
+<script src="sesion-multi.js"></script>
+<script src="selector-ots.js"></script>
+<script src="materiales-serializados.js"></script>
+</body>
+</html>

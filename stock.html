@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Stock General</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Stock General</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Disponible calculado en vivo: entradas manuales (compras) + lo que volvió a stock tras revisión — lo realmente consumido en las OT. Nada de esto se guarda como número fijo, siempre se recalcula solo.</p>
+
+  <div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom:12px;">
+    <button id="exportar-btn" class="btn-secundario">⬇️ Exportar a Excel</button>
+  </div>
+
+  <table class="tabla-revision" id="tabla-stock">
+    <thead>
+      <tr><th>Componente</th><th>Entradas manuales</th><th>Vuelto a stock</th><th>Consumido</th><th>Disponible</th></tr>
+    </thead>
+    <tbody id="stock-tbody"><tr><td colspan="5">Cargando...</td></tr></tbody>
+  </table>
+
+  <h2 style="margin-top:36px;">Registrar entrada o corrección manual</h2>
+  <p style="color:var(--gris-700); font-size:0.85rem; margin-top:-8px;">Para compras nuevas que llegan al almacén, o para corregir el número si algo no cuadra con el conteo físico.</p>
+
+  <div class="materiales-controles">
+    <select id="ajuste-tipo">
+      <option value="">— Componente —</option>
+      <option>Lector Electrónico</option>
+      <option>Cierre Electrónico</option>
+      <option>Batería Recargable</option>
+      <option>Batería No Recargable</option>
+      <option>Módulo de Control</option>
+    </select>
+    <input type="number" id="ajuste-cantidad" placeholder="Cantidad (negativo para restar)">
+    <input type="text" id="ajuste-motivo" placeholder="Motivo (ej: Compra a proveedor X)">
+    <button id="registrar-ajuste-btn" class="btn-primario">Registrar</button>
+  </div>
+  <p id="ajuste-msg" class="resultado-msg" hidden></p>
+
+  <h2 style="margin-top:36px;">Historial de entradas/correcciones manuales</h2>
+  <table class="tabla-revision" id="tabla-ajustes">
+    <thead><tr><th>Fecha</th><th>Componente</th><th>Cantidad</th><th>Motivo</th><th>Registrado por</th><th></th></tr></thead>
+    <tbody id="ajustes-tbody"><tr><td colspan="6">Cargando...</td></tr></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="stock.js"></script>
+</body>
+</html>

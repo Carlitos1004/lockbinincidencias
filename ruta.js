@@ -72,6 +72,7 @@ async function cargarRuta() {
   }
 
   document.getElementById("agregar-equipo-ruta").hidden = false;
+  document.getElementById("buscar-mc-box").hidden = false;
 
   const { data: tickets, error } = await supabaseClient
     .from("historial_fallas")
@@ -368,13 +369,24 @@ function refrescarZonaQR() {
 
   zona.hidden = false;
   botones.innerHTML = codigos.map(c => `
-    <button type="button" class="btn-secundario btn-qr" data-codigo="${c}">
-      📷 Escanear nuevo ${MAPA_COMPONENTE[c].nombre} ${serialesNuevos[c] ? "— ✅ " + serialesNuevos[c] : ""}
-    </button>
+    <div class="fila-serial-nuevo">
+      <button type="button" class="btn-secundario btn-qr" data-codigo="${c}">
+        📷 Escanear nuevo ${MAPA_COMPONENTE[c].nombre}
+      </button>
+      <span class="fila-serial-o">o escribe:</span>
+      <input type="text" class="input-serial-manual" data-codigo="${c}" placeholder="Serial a mano" value="${serialesNuevos[c] || ""}">
+      ${serialesNuevos[c] ? `<span class="serial-confirmado">✅</span>` : ""}
+    </div>
   `).join("");
 
   botones.querySelectorAll(".btn-qr").forEach(btn => {
     btn.addEventListener("click", () => iniciarScanner(btn.dataset.codigo));
+  });
+
+  botones.querySelectorAll(".input-serial-manual").forEach(input => {
+    input.addEventListener("input", () => {
+      serialesNuevos[input.dataset.codigo] = input.value.trim().toUpperCase();
+    });
   });
 }
 
@@ -425,7 +437,13 @@ modalEnviarBtn.addEventListener("click", async () => {
   const fotoFile = document.getElementById("modal-foto-input").files[0];
 
   if (!falla) { mostrarMensaje(modalMsg, "⚠️ Selecciona la falla.", true); return; }
-  if (accionesSeleccionadas.length === 0) { mostrarMensaje(modalMsg, "⚠️ Selecciona al menos una descripción de la acción.", true); return; }
+  const hayCambioOAlgoMas = ["le", "ce", "ba", "mc", "completo"].some(c => document.getElementById("modal-cambio-" + c).checked)
+    || ["le", "ce", "ba", "mc"].some(c => document.getElementById("modal-falta-" + c).checked)
+    || document.getElementById("modal-vandalismo-check").checked;
+  if (accionesSeleccionadas.length === 0 && !hayCambioOAlgoMas) {
+    mostrarMensaje(modalMsg, "⚠️ Selecciona al menos una descripción de la acción (o marca un cambio de componente abajo).", true);
+    return;
+  }
   if (!estadoEquipo) { mostrarMensaje(modalMsg, "⚠️ Selecciona el estado final.", true); return; }
 
   const idOtActiva = sessionStorage.getItem("lockbin_ot_activa");
@@ -597,6 +615,19 @@ modalEnviarBtn.addEventListener("click", async () => {
     await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: idOtActiva });
   }
 
+  // Cruce automático: si alguno de los seriales nuevos coincide con uno
+  // registrado como "Sacado del almacén" para esta OT, lo marcamos como
+  // usado — así queda claro solo, sin que nadie tenga que anotarlo aparte.
+  const serialesUsados = Object.values(serialesNuevos).filter(Boolean);
+  if (serialesUsados.length > 0) {
+    await supabaseClient
+      .from("materiales_serializados")
+      .update({ estado: "Usado en campo", fecha_actualizacion: new Date().toISOString() })
+      .eq("id_ot", idOtActiva)
+      .eq("estado", "Sacado del almacén")
+      .in("serial", serialesUsados);
+  }
+
   modalEnviarBtn.disabled = false;
   modalEnviarBtn.textContent = "Enviar reporte";
   mostrarMensaje(modalMsg, "✅ Reporte guardado.", false);
@@ -687,3 +718,27 @@ document.getElementById("agregar-equipo-btn").addEventListener("click", async ()
   document.getElementById("agregar-falla-select").value = "";
   setTimeout(() => cargarRuta(), 800); // recarga el mapa para que salga el nuevo punto
 });
+
+// --- Buscar un equipo por MC dentro de la ruta ya cargada ---
+document.getElementById("buscar-mc-btn").addEventListener("click", buscarMCEnMapa);
+document.getElementById("buscar-mc-input").addEventListener("keypress", (e) => { if (e.key === "Enter") buscarMCEnMapa(); });
+
+function buscarMCEnMapa() {
+  const mc = document.getElementById("buscar-mc-input").value.trim().toUpperCase();
+  const msg = document.getElementById("buscar-mc-msg");
+  const marcador = marcadores[mc];
+
+  if (!mc) { msg.textContent = ""; return; }
+
+  if (!marcador) {
+    msg.textContent = "❌ No está en esta ruta.";
+    msg.style.color = "var(--ambar)";
+    return;
+  }
+
+  msg.textContent = "✅ Encontrado";
+  msg.style.color = "var(--verde-oscuro)";
+  mapa.setView(marcador.getLatLng(), 17);
+  marcador.openTooltip();
+  abrirModal(mc);
+}

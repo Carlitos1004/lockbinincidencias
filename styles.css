@@ -1297,6 +1297,45 @@ input[type="file"]::file-selector-button:hover {
   resize: vertical;
 }
 
+.fila-serial-nuevo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.fila-serial-o {
+  font-size: 0.8rem;
+  color: var(--gris-700);
+}
+
+.input-serial-manual {
+  padding: 8px 10px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: var(--fuente-mono);
+  width: 160px;
+}
+
+.serial-confirmado {
+  color: var(--verde-medio);
+  font-weight: 700;
+}
+
+.detalle-ammi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detalle-ammi select {
+  min-width: 130px;
+  padding: 6px 28px 6px 8px;
+  font-size: 0.78rem;
+}
+
 .origen-etiqueta {
   display: inline-block;
   padding: 3px 10px;

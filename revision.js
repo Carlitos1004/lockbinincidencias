@@ -3,40 +3,32 @@
 // Lista los componentes retirados de una OT. Por cada uno, el Manager
 // elige un Destino y escribe qué se encontró — al guardar:
 // 1. Actualiza el Estado del componente según el Destino elegido.
-// 2. Si el Destino es de garantía ("Enviar a AMMI con garantía" o
-//    "Dañado sin garantía"), crea/actualiza su fila en "garantias".
+// 2. Si el Destino es "Enviar a AMMI", pide además la Categoría (1ra/2da)
+//    y si cubre garantía del cliente — son 2 preguntas distintas, no la
+//    misma: la categoría se la decimos a AMMI para que sepa si nos cobra,
+//    la garantía es nuestro propio control con el cliente final.
 // 3. Vuelve a calcular Materiales de esa OT (por si cambia algo relevante).
 // =========================================================================
 
 const DESTINOS = [
-  "✓ Equipo OK- Stock (nuevo)",
-  "✓ Equipo OK - Stock (usado)",
+  "✓ Equipo OK - Stock (1ra categoría)",
+  "✓ Equipo OK - Stock (2da categoría)",
   "✓ Equipo OK - Devolver al cliente",
-  "❌ Equipo dañado - Enviar a AMMI (usado)",
-  "❌ Equipo dañado - Enviar a AMMI (nuevo)",
-  "❌ Equipo dañado - Enviar a AMMI (equipo con garantía)",
-  "❌ Equipo dañado sin garantía (esperando presupuesto)",
+  "❌ Equipo dañado - Enviar a AMMI",
   "❌ Equipo dañado - Desechar",
   "🚨 Sigue en revisión"
 ];
 
 const MAPA_DESTINO_A_ESTADO = {
-  "✓ Equipo OK- Stock (nuevo)": "Revisado",
-  "✓ Equipo OK - Stock (usado)": "Revisado",
+  "✓ Equipo OK - Stock (1ra categoría)": "Revisado",
+  "✓ Equipo OK - Stock (2da categoría)": "Revisado",
   "✓ Equipo OK - Devolver al cliente": "Revisado",
-  "❌ Equipo dañado - Enviar a AMMI (usado)": "Revisado",
-  "❌ Equipo dañado - Enviar a AMMI (nuevo)": "Revisado",
-  "❌ Equipo dañado - Enviar a AMMI (equipo con garantía)": "Revisado",
-  "❌ Equipo dañado sin garantía (esperando presupuesto)": "Revisado",
+  "❌ Equipo dañado - Enviar a AMMI": "Revisado",
   "❌ Equipo dañado - Desechar": "Descartado",
   "🚨 Sigue en revisión": "Pendiente revisión"
 };
 
-// Destinos que además generan/actualizan una fila en "garantias"
-const DESTINOS_GARANTIA = new Set([
-  "❌ Equipo dañado - Enviar a AMMI (equipo con garantía)",
-  "❌ Equipo dañado sin garantía (esperando presupuesto)"
-]);
+const DESTINO_AMMI = "❌ Equipo dañado - Enviar a AMMI";
 
 const otInput = document.getElementById("ot-input");
 const buscarBtn = document.getElementById("buscar-btn");
@@ -92,12 +84,28 @@ function renderTabla(componentes) {
 
     const bloqueado = c.estado === "Faltante/Perdido";
     const esParaDevolver = c.destino === "✓ Equipo OK - Devolver al cliente";
+    const esAmmi = c.destino === DESTINO_AMMI;
 
     const celdaDevuelto = esParaDevolver
       ? (c.devuelto
           ? `<span class="devuelto-etiqueta devuelto-si">✅ Devuelto (${new Date(c.devuelto_en).toLocaleDateString("es-ES")})</span>`
           : `<button class="btn-marcar-devuelto" data-id="${c.id}">📦 Listo — Marcar como devuelto</button>`)
       : "—";
+
+    const celdaAmmi = `
+      <div class="detalle-ammi" ${esAmmi ? "" : "hidden"}>
+        <select class="input-categoria-ammi" ${bloqueado ? "disabled" : ""}>
+          <option value="">— Categoría —</option>
+          <option value="1ra categoría" ${c.categoria_ammi === "1ra categoría" ? "selected" : ""}>1ra categoría</option>
+          <option value="2da categoría" ${c.categoria_ammi === "2da categoría" ? "selected" : ""}>2da categoría</option>
+        </select>
+        <select class="input-garantia-cliente" ${bloqueado ? "disabled" : ""}>
+          <option value="">— ¿Garantía? —</option>
+          <option value="SI" ${c.garantia_cliente === "SI" ? "selected" : ""}>Sí cubre</option>
+          <option value="NO" ${c.garantia_cliente === "NO" ? "selected" : ""}>No cubre</option>
+        </select>
+      </div>
+    `;
 
     return `
       <tr data-id="${c.id}">
@@ -112,6 +120,7 @@ function renderTabla(componentes) {
             ${opciones}
           </select>
         </td>
+        <td>${celdaAmmi}</td>
         <td>${celdaDevuelto}</td>
         <td>
           <input type="file" class="input-foto-revision" accept="image/*" capture="environment">
@@ -157,6 +166,13 @@ function renderTabla(componentes) {
     });
   });
 
+  tbody.querySelectorAll(".input-destino").forEach(select => {
+    select.addEventListener("change", () => {
+      const fila = select.closest("tr");
+      fila.querySelector(".detalle-ammi").hidden = select.value !== DESTINO_AMMI;
+    });
+  });
+
   tbody.querySelectorAll(".btn-guardar-fila").forEach(btn => {
     btn.addEventListener("click", () => guardarFila(btn));
   });
@@ -169,9 +185,15 @@ async function guardarFila(btn) {
   const reparacion = fila.querySelector(".input-reparacion").value.trim();
   const mcEditado = fila.querySelector(".input-mc-fila").value.trim().toUpperCase();
   const serialEditado = fila.querySelector(".input-serial-fila").value.trim().toUpperCase();
+  const categoriaAmmi = fila.querySelector(".input-categoria-ammi").value;
+  const garantiaCliente = fila.querySelector(".input-garantia-cliente").value;
 
   if (!destino) {
     alert("Elige un Destino antes de guardar.");
+    return;
+  }
+  if (destino === DESTINO_AMMI && (!categoriaAmmi || !garantiaCliente)) {
+    alert("Para \"Enviar a AMMI\", elige también la Categoría y si cubre garantía del cliente.");
     return;
   }
 
@@ -211,7 +233,9 @@ async function guardarFila(btn) {
 
   const datosActualizacion = {
     destino: destino, reparacion: reparacion, estado: nuevoEstado,
-    m_control: mcEditado || null, serial_retirado: serialEditado || null
+    m_control: mcEditado || null, serial_retirado: serialEditado || null,
+    categoria_ammi: destino === DESTINO_AMMI ? categoriaAmmi : null,
+    garantia_cliente: destino === DESTINO_AMMI ? garantiaCliente : null
   };
   if (fotoRevisionUrl) datosActualizacion.foto_revision = fotoRevisionUrl;
 
@@ -228,10 +252,10 @@ async function guardarFila(btn) {
     return;
   }
 
-  // 3. Si el destino es de garantía, creamos/actualizamos su fila en "garantias"
-  //    (upsert por componente_id — nunca se toca "observacion" ni "nombre_imagen"
-  //    si la fila ya existía, esos se editan a mano por separado)
-  if (DESTINOS_GARANTIA.has(destino)) {
+  // 3. Si se envía a AMMI, creamos/actualizamos su fila en "garantias" —
+  //    el "criterio" se reconstruye a partir de la elección de garantía
+  //    (no del texto del destino, que ya no la incluye)
+  if (destino === DESTINO_AMMI) {
     const { data: existente } = await supabaseClient
       .from("garantias")
       .select("id, fecha_entrega")
@@ -246,6 +270,10 @@ async function guardarFila(btn) {
       fechaEntrega = await buscarFechaEntrega(mcEditado || componente.m_control, serialEditado || componente.serial_retirado);
     }
 
+    const criterioRevisionTexto = garantiaCliente === "SI"
+      ? "❌ Equipo dañado - Enviar a AMMI (con garantía)"
+      : "❌ Equipo dañado sin garantía (esperando presupuesto)";
+
     const datosGarantia = {
       componente_id: componenteId,
       id_ot: componente.id_ot,
@@ -253,9 +281,9 @@ async function guardarFila(btn) {
       m_control: mcEditado || componente.m_control,
       dispositivo_danado: serialEditado || componente.serial_retirado,
       falla: reparacion,
-      criterio_revision: destino, // el "criterio" ES el destino elegido en la revisión
+      criterio_revision: criterioRevisionTexto,
       fecha_entrega: fechaEntrega,
-      garantia: esGarantiaAplicable(destino, fechaEntrega) ? "SI" : "NO"
+      garantia: esGarantiaAplicable(criterioRevisionTexto, fechaEntrega) ? "SI" : "NO"
     };
 
     if (existente) {

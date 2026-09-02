@@ -31,6 +31,12 @@
   <a href="tecnico.html" class="link-manual">Buscar equipo manualmente en su lugar →</a>
 </div>
 
+<div class="ruta-selector" id="buscar-mc-box" hidden>
+  <input type="text" id="buscar-mc-input" placeholder="Buscar equipo en esta ruta por MC...">
+  <button id="buscar-mc-btn" class="btn-secundario">🔎 Buscar en el mapa</button>
+  <span id="buscar-mc-msg"></span>
+</div>
+
 <p id="ruta-msg" class="resultado-msg" hidden></p>
 
 <div id="instrucciones-ruta" class="instrucciones-ruta-banner" hidden>
@@ -98,7 +104,7 @@
       </select>
 
       <fieldset class="grupo-checkbox">
-        <legend>Descripción de la acción * (puedes elegir varias)</legend>
+        <legend>Descripción de la acción (puedes elegir varias — no hace falta si ya marcaste un cambio de componente abajo)</legend>
         <label class="opcion-check"><input type="checkbox" class="accion-check" value="Sin acción/Solo revisión"> Sin acción/Solo revisión</label>
         <label class="opcion-check"><input type="checkbox" class="accion-check" value="❌ No ubicado"> ❌ No ubicado</label>
         <label class="opcion-check"><input type="checkbox" class="accion-check" value="⚙️ Requiere futuro cambio"> ⚙️ Requiere futuro cambio</label>
@@ -110,6 +116,8 @@
         <label class="opcion-check"><input type="checkbox" class="accion-check" value="🔋 Prueba con bat recargable NO OK"> 🔋 Prueba con bat recargable NO OK</label>
         <label class="opcion-check"><input type="checkbox" class="accion-check" value="🌐 Reset remoto desde la plataforma LB"> 🌐 Reset remoto desde la plataforma LB</label>
         <label class="opcion-check"><input type="checkbox" class="accion-check" value="📶 Reset SIM remoto"> 📶 Reset SIM remoto</label>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="🔧 Cambio de componente"> 🔧 Cambio de componente</label>
+        <label class="opcion-check"><input type="checkbox" class="accion-check" value="⚙️ Cambio realizado por el cliente"> ⚙️ Cambio realizado por el cliente</label>
       </fieldset>
       <fieldset class="grupo-checkbox">
         <legend>¿Se cambió algún componente?</legend>
