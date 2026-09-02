@@ -640,6 +640,7 @@ async function cargarComponentesSinTicket(idOt) {
       <td>${c.tipo_componente}</td>
       <td class="celda-mono">${c.serial_retirado || "—"}</td>
       <td>${c.estado}</td>
+      <td>${c.cliente_original || "—"}</td>
       <td>${c.destino || "—"}</td>
       <td>${c.reparacion || "—"}</td>
     </tr>

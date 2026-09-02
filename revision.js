@@ -31,6 +31,22 @@ const MAPA_DESTINO_A_ESTADO = {
 const DESTINO_AMMI = "❌ Equipo dañado - Enviar a AMMI";
 
 const otInput = document.getElementById("ot-input");
+
+let clientesReales = [];
+async function cargarClientesReales() {
+  const TAM_PAGINA = 1000;
+  let desde = 0;
+  let todos = [];
+  while (true) {
+    const { data, error } = await supabaseClient.from("equipos").select("cliente").range(desde, desde + TAM_PAGINA - 1);
+    if (error) break;
+    todos = todos.concat(data || []);
+    if (!data || data.length < TAM_PAGINA) break;
+    desde += TAM_PAGINA;
+  }
+  clientesReales = [...new Set(todos.map(e => e.cliente).filter(Boolean))].sort();
+}
+cargarClientesReales();
 const buscarBtn = document.getElementById("buscar-btn");
 const buscarMsg = document.getElementById("buscar-msg");
 const tabla = document.getElementById("tabla-revision");
@@ -107,12 +123,22 @@ function renderTabla(componentes) {
       </div>
     `;
 
+    const opcionesCliente = clientesReales.map(cl =>
+      `<option value="${escaparHtml(cl)}" ${c.cliente_original === cl ? "selected" : ""}>${escaparHtml(cl)}</option>`
+    ).join("");
+
     return `
       <tr data-id="${c.id}">
         <td><input type="text" class="input-mc-fila" value="${c.m_control || ""}" placeholder="Ej: MC2500642"></td>
         <td>${c.tipo_componente}</td>
         <td><input type="text" class="input-serial-fila celda-mono" value="${c.serial_retirado || ""}"></td>
         <td>${c.estado}</td>
+        <td>
+          <select class="input-cliente-original" ${bloqueado ? "disabled" : ""}>
+            <option value="">— Cliente histórico —</option>
+            ${opcionesCliente}
+          </select>
+        </td>
         <td><textarea class="input-reparacion" rows="2" ${bloqueado ? "disabled" : ""}>${c.reparacion || ""}</textarea></td>
         <td>
           <select class="input-destino" ${bloqueado ? "disabled" : ""}>
@@ -187,6 +213,7 @@ async function guardarFila(btn) {
   const serialEditado = fila.querySelector(".input-serial-fila").value.trim().toUpperCase();
   const categoriaAmmi = fila.querySelector(".input-categoria-ammi").value;
   const garantiaCliente = fila.querySelector(".input-garantia-cliente").value;
+  const clienteOriginal = fila.querySelector(".input-cliente-original").value;
 
   if (!destino) {
     alert("Elige un Destino antes de guardar.");
@@ -235,7 +262,8 @@ async function guardarFila(btn) {
     destino: destino, reparacion: reparacion, estado: nuevoEstado,
     m_control: mcEditado || null, serial_retirado: serialEditado || null,
     categoria_ammi: destino === DESTINO_AMMI ? categoriaAmmi : null,
-    garantia_cliente: destino === DESTINO_AMMI ? garantiaCliente : null
+    garantia_cliente: destino === DESTINO_AMMI ? garantiaCliente : null,
+    cliente_original: clienteOriginal || null
   };
   if (fotoRevisionUrl) datosActualizacion.foto_revision = fotoRevisionUrl;
 
