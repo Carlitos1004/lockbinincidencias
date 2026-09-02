@@ -24,7 +24,6 @@
 
 <div class="panel-body panel-body-ancho">
   <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
-  <datalist id="lista-ots"></datalist>
 
   <div class="tabla-garantias-wrap">
     <table class="tabla-revision" id="tabla-garantias">
@@ -34,7 +33,7 @@
           <th>Falla</th><th>Criterio (destino)</th><th>Fecha Entrega</th><th>Vigencia</th><th>Estado Final</th><th>Observación</th><th>Nombre Imagen</th><th></th>
         </tr>
         <tr class="fila-filtros">
-          <th><input type="text" id="filtro-ot" placeholder="Filtrar..." list="lista-ots"></th>
+          <th><input type="text" id="filtro-ot" placeholder="Filtrar..."></th>
           <th><input type="text" id="filtro-cliente" placeholder="Filtrar..."></th>
           <th><input type="text" id="filtro-modulo" placeholder="Filtrar..."></th>
           <th></th>
@@ -70,7 +69,6 @@
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "manager";</script>
 <script src="sesion.js"></script>
-<script src="selector-ots.js"></script>
 <script src="garantia-utils.js"></script>
 <script src="garantias.js"></script>
 
