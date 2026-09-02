@@ -110,6 +110,8 @@ async function buscarOT() {
   cajaCompletada.hidden = !(ot.origen === "libre" && esManagerActual);
   document.getElementById("completada-checkbox").checked = !!ot.completada;
 
+  await cargarComponentesSinTicket(idOt);
+
   renderTabla();
   otContenido.hidden = false;
 }
@@ -510,6 +512,7 @@ document.getElementById("agregar-componente-btn").addEventListener("click", asyn
   document.getElementById("agregar-comp-tipo").value = "";
   document.getElementById("agregar-comp-serial").value = "";
   document.getElementById("agregar-comp-hallazgo").value = "";
+  cargarComponentesSinTicket(otActualCargada.id_ot);
 });
 
 // --- Marcar/desmarcar una OT libre como completada ---
@@ -611,3 +614,34 @@ document.getElementById("carga-rapida-btn").addEventListener("click", async () =
   document.getElementById("carga-rapida-textarea").value = "";
   buscarOT();
 });
+
+// --- Mostrar los componentes registrados sin ticket (agregados directo
+// en esta pantalla, uno a uno o por carga rápida) ---
+async function cargarComponentesSinTicket(idOt) {
+  const box = document.getElementById("sin-ticket-box");
+  const tbody = document.getElementById("sin-ticket-tbody");
+
+  const { data, error } = await supabaseClient
+    .from("componentes_retirados")
+    .select("*")
+    .eq("id_ot", idOt)
+    .is("id_registro", null)
+    .order("fecha", { ascending: false });
+
+  if (error || !data || data.length === 0) {
+    box.hidden = true;
+    return;
+  }
+
+  box.hidden = false;
+  tbody.innerHTML = data.map(c => `
+    <tr>
+      <td>${c.m_control || "—"}</td>
+      <td>${c.tipo_componente}</td>
+      <td class="celda-mono">${c.serial_retirado || "—"}</td>
+      <td>${c.estado}</td>
+      <td>${c.destino || "—"}</td>
+      <td>${c.reparacion || "—"}</td>
+    </tr>
+  `).join("");
+}
