@@ -1217,6 +1217,25 @@ td[colspan] {
   cursor: help;
 }
 
+.btn-marcar-devuelto {
+  padding: 6px 10px;
+  border: 1.5px solid var(--ambar);
+  border-radius: 8px;
+  background: var(--ambar-bg);
+  color: var(--gris-950);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.devuelto-etiqueta.devuelto-si {
+  color: var(--verde-oscuro);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* --- Estilo global para <select> y "Seleccionar archivo" en toda la app,
    para las pantallas que no tenían una regla más específica ya puesta --- */
 
@@ -1266,6 +1285,34 @@ input[type="file"]::file-selector-button {
 
 input[type="file"]::file-selector-button:hover {
   background: var(--verde-hover);
+}
+
+.agregar-equipo-box textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--gris-200);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-family: var(--fuente-mono);
+  resize: vertical;
+}
+
+.origen-etiqueta {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.origen-etiqueta.origen-normal {
+  background: var(--verde-claro);
+  color: var(--verde-oscuro);
+}
+
+.origen-etiqueta.origen-manual {
+  background: var(--ambar-bg);
+  color: var(--gris-950);
 }
 
 .crear-ot-libre-box {

@@ -53,27 +53,31 @@ function renderTabla() {
   const fCreadoPor = document.getElementById("filtro-creado-por").value.trim().toLowerCase();
   const fCliente = document.getElementById("filtro-cliente").value.trim().toLowerCase();
   const fEstado = document.getElementById("filtro-estado").value;
+  const fOrigen = document.getElementById("filtro-origen").value;
 
   let filtradas = otsConDatos;
 
   if (fOt) filtradas = filtradas.filter(r => r.ot.id_ot.toLowerCase().includes(fOt));
   if (fCreadoPor) filtradas = filtradas.filter(r => (r.ot.creado_por || "").toLowerCase().includes(fCreadoPor));
   if (fCliente) filtradas = filtradas.filter(r => r.clientes.some(c => c.toLowerCase().includes(fCliente)));
+  if (fOrigen) filtradas = filtradas.filter(r => (r.ot.origen || "normal") === fOrigen);
   if (fEstado === "pendientes") filtradas = filtradas.filter(r => r.abiertos > 0);
   if (fEstado === "completas") filtradas = filtradas.filter(r => r.abiertos === 0 && r.totalTickets > 0);
 
   if (filtradas.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9">No hay OT que coincidan.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10">No hay OT que coincidan.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = filtradas.map(r => {
     const porcentaje = r.totalTickets > 0 ? Math.round((r.cerrados / r.totalTickets) * 100) : 0;
     const completa = r.totalTickets > 0 && r.abiertos === 0;
+    const esLibre = r.ot.origen === "libre";
 
     return `
       <tr class="${completa ? '' : 'fila-alerta'}">
         <td><strong>${r.ot.id_ot}</strong></td>
+        <td>${esLibre ? '<span class="origen-etiqueta origen-manual">Manual</span>' : '<span class="origen-etiqueta origen-normal">Campo</span>'}</td>
         <td>${new Date(r.ot.fecha).toLocaleDateString("es-ES")}</td>
         <td>${r.ot.creado_por || "—"}</td>
         <td>${r.clientes.join(", ") || "—"}</td>
@@ -94,3 +98,4 @@ function renderTabla() {
   document.getElementById(id).addEventListener("input", renderTabla);
 });
 document.getElementById("filtro-estado").addEventListener("change", renderTabla);
+document.getElementById("filtro-origen").addEventListener("change", renderTabla);

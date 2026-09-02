@@ -111,6 +111,19 @@
       <p id="agregar-componente-msg" class="resultado-msg" hidden></p>
     </div>
 
+    <div class="agregar-equipo-box" id="carga-rapida-box" hidden>
+      <label><strong>Carga rápida (varios equipos a la vez)</strong> — una línea por componente, separado por comas: <span class="celda-mono">MC, Tipo, Serial, Hallazgo(opcional)</span></label>
+      <p style="font-size:0.8rem; color:var(--gris-700); margin:4px 0 8px;">
+        Tipo acepta el nombre completo o un código corto: <span class="celda-mono">LE</span> = Lector, <span class="celda-mono">CE</span> = Cierre, <span class="celda-mono">BA-R</span> = Batería Recargable, <span class="celda-mono">BA-NR</span> = Batería No Recargable, <span class="celda-mono">MC</span> = Módulo de Control.
+        El MC puede dejarse vacío si no lo tienes.
+      </p>
+      <textarea id="carga-rapida-textarea" rows="6" placeholder="MC2600123, BA-NR, BA2500320, Batería baja
+MC2600124, BA-NR, BA2500321
+, BA-NR, BA2500322, Sin dato de equipo"></textarea>
+      <button id="carga-rapida-btn" class="btn-primario" style="margin-top:8px;">Registrar todos</button>
+      <div id="carga-rapida-resultado"></div>
+    </div>
+
     <table class="tabla-revision" id="tabla-ot">
       <thead>
         <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Serial Nuevo</th><th>Foto</th><th>Acción / Comentarios</th><th></th></tr>

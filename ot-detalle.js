@@ -36,6 +36,7 @@ document.addEventListener("perfil-listo", (e) => {
   document.querySelector(".agregar-equipo-box").hidden = esCliente;
   document.getElementById("crear-ot-libre-box").hidden = !esManager;
   document.getElementById("agregar-componente-box").hidden = !esManager;
+  document.getElementById("carga-rapida-box").hidden = !esManager;
 
   if (otEnUrl) buscarOT();
 });
@@ -525,4 +526,88 @@ document.getElementById("completada-checkbox").addEventListener("change", async 
   } else {
     otActualCargada.completada = e.target.checked;
   }
+});
+
+// --- Carga rápida: registrar varios componentes de golpe ---
+const MAPA_TIPOS_CORTOS = {
+  "LE": "Lector Electrónico",
+  "CE": "Cierre Electrónico",
+  "BA-R": "Batería Recargable",
+  "BAR": "Batería Recargable",
+  "BA-NR": "Batería No Recargable",
+  "BANR": "Batería No Recargable",
+  "MC": "Módulo de Control"
+};
+const TIPOS_VALIDOS = ["Lector Electrónico", "Cierre Electrónico", "Batería Recargable", "Batería No Recargable", "Módulo de Control"];
+
+function resolverTipo(texto) {
+  const limpio = texto.trim();
+  const porCodigo = MAPA_TIPOS_CORTOS[limpio.toUpperCase()];
+  if (porCodigo) return porCodigo;
+  const porNombre = TIPOS_VALIDOS.find(t => t.toLowerCase() === limpio.toLowerCase());
+  return porNombre || null;
+}
+
+document.getElementById("carga-rapida-btn").addEventListener("click", async () => {
+  const texto = document.getElementById("carga-rapida-textarea").value;
+  const resultadoDiv = document.getElementById("carga-rapida-resultado");
+  const lineas = texto.split("\n").map(l => l.trim()).filter(Boolean);
+
+  if (lineas.length === 0 || !otActualCargada) {
+    resultadoDiv.innerHTML = `<p class="resultado-msg resultado-error" style="display:block;">⚠️ Escribe al menos una línea.</p>`;
+    return;
+  }
+
+  const filasBuenas = [];
+  const errores = [];
+
+  lineas.forEach((linea, i) => {
+    const partes = linea.split(",").map(p => p.trim());
+    const [mc, tipoTexto, serial, hallazgo] = partes;
+
+    if (!tipoTexto || !serial) {
+      errores.push(`Línea ${i + 1}: falta Tipo o Serial — "${linea}"`);
+      return;
+    }
+    const tipo = resolverTipo(tipoTexto);
+    if (!tipo) {
+      errores.push(`Línea ${i + 1}: tipo "${tipoTexto}" no reconocido — "${linea}"`);
+      return;
+    }
+
+    filasBuenas.push({
+      cliente: otActualCargada.cliente || null,
+      m_control: mc ? mc.toUpperCase() : null,
+      tipo_componente: tipo,
+      serial_retirado: serial.toUpperCase(),
+      reparacion: hallazgo || null,
+      id_registro: null,
+      id_ot: otActualCargada.id_ot,
+      estado: "Pendiente revisión",
+      excluir_materiales: true
+    });
+  });
+
+  if (errores.length > 0) {
+    resultadoDiv.innerHTML = `<p class="resultado-msg resultado-error" style="display:block;">${errores.join("<br>")}</p>`;
+    if (filasBuenas.length === 0) return;
+  }
+
+  const btn = document.getElementById("carga-rapida-btn");
+  btn.disabled = true;
+  btn.textContent = "Registrando...";
+
+  const { error } = await supabaseClient.from("componentes_retirados").insert(filasBuenas);
+
+  btn.disabled = false;
+  btn.textContent = "Registrar todos";
+
+  if (error) {
+    resultadoDiv.innerHTML = `<p class="resultado-msg resultado-error" style="display:block;">❌ ${error.message}</p>`;
+    return;
+  }
+
+  resultadoDiv.innerHTML = `<p class="resultado-msg resultado-ok" style="display:block;">✅ ${filasBuenas.length} componente(s) registrado(s).${errores.length > 0 ? " (" + errores.length + " línea(s) con error, revísalas y agrégalas aparte)" : ""}</p>`;
+  document.getElementById("carga-rapida-textarea").value = "";
+  buscarOT();
 });

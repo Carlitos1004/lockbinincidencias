@@ -44,7 +44,11 @@ function renderTodo() {
   const conteoPorDestino = {};
   const conteoPorDestinoYTipo = {};
   filtrados.forEach(c => {
-    const destino = c.destino || "(sin destino registrado / pendiente de revisión)";
+    // "Cambiado por el cliente" nunca pasa por Revisión de Taller (no lo
+    // necesita, ya está resuelto) — sin esto, se mezclaría con lo que sí
+    // está genuinamente pendiente de revisar.
+    const destino = c.destino
+      || (c.estado === "Cambiado por el cliente" ? "⚙️ Cambio hecho por el cliente" : "(sin destino registrado / pendiente de revisión)");
     conteoPorDestino[destino] = (conteoPorDestino[destino] || 0) + 1;
     if (!conteoPorDestinoYTipo[destino]) conteoPorDestinoYTipo[destino] = {};
     conteoPorDestinoYTipo[destino][c.tipo_componente] = (conteoPorDestinoYTipo[destino][c.tipo_componente] || 0) + 1;
@@ -77,7 +81,10 @@ function renderTodo() {
   // --- Detalle ---
   let paraDetalle = filtrados;
   if (destinoSeleccionado) {
-    paraDetalle = filtrados.filter(c => (c.destino || "(sin destino registrado / pendiente de revisión)") === destinoSeleccionado);
+    paraDetalle = filtrados.filter(c => {
+      const d = c.destino || (c.estado === "Cambiado por el cliente" ? "⚙️ Cambio hecho por el cliente" : "(sin destino registrado / pendiente de revisión)");
+      return d === destinoSeleccionado;
+    });
   }
 
   detalleTbody.innerHTML = paraDetalle.length > 0

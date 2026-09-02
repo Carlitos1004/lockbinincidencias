@@ -28,11 +28,18 @@
   <table class="tabla-revision" id="tabla-ots">
     <thead>
       <tr>
-        <th>OT</th><th>Fecha</th><th>Creada por</th><th>Clientes</th>
+        <th>OT</th><th>Origen</th><th>Fecha</th><th>Creada por</th><th>Clientes</th>
         <th>Equipos</th><th>Tickets abiertos</th><th>Tickets cerrados</th><th>Avance</th><th></th>
       </tr>
       <tr class="fila-filtros">
         <th><input type="text" id="filtro-ot" placeholder="Filtrar..."></th>
+        <th>
+          <select id="filtro-origen">
+            <option value="">Todas</option>
+            <option value="normal">Automática (campo)</option>
+            <option value="libre">Manual</option>
+          </select>
+        </th>
         <th></th>
         <th><input type="text" id="filtro-creado-por" placeholder="Filtrar..."></th>
         <th><input type="text" id="filtro-cliente" placeholder="Filtrar..."></th>

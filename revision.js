@@ -82,7 +82,14 @@ function renderTabla(componentes) {
       `<option value="${escaparHtml(d)}" ${c.destino === d ? "selected" : ""}>${escaparHtml(d)}</option>`
     ).join("");
 
-    const bloqueado = c.estado === "Cambiado por el cliente" || c.estado === "Faltante/Perdido";
+    const bloqueado = c.estado === "Faltante/Perdido";
+    const esParaDevolver = c.destino === "✓ Equipo OK - Devolver al cliente";
+
+    const celdaDevuelto = esParaDevolver
+      ? (c.devuelto
+          ? `<span class="devuelto-etiqueta devuelto-si">✅ Devuelto (${new Date(c.devuelto_en).toLocaleDateString("es-ES")})</span>`
+          : `<button class="btn-marcar-devuelto" data-id="${c.id}">📦 Listo — Marcar como devuelto</button>`)
+      : "—";
 
     return `
       <tr data-id="${c.id}">
@@ -97,6 +104,7 @@ function renderTabla(componentes) {
             ${opciones}
           </select>
         </td>
+        <td>${celdaDevuelto}</td>
         <td>
           <input type="file" class="input-foto-revision" accept="image/*" capture="environment">
           ${c.foto_revision ? `<a href="${c.foto_revision}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto actual →</a>` : ""}
@@ -106,6 +114,24 @@ function renderTabla(componentes) {
       </tr>
     `;
   }).join("");
+
+  tbody.querySelectorAll(".btn-marcar-devuelto").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.textContent = "Guardando...";
+      const { error } = await supabaseClient
+        .from("componentes_retirados")
+        .update({ devuelto: true, devuelto_en: new Date().toISOString() })
+        .eq("id", btn.dataset.id);
+      if (error) {
+        alert("Error: " + error.message);
+        btn.disabled = false;
+        btn.textContent = "📦 Listo — Marcar como devuelto";
+        return;
+      }
+      buscarComponentes();
+    });
+  });
 
   tbody.querySelectorAll(".btn-eliminar-componente").forEach(btn => {
     btn.addEventListener("click", async () => {

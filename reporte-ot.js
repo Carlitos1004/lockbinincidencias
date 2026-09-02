@@ -100,7 +100,8 @@ async function generarReporte() {
   const conteoPorDestino = {};
   const conteoPorDestinoYTipo = {};
   componentesCambiados.forEach(c => {
-    const destino = c.destino || "(sin destino registrado)";
+    const destino = c.destino
+      || (c.estado === "Cambiado por el cliente" ? "⚙️ Cambio hecho por el cliente" : "(sin destino registrado)");
     conteoPorDestino[destino] = (conteoPorDestino[destino] || 0) + 1;
     if (!conteoPorDestinoYTipo[destino]) conteoPorDestinoYTipo[destino] = {};
     conteoPorDestinoYTipo[destino][c.tipo_componente] = (conteoPorDestinoYTipo[destino][c.tipo_componente] || 0) + 1;
