@@ -51,6 +51,15 @@
     </thead>
     <tbody id="revision-tbody"></tbody>
   </table>
+
+  <div id="faltantes-box" hidden style="margin-top:32px;">
+    <h2>Equipos faltantes / perdidos</h2>
+    <p style="color:var(--gris-700); font-size:0.85rem; margin-top:-8px;">No pasan por revisión — no hay nada físico que evaluar. Quedan aquí solo como registro; aparecen en el reporte final de la OT.</p>
+    <table class="tabla-revision">
+      <thead><tr><th>Módulo</th><th>Componente</th><th>Serial esperado</th><th>Fecha</th></tr></thead>
+      <tbody id="faltantes-tbody"></tbody>
+    </table>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

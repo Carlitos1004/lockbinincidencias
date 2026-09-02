@@ -72,8 +72,16 @@ async function buscarComponentes() {
     return;
   }
 
-  renderTabla(data);
-  tabla.hidden = false;
+  const normales = data.filter(c => c.estado !== "Faltante/Perdido");
+  const faltantes = data.filter(c => c.estado === "Faltante/Perdido");
+
+  renderTabla(normales);
+  tabla.hidden = normales.length === 0;
+  if (normales.length === 0 && faltantes.length > 0) {
+    mostrarMensaje("Todos los componentes de esta OT son faltantes/perdidos — no hay nada que revisar (ver abajo).", false);
+  }
+
+  renderFaltantes(faltantes);
 }
 
 function renderTabla(componentes) {
@@ -274,6 +282,26 @@ async function guardarFila(btn) {
 
   btn.textContent = "✅ Guardado";
   setTimeout(() => { btn.textContent = "Guardar"; btn.disabled = false; }, 1500);
+}
+
+function renderFaltantes(faltantes) {
+  const box = document.getElementById("faltantes-box");
+  const tbody = document.getElementById("faltantes-tbody");
+
+  if (faltantes.length === 0) {
+    box.hidden = true;
+    return;
+  }
+
+  box.hidden = false;
+  tbody.innerHTML = faltantes.map(c => `
+    <tr>
+      <td>${c.m_control || "—"}</td>
+      <td>${c.tipo_componente}</td>
+      <td class="celda-mono">${c.serial_retirado || "—"}</td>
+      <td>${new Date(c.fecha).toLocaleDateString("es-ES")}</td>
+    </tr>
+  `).join("");
 }
 
 function mostrarMensaje(texto, esError) {
