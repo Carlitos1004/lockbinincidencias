@@ -49,7 +49,9 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: var(--blanco);
+  background:
+    linear-gradient(rgba(255,255,255,0.88), rgba(255,255,255,0.88)),
+    url("https://www.formatoverde.com/media/product/lock-bin/gallery-principal/gallery/thumbs/slide-2-980x427-980x427.jpg") center / cover no-repeat;
 }
 
 .login-panel-visual {
