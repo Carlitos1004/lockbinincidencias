@@ -33,6 +33,7 @@ document.addEventListener("perfil-listo", (e) => {
   instruccionesTextarea.readOnly = !esManager;
   descargarBtn.hidden = !esManager;
   document.getElementById("descargar-plantilla-btn").hidden = !esManager;
+  document.getElementById("guardar-todo-btn").hidden = !esManager;
   document.getElementById("eliminar-ot-btn").hidden = !esManager;
   document.querySelector(".agregar-equipo-box").hidden = esCliente;
   document.getElementById("crear-ot-libre-box").hidden = !esManager;
@@ -164,26 +165,48 @@ function renderTabla() {
   });
 
   tbody.querySelectorAll(".btn-guardar-ticket").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idRegistro = btn.dataset.id;
-      const textarea = tbody.querySelector(`.input-accion-comentarios[data-id="${idRegistro}"]`);
-      btn.disabled = true;
-      btn.textContent = "Guardando...";
-
-      const { error } = await supabaseClient
-        .from("historial_fallas")
-        .update({ comentarios: textarea.value.trim(), accion_calle: null })
-        .eq("id_registro", idRegistro);
-
-      btn.textContent = error ? "❌ Error" : "✅ Guardado";
-      if (!error) {
-        const ticketLocal = ticketsCargados.find(t => t.id_registro === idRegistro);
-        if (ticketLocal) { ticketLocal.comentarios = textarea.value.trim(); ticketLocal.accion_calle = null; }
-      }
-      setTimeout(() => { btn.textContent = "Guardar"; btn.disabled = false; }, 1200);
-    });
+    btn.addEventListener("click", () => guardarUnTicket(btn.dataset.id, btn));
   });
 }
+
+async function guardarUnTicket(idRegistro, btn) {
+  const textarea = tbody.querySelector(`.input-accion-comentarios[data-id="${idRegistro}"]`);
+  if (!textarea) return true; // no editable (ticket cerrado u otro rol), no hay nada que guardar
+
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+
+  const { error } = await supabaseClient
+    .from("historial_fallas")
+    .update({ comentarios: textarea.value.trim(), accion_calle: null })
+    .eq("id_registro", idRegistro);
+
+  if (btn) btn.textContent = error ? "❌ Error" : "✅ Guardado";
+  if (!error) {
+    const ticketLocal = ticketsCargados.find(t => t.id_registro === idRegistro);
+    if (ticketLocal) { ticketLocal.comentarios = textarea.value.trim(); ticketLocal.accion_calle = null; }
+  }
+  if (btn) setTimeout(() => { btn.textContent = "Guardar"; btn.disabled = false; }, 1200);
+  return !error;
+}
+
+document.getElementById("guardar-todo-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("guardar-todo-btn");
+  const textareas = [...tbody.querySelectorAll(".input-accion-comentarios")];
+  if (textareas.length === 0) { alert("No hay ninguna fila editable para guardar."); return; }
+
+  btn.disabled = true;
+  btn.textContent = "Guardando todo...";
+
+  let fallos = 0;
+  for (const textarea of textareas) {
+    const ok = await guardarUnTicket(textarea.dataset.id, null);
+    if (!ok) fallos++;
+  }
+
+  btn.disabled = false;
+  btn.textContent = fallos > 0 ? `⚠️ ${fallos} con error` : "✅ Todo guardado";
+  setTimeout(() => { btn.textContent = "💾 Guardar todo"; }, 2000);
+});
 
 guardarInstruccionesBtn.addEventListener("click", async () => {
   if (!otActualCargada) return;
