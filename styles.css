@@ -57,18 +57,9 @@ body {
   display: none; /* se muestra solo en pantallas anchas, como el real */
   position: relative;
   background:
-    radial-gradient(circle at 20% 20%, rgba(255,255,255,0.15) 0, transparent 45%),
-    radial-gradient(circle at 80% 75%, rgba(255,255,255,0.12) 0, transparent 40%),
-    linear-gradient(135deg, var(--verde-medio) 0%, #4d7a1f 100%);
+    linear-gradient(135deg, rgba(77,122,31,0.75) 0%, rgba(50,80,20,0.85) 100%),
+    url("https://www.formatoverde.com/media/product/lock-bin/gallery-principal/gallery/thumbs/slide-2-980x427-980x427.jpg") center / cover no-repeat;
   overflow: hidden;
-}
-
-.login-panel-visual::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 40px);
 }
 
 .login-panel-visual .visual-texto {
