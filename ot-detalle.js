@@ -84,7 +84,7 @@ async function buscarOT() {
   if (mcsUnicos.length > 0) {
     const { data: equiposData } = await supabaseClient
       .from("equipos")
-      .select("m_control, fraccion, latitud, longitud")
+      .select("m_control, fraccion, latitud, longitud, ultima_comunicacion")
       .in("m_control", mcsUnicos);
     (equiposData || []).forEach(eq => { mapaEquipos[eq.m_control] = eq; });
   }
@@ -274,6 +274,9 @@ document.getElementById("descargar-plantilla-btn").addEventListener("click", () 
     const lat = t.equipos?.latitud;
     const lng = t.equipos?.longitud;
     const accion = [t.accion_calle, t.comentarios].filter(Boolean).join(" — ");
+    const fechaComunicacion = t.equipos?.ultima_comunicacion
+      ? new Date(t.equipos.ultima_comunicacion).toLocaleDateString("es-ES")
+      : "sin dato";
     return {
       "Localidad": t.cliente || "",
       "Modulo de control": t.m_control,
@@ -282,7 +285,7 @@ document.getElementById("descargar-plantilla-btn").addEventListener("click", () 
       "Latitud": lat || "",
       "Longitud": lng || "",
       "Enlace": (lat && lng) ? `https://maps.google.com/?q=${lat},${lng}` : "",
-      "Estado": `${t.falla} (${new Date(t.fecha).toLocaleDateString("es-ES")})`
+      "Estado": `${t.falla} (${fechaComunicacion})`
     };
   });
 
