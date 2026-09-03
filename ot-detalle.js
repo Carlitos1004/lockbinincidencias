@@ -293,6 +293,7 @@ document.getElementById("descargar-plantilla-btn").addEventListener("click", () 
     return;
   }
 
+  const encabezados = ["Localidad", "Modulo de control", "Fracción", "Acción", "Comentarios", "Latitud", "Longitud", "Enlace", "Estado"];
   const filas = abiertos.map(t => {
     const lat = t.equipos?.latitud;
     const lng = t.equipos?.longitud;
@@ -300,20 +301,28 @@ document.getElementById("descargar-plantilla-btn").addEventListener("click", () 
     const fechaComunicacion = t.equipos?.ultima_comunicacion
       ? new Date(t.equipos.ultima_comunicacion).toLocaleDateString("es-ES")
       : "sin dato";
-    return {
-      "Localidad": t.cliente || "",
-      "Modulo de control": t.m_control,
-      "Fracción": t.equipos?.fraccion || "",
-      "Acción": accion,
-      "Comentarios": "",
-      "Latitud": lat || "",
-      "Longitud": lng || "",
-      "Enlace": (lat && lng) ? `https://maps.google.com/?q=${lat},${lng}` : "",
-      "Estado": `${t.falla} (${fechaComunicacion})`
-    };
+    return [
+      t.cliente || "",
+      t.m_control,
+      t.equipos?.fraccion || "",
+      accion,
+      "",
+      lat || "",
+      lng || "",
+      (lat && lng) ? `https://maps.google.com/?q=${lat},${lng}` : "",
+      `${t.falla} (${fechaComunicacion})`
+    ];
   });
 
-  const hoja = XLSX.utils.json_to_sheet(filas);
+  const filasHoja = [];
+  if (otActualCargada.instrucciones) {
+    filasHoja.push(["Instrucciones: " + otActualCargada.instrucciones]);
+    filasHoja.push([]); // fila en blanco de separación
+  }
+  filasHoja.push(encabezados);
+  filasHoja.push(...filas);
+
+  const hoja = XLSX.utils.aoa_to_sheet(filasHoja);
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Plantilla");
   XLSX.writeFile(libro, `Plantilla_${otActualCargada.id_ot}.xlsx`);

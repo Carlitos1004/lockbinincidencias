@@ -65,6 +65,14 @@ body {
   overflow: hidden;
 }
 
+.login-panel-visual::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 40px);
+}
+
 .login-panel-visual .visual-texto {
   position: absolute;
   bottom: 48px;
