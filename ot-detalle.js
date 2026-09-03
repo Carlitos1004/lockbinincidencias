@@ -280,6 +280,7 @@ document.getElementById("descargar-plantilla-btn").addEventListener("click", () 
     return {
       "Localidad": t.cliente || "",
       "Modulo de control": t.m_control,
+      "Fracción": t.equipos?.fraccion || "",
       "Acción": accion,
       "Comentarios": "",
       "Latitud": lat || "",
