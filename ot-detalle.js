@@ -32,6 +32,7 @@ document.addEventListener("perfil-listo", (e) => {
   guardarInstruccionesBtn.hidden = !esManager;
   instruccionesTextarea.readOnly = !esManager;
   descargarBtn.hidden = !esManager;
+  document.getElementById("descargar-plantilla-btn").hidden = !esManager;
   document.getElementById("eliminar-ot-btn").hidden = !esManager;
   document.querySelector(".agregar-equipo-box").hidden = esCliente;
   document.getElementById("crear-ot-libre-box").hidden = !esManager;
@@ -258,6 +259,37 @@ descargarBtn.addEventListener("click", () => {
   XLSX.utils.book_append_sheet(libro, hojaInfo, "Info");
 
   XLSX.writeFile(libro, otActualCargada.id_ot + ".xlsx");
+});
+
+document.getElementById("descargar-plantilla-btn").addEventListener("click", () => {
+  if (!otActualCargada) return;
+
+  const abiertos = ticketsCargados.filter(t => t.estado === "🚨 ABIERTO");
+  if (abiertos.length === 0) {
+    alert("No hay tickets abiertos en esta OT para incluir en la plantilla.");
+    return;
+  }
+
+  const filas = abiertos.map(t => {
+    const lat = t.equipos?.latitud;
+    const lng = t.equipos?.longitud;
+    const accion = [t.accion_calle, t.comentarios].filter(Boolean).join(" — ");
+    return {
+      "Localidad": t.cliente || "",
+      "Modulo de control": t.m_control,
+      "Acción": accion,
+      "Comentarios": "",
+      "Latitud": lat || "",
+      "Longitud": lng || "",
+      "Enlace": (lat && lng) ? `https://maps.google.com/?q=${lat},${lng}` : "",
+      "Estado": `${t.falla} (${new Date(t.fecha).toLocaleDateString("es-ES")})`
+    };
+  });
+
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Plantilla");
+  XLSX.writeFile(libro, `Plantilla_${otActualCargada.id_ot}.xlsx`);
 });
 
 function mostrarMensaje(el, texto, esError) {
