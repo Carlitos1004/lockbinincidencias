@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Equipos por Cliente</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Equipos por Cliente</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Vista de solo lectura — todos los equipos de un cliente, sin filtrar por fallas. Solo para consulta.</p>
+
+  <div class="materiales-controles">
+    <select id="cliente-select"><option value="">Cargando clientes...</option></select>
+  </div>
+  <p id="cargar-msg" class="resultado-msg" hidden></p>
+
+  <p id="total-equipos" style="font-weight:600; margin-top:16px;"></p>
+
+  <table class="tabla-revision" id="tabla-equipos">
+    <thead>
+      <tr>
+        <th>M. de Control</th><th>Fracción</th><th>Modelo</th><th>Estado Montaje</th>
+        <th>Serie Lector</th><th>Serie Cierre</th><th>Serie Batería</th><th>Firmware</th><th>IMEI</th>
+      </tr>
+      <tr class="fila-filtros">
+        <th><input type="text" id="f-mc" placeholder="Filtrar..."></th>
+        <th><input type="text" id="f-fraccion" placeholder="Filtrar..."></th>
+        <th><input type="text" id="f-modelo" placeholder="Filtrar..."></th>
+        <th><input type="text" id="f-estado" placeholder="Filtrar..."></th>
+        <th><input type="text" id="f-lector" placeholder="Filtrar..."></th>
+        <th><input type="text" id="f-cierre" placeholder="Filtrar..."></th>
+        <th><input type="text" id="f-bateria" placeholder="Filtrar..."></th>
+        <th><input type="text" id="f-firmware" placeholder="Filtrar..."></th>
+        <th><input type="text" id="f-imei" placeholder="Filtrar..."></th>
+      </tr>
+    </thead>
+    <tbody id="equipos-tbody"><tr><td colspan="9">Elige un cliente arriba.</td></tr></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="equipos-cliente.js"></script>
+</body>
+</html>
