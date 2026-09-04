@@ -260,9 +260,8 @@ async function abrirModal(mc) {
     });
     modalForm.hidden = true;
   } else {
-    modalTickets.innerHTML = `<p class="tickets-titulo">Sin tickets todavía — este reporte crea uno nuevo.</p>`;
-    limpiarFormularioModal();
-    modalForm.hidden = false;
+    modalTickets.innerHTML = `<p class="tickets-titulo">⚠️ Este equipo no tiene ningún ticket registrado en esta OT — usa "Agregar un equipo a esta OT" arriba del mapa para crearle uno.</p>`;
+    modalForm.hidden = true;
   }
 
   configurarBotonesQR();
@@ -283,9 +282,6 @@ async function precargarTicket(idRegistro, btnElegido) {
   // fijo (no depende de que coincida con una opción del dropdown, que era
   // justo el bug: fallas como "Batería Crítica" no estaban en la lista y
   // la dejaban vacía, bloqueando el envío).
-  document.getElementById("modal-nuevo-titulo").hidden = true;
-  document.getElementById("modal-falla-label").hidden = true;
-  document.getElementById("modal-falla-select").hidden = true;
   const fallaFija = document.getElementById("modal-falla-fija");
   fallaFija.textContent = "Falla: " + (ticket.falla || "—");
   fallaFija.hidden = false;
@@ -338,10 +334,6 @@ function cerrarModal() {
 }
 
 function limpiarFormularioModal() {
-  document.getElementById("modal-nuevo-titulo").hidden = false;
-  document.getElementById("modal-falla-label").hidden = false;
-  document.getElementById("modal-falla-select").hidden = false;
-  document.getElementById("modal-falla-select").value = "";
   document.getElementById("modal-falla-fija").hidden = true;
   document.querySelectorAll(".accion-check").forEach(c => { c.checked = false; });
   document.getElementById("modal-comentarios-input").value = "";
@@ -501,8 +493,6 @@ function serialViejoDe(codigo) {
 }
 
 modalEnviarBtn.addEventListener("click", async () => {
-  const fallaSeleccionUsuario = document.getElementById("modal-falla-select").value;
-  if (!ticketExistente) fallaActual = fallaSeleccionUsuario;
   const falla = fallaActual;
 
   const accionesSeleccionadas = [...document.querySelectorAll(".accion-check:checked")].map(c => c.value);
