@@ -81,6 +81,15 @@
       <label class="opcion-check opcion-secundaria"><input type="checkbox" id="retirado-cliente"> El cliente ya lo había retirado/cambiado por su cuenta (no cuenta como material tuyo)</label>
     </fieldset>
 
+    <div id="tipo-bateria-box" class="tipo-bateria-box" hidden>
+      <label for="tipo-bateria"><strong>¿Qué tipo de batería?</strong> (para que cuente bien en Materiales)</label>
+      <select id="tipo-bateria">
+        <option value="">— Elige —</option>
+        <option value="Batería Recargable">Batería Recargable</option>
+        <option value="Batería No Recargable">Batería No Recargable</option>
+      </select>
+    </div>
+
     <fieldset class="grupo-checkbox">
       <legend>¿Llegó sin algún componente (faltante/perdido)?</legend>
       <label class="opcion-check"><input type="checkbox" id="falta-le"> Falta Lector</label>

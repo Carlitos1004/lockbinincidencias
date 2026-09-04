@@ -130,6 +130,15 @@
         <label class="opcion-check opcion-secundaria"><input type="checkbox" id="modal-retirado-cliente"> El cliente ya lo había retirado/cambiado por su cuenta</label>
       </fieldset>
 
+      <div id="tipo-bateria-box" class="tipo-bateria-box" hidden>
+        <label for="modal-tipo-bateria"><strong>¿Qué tipo de batería?</strong> (para que cuente bien en Materiales)</label>
+        <select id="modal-tipo-bateria">
+          <option value="">— Elige —</option>
+          <option value="Batería Recargable">Batería Recargable</option>
+          <option value="Batería No Recargable">Batería No Recargable</option>
+        </select>
+      </div>
+
       <div id="qr-zona" class="qr-zona" hidden>
         <p>Escanea el serial del componente NUEVO instalado (opcional, uno por cada componente marcado arriba):</p>
         <div id="qr-botones"></div>
