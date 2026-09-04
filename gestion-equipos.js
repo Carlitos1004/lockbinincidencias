@@ -231,20 +231,21 @@ generarBtn.addEventListener("click", async () => {
     return;
   }
 
-  // --- Un ticket por cada falla activa de cada equipo (filtrado o manual) ---
+  // --- Un solo ticket por equipo, combinando todas sus fallas activas ---
+  // (antes creaba uno por cada falla — resultaba en tickets duplicados del
+  // mismo equipo, con la misma acción repetida varias veces)
   const nuevosTickets = [];
   todosLosEquipos.forEach(eq => {
-    eq.fallas.forEach(falla => {
-      nuevosTickets.push({
-        id_registro: "TK-" + eq.m_control + "-" + Math.floor(Math.random() * 900 + 100),
-        cliente: eq.cliente,
-        m_control: eq.m_control,
-        falla: falla,
-        estado: "🚨 ABIERTO",
-        accion_calle: obtenerAccionPorDefecto(falla),
-        origen: user.email,
-        id_ot: nuevoIdOt
-      });
+    const accionesUnicas = [...new Set(eq.fallas.map(obtenerAccionPorDefecto))];
+    nuevosTickets.push({
+      id_registro: "TK-" + eq.m_control + "-" + Math.floor(Math.random() * 900 + 100),
+      cliente: eq.cliente,
+      m_control: eq.m_control,
+      falla: eq.fallas.join(", "),
+      estado: "🚨 ABIERTO",
+      accion_calle: accionesUnicas.join(" / "),
+      origen: user.email,
+      id_ot: nuevoIdOt
     });
   });
 
