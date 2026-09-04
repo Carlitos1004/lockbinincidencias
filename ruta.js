@@ -243,22 +243,20 @@ async function abrirModal(mc) {
 
   // Mostramos TODOS los tickets de este equipo en esta OT, no solo los
   // abiertos — así uno ya cerrado se puede revisar/editar en vez de
-  // desaparecer del modal.
+  // desaparecer del modal. Cada equipo ya trae UN solo ticket (con todas
+  // sus fallas juntas) — si hay exactamente uno, se abre directo, sin
+  // tener que elegirlo. Si hay más de uno (equipos de antes de este
+  // cambio), sí hace falta elegir cuál.
   const todos = info.tickets;
-  if (todos.length > 0) {
-    modalTickets.innerHTML = `<p class="tickets-titulo">Tickets de este equipo — elige uno para ver/editar lo ya guardado, o reporta algo nuevo abajo:</p>` +
-      todos.map(t => `<button type="button" class="ticket-btn" data-id="${t.id_registro}">${t.estado === "✅ CERRADO" ? "✅" : "🚨"} ${escaparHtml(t.falla)} (${t.id_registro})</button>`).join("") +
-      `<button type="button" id="reportar-nuevo-btn" class="btn-secundario">➕ Reportar algo nuevo</button>`;
 
+  if (todos.length === 1) {
+    modalTickets.innerHTML = "";
+    await precargarTicket(todos[0].id_registro, null);
+  } else if (todos.length > 1) {
+    modalTickets.innerHTML = `<p class="tickets-titulo">Este equipo tiene varios tickets — elige cuál ver/editar:</p>` +
+      todos.map(t => `<button type="button" class="ticket-btn" data-id="${t.id_registro}">${t.estado === "✅ CERRADO" ? "✅" : "🚨"} ${escaparHtml(t.falla)} (${t.id_registro})</button>`).join("");
     modalTickets.querySelectorAll(".ticket-btn").forEach(btn => {
       btn.addEventListener("click", () => precargarTicket(btn.dataset.id, btn));
-    });
-    document.getElementById("reportar-nuevo-btn").addEventListener("click", () => {
-      ticketExistente = null;
-      fallaActual = null;
-      limpiarFormularioModal();
-      modalTickets.querySelectorAll(".ticket-btn").forEach(b => b.classList.remove("ticket-elegido"));
-      modalForm.hidden = false;
     });
     modalForm.hidden = true;
   } else {
@@ -274,7 +272,7 @@ async function abrirModal(mc) {
 async function precargarTicket(idRegistro, btnElegido) {
   ticketExistente = idRegistro;
   modalTickets.querySelectorAll(".ticket-btn").forEach(b => b.classList.remove("ticket-elegido"));
-  btnElegido.classList.add("ticket-elegido");
+  if (btnElegido) btnElegido.classList.add("ticket-elegido");
 
   limpiarFormularioModal();
 
