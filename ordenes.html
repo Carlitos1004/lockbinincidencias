@@ -29,7 +29,7 @@
     <thead>
       <tr>
         <th>OT</th><th>Origen</th><th>Fecha</th><th>Creada por</th><th>Clientes</th>
-        <th>Equipos</th><th>Tickets abiertos</th><th>Tickets cerrados</th><th>Avance</th><th></th>
+        <th>Equipos</th><th>Tickets abiertos</th><th>Tickets cerrados</th><th>Avance</th><th>Estado General</th><th></th>
       </tr>
       <tr class="fila-filtros">
         <th><input type="text" id="filtro-ot" placeholder="Filtrar..."></th>
@@ -51,6 +51,19 @@
             <option value="todas">Todas</option>
             <option value="pendientes">Pendientes</option>
             <option value="completas">Completas</option>
+          </select>
+        </th>
+        <th>
+          <select id="filtro-estado-general">
+            <option value="">Todos</option>
+            <option>En espera de visita</option>
+            <option>Visita realizada</option>
+            <option>En revisión de equipos</option>
+            <option>Equipos revisados, en espera de gestión de garantías</option>
+            <option>Equipos revisados, clasificación de stock y AMMI realizada</option>
+            <option>Equipos revisados, en espera a devolución a cliente</option>
+            <option>Equipos devueltos a cliente, en espera de facturación y/o definición de restante</option>
+            <option>Orden completada y cerrada</option>
           </select>
         </th>
         <th></th>

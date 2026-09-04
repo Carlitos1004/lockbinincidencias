@@ -5,6 +5,17 @@
 
 let otsConDatos = []; // [{ot, tickets, clientes, equipos, abiertos, cerrados}]
 
+const ESTADOS_GENERALES = [
+  "En espera de visita",
+  "Visita realizada",
+  "En revisión de equipos",
+  "Equipos revisados, en espera de gestión de garantías",
+  "Equipos revisados, clasificación de stock y AMMI realizada",
+  "Equipos revisados, en espera a devolución a cliente",
+  "Equipos devueltos a cliente, en espera de facturación y/o definición de restante",
+  "Orden completada y cerrada"
+];
+
 const tbody = document.getElementById("ots-tbody");
 
 cargarOTs();
@@ -16,7 +27,7 @@ async function cargarOTs() {
     .order("fecha", { ascending: false });
 
   if (errorOts) {
-    tbody.innerHTML = `<tr><td colspan="9">Error: ${errorOts.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10">Error: ${errorOts.message}</td></tr>`;
     return;
   }
 
@@ -25,7 +36,7 @@ async function cargarOTs() {
     .select("id_ot, cliente, m_control, estado");
 
   if (errorTickets) {
-    tbody.innerHTML = `<tr><td colspan="9">Error: ${errorTickets.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10">Error: ${errorTickets.message}</td></tr>`;
     return;
   }
 
@@ -54,6 +65,7 @@ function renderTabla() {
   const fCliente = document.getElementById("filtro-cliente").value.trim().toLowerCase();
   const fEstado = document.getElementById("filtro-estado").value;
   const fOrigen = document.getElementById("filtro-origen").value;
+  const fEstadoGeneral = document.getElementById("filtro-estado-general").value;
 
   let filtradas = otsConDatos;
 
@@ -61,6 +73,7 @@ function renderTabla() {
   if (fCreadoPor) filtradas = filtradas.filter(r => (r.ot.creado_por || "").toLowerCase().includes(fCreadoPor));
   if (fCliente) filtradas = filtradas.filter(r => r.clientes.some(c => c.toLowerCase().includes(fCliente)));
   if (fOrigen) filtradas = filtradas.filter(r => (r.ot.origen || "normal") === fOrigen);
+  if (fEstadoGeneral) filtradas = filtradas.filter(r => r.ot.estado_general === fEstadoGeneral);
   if (fEstado === "pendientes") filtradas = filtradas.filter(r => r.abiertos > 0);
   if (fEstado === "completas") filtradas = filtradas.filter(r => r.abiertos === 0 && r.totalTickets > 0);
 
@@ -73,6 +86,9 @@ function renderTabla() {
     const porcentaje = r.totalTickets > 0 ? Math.round((r.cerrados / r.totalTickets) * 100) : 0;
     const completa = r.totalTickets > 0 && r.abiertos === 0;
     const esLibre = r.ot.origen === "libre";
+    const opcionesEstado = ESTADOS_GENERALES.map(e =>
+      `<option ${r.ot.estado_general === e ? "selected" : ""}>${e}</option>`
+    ).join("");
 
     return `
       <tr class="${completa ? '' : 'fila-alerta'}">
@@ -88,10 +104,28 @@ function renderTabla() {
           <div class="barra-avance"><div class="barra-avance-relleno" style="width:${porcentaje}%"></div></div>
           <span class="avance-texto">${porcentaje}%</span>
         </td>
+        <td><select class="select-estado-general" data-ot="${r.ot.id_ot}">${opcionesEstado}</select></td>
         <td><a href="ot-detalle.html?ot=${r.ot.id_ot}" class="btn-ver-tabla">Ver →</a></td>
       </tr>
     `;
   }).join("");
+
+  tbody.querySelectorAll(".select-estado-general").forEach(select => {
+    select.addEventListener("change", async () => {
+      select.disabled = true;
+      const { error } = await supabaseClient
+        .from("ordenes_trabajo")
+        .update({ estado_general: select.value })
+        .eq("id_ot", select.dataset.ot);
+      select.disabled = false;
+      if (error) {
+        alert("No se pudo guardar: " + error.message);
+        return;
+      }
+      const fila = otsConDatos.find(r => r.ot.id_ot === select.dataset.ot);
+      if (fila) fila.ot.estado_general = select.value;
+    });
+  });
 }
 
 ["filtro-ot", "filtro-creado-por", "filtro-cliente"].forEach(id => {
@@ -99,3 +133,4 @@ function renderTabla() {
 });
 document.getElementById("filtro-estado").addEventListener("change", renderTabla);
 document.getElementById("filtro-origen").addEventListener("change", renderTabla);
+document.getElementById("filtro-estado-general").addEventListener("change", renderTabla);
