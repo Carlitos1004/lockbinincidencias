@@ -109,9 +109,21 @@ function limpiarFormulario() {
    "falta-le", "falta-ce", "falta-ba", "falta-mc", "vandalismo-check"].forEach(id => {
     document.getElementById(id).checked = false;
   });
+  document.getElementById("tipo-bateria-box").hidden = true;
+  document.getElementById("tipo-bateria").value = "";
   pasoReporte.hidden = true;
   pasoBuscar.hidden = false;
 }
+
+function refrescarTipoBateria() {
+  const necesitaBateria = document.getElementById("cambio-ba").checked
+    || document.getElementById("falta-ba").checked
+    || document.getElementById("cambio-completo").checked;
+  document.getElementById("tipo-bateria-box").hidden = !necesitaBateria;
+}
+["cambio-ba", "falta-ba", "cambio-completo"].forEach(id => {
+  document.getElementById(id).addEventListener("change", refrescarTipoBateria);
+});
 
 // Mapa de componente -> {columna en "equipos" donde vive su serial, nombre legible}
 const MAPA_COMPONENTE = {
@@ -137,6 +149,10 @@ enviarBtn.addEventListener("click", async () => {
 
   const idOtActiva = otActiva();
   if (!idOtActiva) { mostrarMensajeReporte("⚠️ No hay una OT activa — créala o elígela arriba antes de reportar.", true); return; }
+  if (!document.getElementById("tipo-bateria-box").hidden && !document.getElementById("tipo-bateria").value) {
+    mostrarMensajeReporte("⚠️ Elige el tipo de batería (Recargable o No Recargable).", true);
+    return;
+  }
 
   // --- Leer las casillas marcadas ---
   const cambioCompleto = document.getElementById("cambio-completo").checked;
@@ -206,19 +222,22 @@ enviarBtn.addEventListener("click", async () => {
   const filasComponentes = [];
   const lineasComentario = [];
 
+  const tipoBateriaElegido = document.getElementById("tipo-bateria").value;
+  const nombreTipoDe = (codigo) => codigo === "BA" && tipoBateriaElegido ? tipoBateriaElegido : MAPA_COMPONENTE[codigo].nombre;
+
   codigosCambio.forEach(codigo => {
     const serial = serialDe(codigo);
     filasComponentes.push({
       cliente: equipoActual.cliente,
       m_control: equipoActual.m_control,
-      tipo_componente: MAPA_COMPONENTE[codigo].nombre,
+      tipo_componente: nombreTipoDe(codigo),
       serial_retirado: serial,
       id_registro: idRegistro,
       id_ot: idOtActiva,
       estado: retiradoPorCliente ? "Cambiado por el cliente" : "Pendiente revisión",
       excluir_materiales: retiradoPorCliente
     });
-    lineasComentario.push("🔧 " + MAPA_COMPONENTE[codigo].nombre + " retirado/asociado: " + serial);
+    lineasComentario.push("🔧 " + nombreTipoDe(codigo) + " retirado/asociado: " + serial);
   });
 
   // --- 3. Componentes faltantes/perdidos ---
@@ -227,7 +246,7 @@ enviarBtn.addEventListener("click", async () => {
     filasComponentes.push({
       cliente: equipoActual.cliente,
       m_control: equipoActual.m_control,
-      tipo_componente: MAPA_COMPONENTE[codigo].nombre,
+      tipo_componente: nombreTipoDe(codigo),
       serial_retirado: serial,
       id_registro: idRegistro,
       id_ot: idOtActiva,

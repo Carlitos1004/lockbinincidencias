@@ -310,8 +310,13 @@ async function precargarTicket(idRegistro, btnElegido) {
     .eq("id_registro", idRegistro);
 
   (componentes || []).forEach(c => {
-    const codigo = Object.keys(MAPA_COMPONENTE).find(k => MAPA_COMPONENTE[k].nombre === c.tipo_componente);
+    const esBateria = c.tipo_componente === "Batería Recargable" || c.tipo_componente === "Batería No Recargable" || c.tipo_componente === "Batería";
+    const codigo = esBateria ? "BA" : Object.keys(MAPA_COMPONENTE).find(k => MAPA_COMPONENTE[k].nombre === c.tipo_componente);
     if (!codigo) return;
+
+    if (esBateria && c.tipo_componente !== "Batería") {
+      document.getElementById("modal-tipo-bateria").value = c.tipo_componente;
+    }
 
     if (c.estado === "Faltante/Perdido") {
       document.getElementById("modal-falta-" + codigo.toLowerCase()).checked = true;
@@ -324,6 +329,7 @@ async function precargarTicket(idRegistro, btnElegido) {
     }
   });
 
+  refrescarTipoBateria();
   refrescarZonaQR();
   modalForm.hidden = false;
 }
@@ -348,6 +354,8 @@ function limpiarFormularioModal() {
    "modal-vandalismo-check"].forEach(id => { document.getElementById(id).checked = false; });
   modalMsg.hidden = true;
   document.getElementById("qr-zona").hidden = true;
+  document.getElementById("tipo-bateria-box").hidden = true;
+  document.getElementById("modal-tipo-bateria").value = "";
 }
 
 function configurarBotonesQR() {
@@ -356,6 +364,17 @@ function configurarBotonesQR() {
     check.addEventListener("change", refrescarZonaQR);
   });
   document.getElementById("modal-cambio-completo").addEventListener("change", refrescarZonaQR);
+
+  ["modal-cambio-ba", "modal-falta-ba", "modal-cambio-completo"].forEach(id => {
+    document.getElementById(id).addEventListener("change", refrescarTipoBateria);
+  });
+}
+
+function refrescarTipoBateria() {
+  const necesitaBateria = document.getElementById("modal-cambio-ba").checked
+    || document.getElementById("modal-falta-ba").checked
+    || document.getElementById("modal-cambio-completo").checked;
+  document.getElementById("tipo-bateria-box").hidden = !necesitaBateria;
 }
 
 function refrescarZonaQR() {
@@ -501,6 +520,10 @@ modalEnviarBtn.addEventListener("click", async () => {
     mostrarMensaje(modalMsg, "⚠️ Selecciona al menos una descripción de la acción (o marca un cambio de componente abajo).", true);
     return;
   }
+  if (!document.getElementById("tipo-bateria-box").hidden && !document.getElementById("modal-tipo-bateria").value) {
+    mostrarMensaje(modalMsg, "⚠️ Elige el tipo de batería (Recargable o No Recargable).", true);
+    return;
+  }
   if (!estadoEquipo) { mostrarMensaje(modalMsg, "⚠️ Selecciona el estado final.", true); return; }
 
   const idOtActiva = sessionStorage.getItem("lockbin_ot_activa");
@@ -595,9 +618,13 @@ modalEnviarBtn.addEventListener("click", async () => {
   const idsABorrar = [];
   const actualizaciones = [];
 
+  const tipoBateriaElegido = document.getElementById("modal-tipo-bateria").value;
+
   Object.keys(MAPA_COMPONENTE).forEach(codigo => {
-    const nombreTipo = MAPA_COMPONENTE[codigo].nombre;
-    const filaExistente = (yaRegistrados || []).find(c => c.tipo_componente === nombreTipo);
+    const nombreTipo = codigo === "BA" && tipoBateriaElegido ? tipoBateriaElegido : MAPA_COMPONENTE[codigo].nombre;
+    const filaExistente = codigo === "BA"
+      ? (yaRegistrados || []).find(c => c.tipo_componente === "Batería Recargable" || c.tipo_componente === "Batería No Recargable" || c.tipo_componente === "Batería")
+      : (yaRegistrados || []).find(c => c.tipo_componente === nombreTipo);
     const deseaCambio = codigosCambioReal.includes(codigo);
     const deseaFalta = codigosFaltantes.includes(codigo);
 
@@ -620,7 +647,7 @@ modalEnviarBtn.addEventListener("click", async () => {
       if (cambioDeCategoria || cambioDeSerial) {
         actualizaciones.push({
           id: filaExistente.id,
-          cambios: { estado: estadoDeseado, excluir_materiales: excluirDeseado, serial_nuevo: serialNuevoDeseado || filaExistente.serial_nuevo }
+          cambios: { estado: estadoDeseado, excluir_materiales: excluirDeseado, serial_nuevo: serialNuevoDeseado || filaExistente.serial_nuevo, tipo_componente: nombreTipo }
         });
       }
       return;
