@@ -7,6 +7,7 @@ let destinoSeleccionado = null;
 
 const filtroTipo = document.getElementById("filtro-tipo");
 const filtroCliente = document.getElementById("filtro-cliente");
+const filtroOt = document.getElementById("filtro-ot");
 const resumenTbody = document.getElementById("resumen-tbody");
 const detalleTbody = document.getElementById("detalle-tbody");
 
@@ -33,6 +34,10 @@ function componentesFiltrados() {
   if (filtroCliente.value.trim()) {
     const texto = filtroCliente.value.trim().toLowerCase();
     filtrados = filtrados.filter(c => (c.cliente || "").toLowerCase().includes(texto));
+  }
+  if (filtroOt.value.trim()) {
+    const textoOt = filtroOt.value.trim().toLowerCase();
+    filtrados = filtrados.filter(c => (c.id_ot || "").toLowerCase().includes(textoOt));
   }
   return filtrados;
 }
@@ -105,6 +110,7 @@ function renderTodo() {
 
 filtroTipo.addEventListener("change", () => { destinoSeleccionado = null; renderTodo(); });
 filtroCliente.addEventListener("input", () => { destinoSeleccionado = null; renderTodo(); });
+filtroOt.addEventListener("input", () => { destinoSeleccionado = null; renderTodo(); });
 
 function escaparAtributo(texto) {
   const div = document.createElement("div");

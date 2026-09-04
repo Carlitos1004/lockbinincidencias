@@ -285,6 +285,7 @@ async function precargarTicket(idRegistro, btnElegido) {
   // fijo (no depende de que coincida con una opción del dropdown, que era
   // justo el bug: fallas como "Batería Crítica" no estaban en la lista y
   // la dejaban vacía, bloqueando el envío).
+  document.getElementById("modal-nuevo-titulo").hidden = true;
   document.getElementById("modal-falla-label").hidden = true;
   document.getElementById("modal-falla-select").hidden = true;
   const fallaFija = document.getElementById("modal-falla-fija");
@@ -333,6 +334,7 @@ function cerrarModal() {
 }
 
 function limpiarFormularioModal() {
+  document.getElementById("modal-nuevo-titulo").hidden = false;
   document.getElementById("modal-falla-label").hidden = false;
   document.getElementById("modal-falla-select").hidden = false;
   document.getElementById("modal-falla-select").value = "";
@@ -358,12 +360,29 @@ function configurarBotonesQR() {
 
 function refrescarZonaQR() {
   const completo = document.getElementById("modal-cambio-completo").checked;
-  const codigos = completo
-    ? ["LE", "CE", "BA", "MC"]
-    : ["LE", "CE", "BA", "MC"].filter(c => document.getElementById("modal-cambio-" + c.toLowerCase()).checked);
-
   const zona = document.getElementById("qr-zona");
   const botones = document.getElementById("qr-botones");
+
+  if (completo) {
+    zona.hidden = false;
+    botones.innerHTML = `
+      <div class="fila-serial-nuevo">
+        <button type="button" class="btn-secundario btn-qr" data-codigo="MC">
+          📷 Escanear el MC del equipo nuevo
+        </button>
+        <span class="fila-serial-o">o escribe:</span>
+        <input type="text" id="input-mc-nuevo-completo" placeholder="Ej: MC2600123" value="${serialesNuevos.MC || ""}">
+        <span id="estado-busqueda-mc-nuevo"></span>
+      </div>
+      <p style="font-size:0.8rem; color:var(--gris-700); margin:4px 0 0;">Como el equipo ya viene configurado con sus propios Lector/Cierre/Batería, basta con el MC — lo buscamos solo en la lista de Equipos.</p>
+    `;
+
+    document.querySelector('[data-codigo="MC"].btn-qr').addEventListener("click", () => iniciarScanner("MC_COMPLETO"));
+    document.getElementById("input-mc-nuevo-completo").addEventListener("input", (e) => buscarEquipoNuevoCompleto(e.target.value));
+    return;
+  }
+
+  const codigos = ["LE", "CE", "BA", "MC"].filter(c => document.getElementById("modal-cambio-" + c.toLowerCase()).checked);
 
   if (codigos.length === 0) { zona.hidden = true; return; }
 
@@ -390,6 +409,37 @@ function refrescarZonaQR() {
   });
 }
 
+// Busca el MC nuevo en la tabla "equipos" y, si lo encuentra, rellena solo
+// LE/CE/BA/MC con lo que ya traiga configurado — hasta que llegue el
+// endpoint de la API principal, esto depende de que ese equipo ya esté en
+// el último Excel subido en "Equipos".
+async function buscarEquipoNuevoCompleto(valor) {
+  const mc = valor.trim().toUpperCase();
+  const estadoSpan = document.getElementById("estado-busqueda-mc-nuevo");
+  serialesNuevos.MC = mc;
+
+  if (!mc) { estadoSpan.textContent = ""; return; }
+
+  estadoSpan.textContent = "🔎 Buscando...";
+  const { data: equipoNuevo } = await supabaseClient
+    .from("equipos")
+    .select("m_control, serie_lector, serie_cierre, serie_bateria")
+    .eq("m_control", mc)
+    .maybeSingle();
+
+  if (!equipoNuevo) {
+    estadoSpan.innerHTML = `⚠️ No está en la lista de Equipos — anota el resto a mano en Revisión de Taller.`;
+    estadoSpan.style.color = "var(--ambar)";
+    return;
+  }
+
+  serialesNuevos.LE = equipoNuevo.serie_lector || "";
+  serialesNuevos.CE = equipoNuevo.serie_cierre || "";
+  serialesNuevos.BA = equipoNuevo.serie_bateria || "";
+  estadoSpan.innerHTML = `✅ Encontrado — Lector/Cierre/Batería completados solos.`;
+  estadoSpan.style.color = "var(--verde-oscuro)";
+}
+
 function iniciarScanner(codigo) {
   detenerScanner();
   const lector = document.getElementById("qr-lector");
@@ -401,8 +451,15 @@ function iniciarScanner(codigo) {
     { facingMode: "environment" },
     { fps: 10, qrbox: 220 },
     (textoLeido) => {
-      serialesNuevos[codigo] = textoLeido.trim().toUpperCase();
+      const valor = textoLeido.trim().toUpperCase();
       detenerScanner();
+      if (codigo === "MC_COMPLETO") {
+        const input = document.getElementById("input-mc-nuevo-completo");
+        if (input) input.value = valor;
+        buscarEquipoNuevoCompleto(valor);
+        return;
+      }
+      serialesNuevos[codigo] = valor;
       refrescarZonaQR();
     },
     () => {} // ignoramos errores de frames sin QR, es normal mientras enfoca

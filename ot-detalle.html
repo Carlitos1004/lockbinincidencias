@@ -123,10 +123,25 @@
 
     <button id="guardar-todo-btn" class="btn-primario" style="margin-bottom:10px;">💾 Guardar todo</button>
 
+    <div class="cierre-masivo-box" id="cierre-masivo-box" hidden>
+      <label><strong>Cerrar seleccionados con la misma acción</strong> (deben ser tickets del mismo MC)</label>
+      <div class="materiales-controles">
+        <select id="cierre-masivo-estado">
+          <option value="🟢 FUNCIONANDO">🟢 Funcionando</option>
+          <option value="🟡 CAMBIO NECESARIO">🟡 Cambio necesario</option>
+          <option value="🔴 PENDIENTE">🔴 Pendiente</option>
+        </select>
+      </div>
+      <textarea id="cierre-masivo-comentario" rows="2" placeholder="Comentario/acción a aplicar a todos los seleccionados..."></textarea>
+      <button id="cierre-masivo-btn" class="btn-primario" style="margin-top:8px;">Aplicar a seleccionados</button>
+      <p id="cierre-masivo-msg" class="resultado-msg" hidden></p>
+    </div>
+
     <table class="tabla-revision" id="tabla-ot">
       <thead>
-        <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Serial Nuevo</th><th>Foto</th><th>Acción / Comentarios</th><th></th></tr>
+        <tr><th></th><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Serial Nuevo</th><th>Foto</th><th>Acción / Comentarios</th><th></th></tr>
         <tr class="fila-filtros">
+          <th></th>
           <th><input type="text" id="filtro-modulo" placeholder="Filtrar..."></th>
           <th></th>
           <th><select id="filtro-falla-select"><option value="">Todas</option></select></th>

@@ -34,6 +34,7 @@ document.addEventListener("perfil-listo", (e) => {
   descargarBtn.hidden = !esManager;
   document.getElementById("descargar-plantilla-btn").hidden = !esManager;
   document.getElementById("guardar-todo-btn").hidden = !esManager;
+  document.getElementById("cierre-masivo-box").hidden = !esManager;
   document.getElementById("eliminar-ot-btn").hidden = !esManager;
   document.querySelector(".agregar-equipo-box").hidden = esCliente;
   document.getElementById("crear-ot-libre-box").hidden = !esManager;
@@ -146,8 +147,13 @@ function renderTabla() {
       ? `<button class="btn-eliminar-ticket" data-id="${t.id_registro}" title="Quitar este equipo de la OT">🗑️</button>`
       : "";
 
+    const celdaCheckbox = puedeEditar
+      ? `<input type="checkbox" class="check-cierre-masivo" data-id="${t.id_registro}" data-mc="${t.m_control}">`
+      : "";
+
     return `
       <tr>
+        <td>${celdaCheckbox}</td>
         <td>${t.m_control}</td>
         <td>${t.equipos?.fraccion || "—"}</td>
         <td>${t.falla}</td>
@@ -629,3 +635,51 @@ async function cargarComponentesSinTicket(idOt) {
     </tr>
   `).join("");
 }
+
+// --- Cerrar varios tickets del mismo MC con la misma acción, de una vez ---
+document.getElementById("cierre-masivo-btn").addEventListener("click", async () => {
+  const msg = document.getElementById("cierre-masivo-msg");
+  const seleccionados = [...document.querySelectorAll(".check-cierre-masivo:checked")];
+
+  if (seleccionados.length < 2) {
+    mostrarMensaje(msg, "⚠️ Selecciona al menos 2 tickets (con la casilla a la izquierda) para usar esto — si es solo uno, usa su botón \"Guardar\" normal.", true);
+    return;
+  }
+
+  const mcsDistintos = new Set(seleccionados.map(c => c.dataset.mc));
+  if (mcsDistintos.size > 1) {
+    mostrarMensaje(msg, "❌ Los tickets seleccionados son de MC distintos (" + [...mcsDistintos].join(", ") + "). Deben ser todos del mismo equipo.", true);
+    return;
+  }
+
+  const comentario = document.getElementById("cierre-masivo-comentario").value.trim();
+  const estadoEquipo = document.getElementById("cierre-masivo-estado").value;
+  const nuevoEstado = estadoEquipo === "🟢 FUNCIONANDO" ? "✅ CERRADO" : "🚨 ABIERTO";
+
+  if (!comentario) {
+    mostrarMensaje(msg, "⚠️ Escribe el comentario/acción a aplicar.", true);
+    return;
+  }
+
+  const btn = document.getElementById("cierre-masivo-btn");
+  btn.disabled = true;
+  btn.textContent = "Aplicando...";
+
+  const ids = seleccionados.map(c => c.dataset.id);
+  const { error } = await supabaseClient
+    .from("historial_fallas")
+    .update({ comentarios: comentario, accion_calle: null, estado_equipo: estadoEquipo, estado: nuevoEstado })
+    .in("id_registro", ids);
+
+  btn.disabled = false;
+  btn.textContent = "Aplicar a seleccionados";
+
+  if (error) {
+    mostrarMensaje(msg, "❌ " + error.message, true);
+    return;
+  }
+
+  mostrarMensaje(msg, `✅ ${ids.length} tickets actualizados.`, false);
+  document.getElementById("cierre-masivo-comentario").value = "";
+  buscarOT();
+});

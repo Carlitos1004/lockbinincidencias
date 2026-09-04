@@ -93,6 +93,9 @@ async function generarReporte() {
   // --- Componentes cambiados (excluye Faltante/Perdido) ---
   const componentesCambiados = (componentes || []).filter(c => c.estado !== "Faltante/Perdido");
 
+  // --- Desglose de equipos enviados a AMMI ---
+  const enviadosAmmi = componentesCambiados.filter(c => c.destino === "❌ Equipo dañado - Enviar a AMMI");
+
   // --- Fallas y revisión (donde ya hay hallazgo escrito) ---
   const fallasRevision = componentesCambiados.filter(c => c.reparacion);
 
@@ -121,7 +124,7 @@ async function generarReporte() {
       ["⚪ Sin estado registrado", sinEstado]
     ],
     equiposRecibidos, componentesCambiados, materiales: materiales || [],
-    fallasRevision, garantias: garantiasOt || [], desglosePorDestino
+    fallasRevision, garantias: garantiasOt || [], desglosePorDestino, enviadosAmmi
   };
 
   renderReporte();
@@ -135,7 +138,7 @@ function renderReporte() {
 
   llenarTabla("tabla-estado", r.estadoFinal.map(([e, n]) => [e, n]));
   llenarTabla("tabla-recibidos", r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
-  llenarTabla("tabla-componentes", r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_retirado, c.destino || "—"]));
+  llenarTabla("tabla-componentes", r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_nuevo || "—", c.serial_retirado, c.destino || "—"]));
   llenarTabla("tabla-materiales", r.materiales.map(m => [m.tipo_componente, m.llevados, m.utilizados, m.vuelven]));
   llenarTabla("tabla-fallas", r.fallasRevision.map(c => [c.m_control, c.serial_retirado, c.destino || "—", c.reparacion]));
   llenarTabla("tabla-garantias-reporte", r.garantias.map(g => [
@@ -144,6 +147,7 @@ function renderReporte() {
     g.foto_real || g.nombre_imagen || "—"
   ]));
   llenarTabla("tabla-destino", r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
+  llenarTabla("tabla-ammi", r.enviadosAmmi.map(c => [c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—"]));
 
   reporteContenido.hidden = false;
 }
@@ -195,13 +199,13 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
 
   seccion("RESUMEN DE ESTADO FINAL", ["Estado", "Cantidad"], r.estadoFinal);
 
-  seccion("RESUMEN DE EQUIPOS RECIBIDOS",
+  seccion("RESUMEN DE EQUIPOS ATENDIDOS",
     ["Módulo", "Acción en calle", "Comentarios"],
     r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
 
   seccion("CAMBIOS DE COMPONENTES REALIZADOS",
-    ["Módulo", "Tipo", "Serial", "Destino"],
-    r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_retirado, c.destino || ""]));
+    ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino"],
+    r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_nuevo || "—", c.serial_retirado, c.destino || ""]));
 
   seccion("CONTROL DE MATERIALES",
     ["Tipo", "Llevados", "Utilizados", "Vuelven"],
@@ -222,6 +226,10 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
   seccion("CONTROL STOCK DE DESTINO",
     ["Destino", "Cantidad", "Desglose"],
     r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
+
+  seccion("DESGLOSE - ENVIADOS A AMMI",
+    ["Serial", "Fallas detectadas en la revisión", "Categoría"],
+    r.enviadosAmmi.map(c => [c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—"]));
 
   const hoja = XLSX.utils.aoa_to_sheet(filas);
   hoja["!cols"] = [{ wch: 26 }, { wch: 26 }, { wch: 22 }, { wch: 34 }];
@@ -260,8 +268,8 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
   };
 
   seccion("Resumen de Estado Final", ["Estado", "Cantidad"], r.estadoFinal);
-  seccion("Resumen de Equipos Recibidos", ["Módulo", "Acción en calle", "Comentarios"], r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
-  seccion("Cambios de Componentes Realizados", ["Módulo", "Tipo", "Serial", "Destino"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_retirado, c.destino || "—"]));
+  seccion("Resumen de Equipos Atendidos", ["Módulo", "Acción en calle", "Comentarios"], r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
+  seccion("Cambios de Componentes Realizados", ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_nuevo || "—", c.serial_retirado, c.destino || "—"]));
   seccion("Control de Materiales", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales.map(m => [m.tipo_componente, m.llevados, m.utilizados, m.vuelven]));
   seccion("Resumen de Fallas y Revisión", ["Módulo", "Serial", "Destino", "Hallazgo"], r.fallasRevision.map(c => [c.m_control, c.serial_retirado, c.destino || "—", c.reparacion]));
   seccion("Control de Garantías",
@@ -272,6 +280,7 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
       g.foto_real || g.nombre_imagen || "—"
     ]));
   seccion("Control Stock de Destino", ["Destino", "Cantidad", "Desglose"], r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
+  seccion("Desglose — Enviados a AMMI", ["Serial", "Fallas detectadas en la revisión", "Categoría"], r.enviadosAmmi.map(c => [c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—"]));
 
   doc.save(r.idOt + "_reporte.pdf");
 });
