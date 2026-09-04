@@ -5,6 +5,14 @@
    geométrica redondeada (Poppins) para títulos, fondos blancos limpios.
    ========================================================================= */
 
+/* [hidden] siempre debe ganar, sin importar qué otra regla le ponga
+   "display" a ese mismo elemento (ej. .modal-caja select) — si no, un
+   elemento oculto con JS (element.hidden = true) puede seguir
+   mostrándose por accidente, como pasó con el desplegable de Falla. */
+[hidden] {
+  display: none !important;
+}
+
 :root {
   --verde-oscuro: #4d7a1f;   /* para texto sobre fondo claro, mejor contraste que el verde principal */
   --verde-medio: #6FA827;    /* verde de marca — botones, acentos, estados activos */
