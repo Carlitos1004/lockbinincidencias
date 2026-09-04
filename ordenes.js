@@ -7,7 +7,7 @@ let otsConDatos = []; // [{ot, tickets, clientes, equipos, abiertos, cerrados}]
 
 const ESTADOS_GENERALES = [
   "En espera de visita",
-  "Visita realizada",
+  "Visita realizada, en espera de equipos retirados",
   "En revisión de equipos",
   "Equipos revisados, en espera de gestión de garantías",
   "Equipos revisados, clasificación de stock y AMMI realizada",
@@ -83,8 +83,11 @@ function renderTabla() {
   }
 
   tbody.innerHTML = filtradas.map(r => {
-    const porcentaje = r.totalTickets > 0 ? Math.round((r.cerrados / r.totalTickets) * 100) : 0;
-    const completa = r.totalTickets > 0 && r.abiertos === 0;
+    const cerrada = r.ot.completada || r.ot.estado_general === "Orden completada y cerrada";
+    const porcentaje = r.totalTickets > 0
+      ? Math.round((r.cerrados / r.totalTickets) * 100)
+      : (cerrada ? 100 : 0);
+    const completa = r.totalTickets > 0 ? r.abiertos === 0 : cerrada;
     const esLibre = r.ot.origen === "libre";
     const opcionesEstado = ESTADOS_GENERALES.map(e =>
       `<option ${r.ot.estado_general === e ? "selected" : ""}>${e}</option>`
