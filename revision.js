@@ -33,6 +33,7 @@ const DESTINO_AMMI = "❌ Equipo dañado - Enviar a AMMI";
 const otInput = document.getElementById("ot-input");
 
 let clientesReales = [];
+let mostrarClienteHistorico = false;
 async function cargarClientesReales() {
   const TAM_PAGINA = 1000;
   let desde = 0;
@@ -79,6 +80,13 @@ async function buscarComponentes() {
     mostrarMensaje("No hay componentes retirados registrados para esa OT.", false);
     return;
   }
+
+  const { data: ot } = await supabaseClient
+    .from("ordenes_trabajo")
+    .select("cliente, origen")
+    .eq("id_ot", idOt)
+    .maybeSingle();
+  mostrarClienteHistorico = ot?.origen === "libre" && ot?.cliente === "INTERNO";
 
   const normales = data.filter(c => c.estado !== "Faltante/Perdido");
   const faltantes = data.filter(c => c.estado === "Faltante/Perdido");
@@ -127,18 +135,20 @@ function renderTabla(componentes) {
       `<option value="${escaparHtml(cl)}" ${c.cliente_original === cl ? "selected" : ""}>${escaparHtml(cl)}</option>`
     ).join("");
 
+    const celdaClienteHistorico = mostrarClienteHistorico
+      ? `<select class="input-cliente-original" ${bloqueado ? "disabled" : ""}>
+          <option value="">— Cliente histórico —</option>
+          ${opcionesCliente}
+        </select>`
+      : "—";
+
     return `
       <tr data-id="${c.id}">
         <td><input type="text" class="input-mc-fila" value="${c.m_control || ""}" placeholder="Ej: MC2500642"></td>
         <td>${c.tipo_componente}</td>
         <td><input type="text" class="input-serial-fila celda-mono" value="${c.serial_retirado || ""}"></td>
         <td>${c.estado}</td>
-        <td>
-          <select class="input-cliente-original" ${bloqueado ? "disabled" : ""}>
-            <option value="">— Cliente histórico —</option>
-            ${opcionesCliente}
-          </select>
-        </td>
+        <td>${celdaClienteHistorico}</td>
         <td><textarea class="input-reparacion" rows="2" ${bloqueado ? "disabled" : ""}>${c.reparacion || ""}</textarea></td>
         <td>
           <select class="input-destino" ${bloqueado ? "disabled" : ""}>
@@ -213,7 +223,7 @@ async function guardarFila(btn) {
   const serialEditado = fila.querySelector(".input-serial-fila").value.trim().toUpperCase();
   const categoriaAmmi = fila.querySelector(".input-categoria-ammi").value;
   const garantiaCliente = fila.querySelector(".input-garantia-cliente").value;
-  const clienteOriginal = fila.querySelector(".input-cliente-original").value;
+  const clienteOriginal = fila.querySelector(".input-cliente-original")?.value || "";
 
   if (!destino) {
     alert("Elige un Destino antes de guardar.");
