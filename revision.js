@@ -144,6 +144,14 @@ function renderTabla(componentes) {
         </select>`
       : "—";
 
+    const celdaEnCalle = `
+      <select class="input-en-calle" ${bloqueado ? "disabled" : ""}>
+        <option value="" ${c.estuvo_en_calle === null || c.estuvo_en_calle === undefined ? "selected" : ""}>— Sin definir —</option>
+        <option value="true" ${c.estuvo_en_calle === true ? "selected" : ""}>Sí, en calle</option>
+        <option value="false" ${c.estuvo_en_calle === false ? "selected" : ""}>No, en nave/stock</option>
+      </select>
+    `;
+
     return `
       <tr data-id="${c.id}">
         <td><input type="text" class="input-mc-fila" value="${c.m_control || ""}" placeholder="Ej: MC2500642"></td>
@@ -151,6 +159,7 @@ function renderTabla(componentes) {
         <td><input type="text" class="input-serial-fila celda-mono" value="${c.serial_retirado || ""}"></td>
         <td>${c.estado}</td>
         <td>${celdaClienteHistorico}</td>
+        <td>${celdaEnCalle}</td>
         <td><textarea class="input-reparacion" rows="2" ${bloqueado ? "disabled" : ""}>${c.reparacion || ""}</textarea></td>
         <td>
           <select class="input-destino" ${bloqueado ? "disabled" : ""}>
@@ -226,6 +235,8 @@ async function guardarFila(btn) {
   const categoriaAmmi = fila.querySelector(".input-categoria-ammi").value;
   const garantiaCliente = fila.querySelector(".input-garantia-cliente").value;
   const clienteOriginal = fila.querySelector(".input-cliente-original")?.value || "";
+  const enCalleValor = fila.querySelector(".input-en-calle").value;
+  const estuvoEnCalle = enCalleValor === "" ? null : enCalleValor === "true";
 
   if (!destino) {
     alert("Elige un Destino antes de guardar.");
@@ -275,7 +286,8 @@ async function guardarFila(btn) {
     m_control: mcEditado || null, serial_retirado: serialEditado || null,
     categoria_ammi: destino === DESTINO_AMMI ? categoriaAmmi : null,
     garantia_cliente: destino === DESTINO_AMMI ? garantiaCliente : null,
-    cliente_original: clienteOriginal || null
+    cliente_original: clienteOriginal || null,
+    estuvo_en_calle: estuvoEnCalle
   };
   if (fotoRevisionUrl) datosActualizacion.foto_revision = fotoRevisionUrl;
 

@@ -147,7 +147,11 @@ function renderReporte() {
     g.foto_real || g.nombre_imagen || "—"
   ]));
   llenarTabla("tabla-destino", r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
-  llenarTabla("tabla-ammi", r.enviadosAmmi.map(c => [c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—"]));
+  llenarTabla("tabla-ammi", r.enviadosAmmi.map(c => [
+      c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—",
+      c.estuvo_en_calle === true ? "Sí" : c.estuvo_en_calle === false ? "No" : "Sin definir",
+      c.cliente_original || c.cliente || "—"
+    ]));
 
   reporteContenido.hidden = false;
 }
@@ -228,8 +232,12 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
     r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
 
   seccion("DESGLOSE - ENVIADOS A AMMI",
-    ["Serial", "Fallas detectadas en la revisión", "Categoría"],
-    r.enviadosAmmi.map(c => [c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—"]));
+    ["Serial", "Fallas detectadas en la revisión", "Categoría", "En Calle", "Cliente de Origen"],
+    r.enviadosAmmi.map(c => [
+      c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—",
+      c.estuvo_en_calle === true ? "Sí" : c.estuvo_en_calle === false ? "No" : "Sin definir",
+      c.cliente_original || c.cliente || "—"
+    ]));
 
   const hoja = XLSX.utils.aoa_to_sheet(filas);
   hoja["!cols"] = [{ wch: 26 }, { wch: 26 }, { wch: 22 }, { wch: 34 }];
@@ -280,7 +288,11 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
       g.foto_real || g.nombre_imagen || "—"
     ]));
   seccion("Control Stock de Destino", ["Destino", "Cantidad", "Desglose"], r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
-  seccion("Desglose — Enviados a AMMI", ["Serial", "Fallas detectadas en la revisión", "Categoría"], r.enviadosAmmi.map(c => [c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—"]));
+  seccion("Desglose — Enviados a AMMI", ["Serial", "Fallas detectadas en la revisión", "Categoría", "En Calle", "Cliente de Origen"], r.enviadosAmmi.map(c => [
+      c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—",
+      c.estuvo_en_calle === true ? "Sí" : c.estuvo_en_calle === false ? "No" : "Sin definir",
+      c.cliente_original || c.cliente || "—"
+    ]));
 
   doc.save(r.idOt + "_reporte.pdf");
 });
