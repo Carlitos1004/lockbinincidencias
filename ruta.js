@@ -24,6 +24,7 @@ let ticketExistente = null;
 let fallaActual = null; // falla del ticket elegido, o la seleccionada a mano si es nuevo
 let scanner = null;
 let serialesNuevos = {}; // codigo -> serial escaneado, se resetea por reporte
+let categoriasPorComponente = {}; // codigo -> "1ra categoría" / "2da categoría", auto o a mano
 
 const otInput = document.getElementById("ot-input");
 const cargarBtn = document.getElementById("cargar-ruta-btn");
@@ -236,6 +237,7 @@ async function abrirModal(mc) {
   equipoAbierto = mc;
   ticketExistente = null;
   serialesNuevos = {};
+  categoriasPorComponente = {};
 
   const info = equiposPorMC[mc];
   modalMc.textContent = mc;
@@ -320,6 +322,7 @@ async function precargarTicket(idRegistro, btnElegido) {
         document.getElementById("modal-retirado-cliente").checked = true;
       }
       if (c.serial_nuevo) serialesNuevos[codigo] = c.serial_nuevo;
+      if (c.categoria) categoriasPorComponente[codigo] = c.categoria;
     }
   });
 
@@ -405,6 +408,7 @@ function refrescarZonaQR() {
       <input type="text" class="input-serial-manual" data-codigo="${c}" placeholder="Serial a mano" value="${serialesNuevos[c] || ""}">
       ${serialesNuevos[c] ? `<span class="serial-confirmado">✅</span>` : ""}
     </div>
+    <div class="fila-categoria-componente" id="fila-categoria-${c}" data-codigo="${c}"></div>
   `).join("");
 
   botones.querySelectorAll(".btn-qr").forEach(btn => {
@@ -415,6 +419,55 @@ function refrescarZonaQR() {
     input.addEventListener("input", () => {
       serialesNuevos[input.dataset.codigo] = input.value.trim().toUpperCase();
     });
+    input.addEventListener("change", () => resolverCategoriaComponente(input.dataset.codigo));
+  });
+
+  // Ya con el serial que traía precargado (si estamos editando un ticket
+  // existente), intentamos resolver la categoría de una vez
+  codigos.forEach(c => { if (serialesNuevos[c]) resolverCategoriaComponente(c); });
+}
+
+// Si el serial coincide con uno registrado en Materiales Serializados para
+// esta OT, tomamos su categoría solos, sin preguntar nada. Si no hay
+// coincidencia, dejamos un selector para elegirla a mano.
+async function resolverCategoriaComponente(codigo) {
+  const serial = (serialesNuevos[codigo] || "").trim().toUpperCase();
+  const celda = document.getElementById("fila-categoria-" + codigo);
+  if (!celda) return;
+
+  if (!serial) {
+    celda.innerHTML = "";
+    delete categoriasPorComponente[codigo];
+    return;
+  }
+
+  celda.innerHTML = `<span class="fila-serial-o">Buscando categoría...</span>`;
+
+  const { data: registrado } = await supabaseClient
+    .from("materiales_serializados")
+    .select("tipo_componente")
+    .eq("id_ot", idOtActiva)
+    .eq("serial", serial)
+    .maybeSingle();
+
+  if (registrado) {
+    const categoria = registrado.tipo_componente.includes("1ra") ? "1ra categoría" : "2da categoría";
+    categoriasPorComponente[codigo] = categoria;
+    celda.innerHTML = `<span class="serial-confirmado">✅ Categoría: ${categoria} (detectada de Materiales Serializados)</span>`;
+    return;
+  }
+
+  celda.innerHTML = `
+    <label class="fila-serial-o">Categoría de este repuesto (no estaba pre-registrado):</label>
+    <select class="input-categoria-manual" data-codigo="${codigo}">
+      <option value="">— Elige —</option>
+      <option value="1ra categoría" ${categoriasPorComponente[codigo] === "1ra categoría" ? "selected" : ""}>1ra categoría</option>
+      <option value="2da categoría" ${categoriasPorComponente[codigo] === "2da categoría" ? "selected" : ""}>2da categoría</option>
+    </select>
+  `;
+  celda.querySelector(".input-categoria-manual").addEventListener("change", (e) => {
+    categoriasPorComponente[codigo] = e.target.value || null;
+    if (!e.target.value) delete categoriasPorComponente[codigo];
   });
 }
 
@@ -510,6 +563,11 @@ modalEnviarBtn.addEventListener("click", async () => {
   }
   if (!document.getElementById("tipo-bateria-box").hidden && !document.getElementById("modal-tipo-bateria").value) {
     mostrarMensaje(modalMsg, "⚠️ Elige el tipo de batería (Recargable o No Recargable).", true);
+    return;
+  }
+  const faltaCategoria = Object.keys(serialesNuevos).some(c => serialesNuevos[c] && !categoriasPorComponente[c]);
+  if (faltaCategoria) {
+    mostrarMensaje(modalMsg, "⚠️ Falta elegir la Categoría de algún repuesto instalado (junto al serial).", true);
     return;
   }
   if (!estadoEquipo) { mostrarMensaje(modalMsg, "⚠️ Selecciona el estado final.", true); return; }
@@ -632,10 +690,11 @@ modalEnviarBtn.addEventListener("click", async () => {
     if (filaExistente) {
       const cambioDeCategoria = filaExistente.estado !== estadoDeseado;
       const cambioDeSerial = serialNuevoDeseado && filaExistente.serial_nuevo !== serialNuevoDeseado;
-      if (cambioDeCategoria || cambioDeSerial) {
+      const cambioDeCategoriaMaterial = categoriasPorComponente[codigo] && categoriasPorComponente[codigo] !== filaExistente.categoria;
+      if (cambioDeCategoria || cambioDeSerial || cambioDeCategoriaMaterial) {
         actualizaciones.push({
           id: filaExistente.id,
-          cambios: { estado: estadoDeseado, excluir_materiales: excluirDeseado, serial_nuevo: serialNuevoDeseado || filaExistente.serial_nuevo, tipo_componente: nombreTipo }
+          cambios: { estado: estadoDeseado, excluir_materiales: excluirDeseado, serial_nuevo: serialNuevoDeseado || filaExistente.serial_nuevo, tipo_componente: nombreTipo, categoria: categoriasPorComponente[codigo] || filaExistente.categoria || null }
         });
       }
       return;
@@ -645,7 +704,8 @@ modalEnviarBtn.addEventListener("click", async () => {
       cliente: equiposPorMC[equipoAbierto].equipo.cliente, m_control: equipoAbierto,
       tipo_componente: nombreTipo, serial_retirado: serialViejoDe(codigo),
       serial_nuevo: serialNuevoDeseado, id_registro: idRegistro, id_ot: idOtActiva,
-      estado: estadoDeseado, excluir_materiales: excluirDeseado
+      estado: estadoDeseado, excluir_materiales: excluirDeseado,
+      categoria: categoriasPorComponente[codigo] || null
     });
   });
 

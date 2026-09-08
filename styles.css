@@ -1334,6 +1334,16 @@ input[type="file"]::file-selector-button:hover {
   font-weight: 700;
 }
 
+.fila-categoria-componente {
+  margin: -4px 0 10px 0;
+  font-size: 0.82rem;
+}
+
+.fila-categoria-componente select {
+  margin-top: 4px;
+  min-width: 160px;
+}
+
 .modal-seccion-titulo {
   margin: 0 0 10px;
   padding-bottom: 6px;
