@@ -36,16 +36,31 @@
 
   <div id="tabla-llevados-wrap" hidden>
     <table class="tabla-materiales">
-      <thead><tr><th>Componente</th><th>Llevados</th></tr></thead>
+      <thead><tr><th>Componente</th><th>1ra categoría</th><th>2da categoría</th></tr></thead>
       <tbody id="llevados-tbody">
-        <tr><td>Lector Electrónico (LE)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Lector Electrónico" value="0"></td></tr>
-        <tr><td>Cierre Electrónico (CE)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Cierre Electrónico" value="0"></td></tr>
-        <tr><td>Batería Recargable</td><td><input type="number" min="0" class="input-llevados" data-tipo="Batería Recargable" value="0"></td></tr>
-        <tr><td>Batería No Recargable</td><td><input type="number" min="0" class="input-llevados" data-tipo="Batería No Recargable" value="0"></td></tr>
-        <tr><td>Módulo de Control (MC)</td><td><input type="number" min="0" class="input-llevados" data-tipo="Módulo de Control" value="0"></td></tr>
+        <tr><td>Lector Electrónico (LE)</td>
+          <td><input type="number" min="0" class="input-llevados" data-tipo="Lector Electrónico - 1ra categoría" value="0"></td>
+          <td><input type="number" min="0" class="input-llevados" data-tipo="Lector Electrónico - 2da categoría" value="0"></td>
+        </tr>
+        <tr><td>Cierre Electrónico (CE)</td>
+          <td><input type="number" min="0" class="input-llevados" data-tipo="Cierre Electrónico - 1ra categoría" value="0"></td>
+          <td><input type="number" min="0" class="input-llevados" data-tipo="Cierre Electrónico - 2da categoría" value="0"></td>
+        </tr>
+        <tr><td>Batería Recargable</td>
+          <td><input type="number" min="0" class="input-llevados" data-tipo="Batería Recargable - 1ra categoría" value="0"></td>
+          <td><input type="number" min="0" class="input-llevados" data-tipo="Batería Recargable - 2da categoría" value="0"></td>
+        </tr>
+        <tr><td>Batería No Recargable</td>
+          <td><input type="number" min="0" class="input-llevados" data-tipo="Batería No Recargable - 1ra categoría" value="0"></td>
+          <td><input type="number" min="0" class="input-llevados" data-tipo="Batería No Recargable - 2da categoría" value="0"></td>
+        </tr>
+        <tr><td>Módulo de Control (MC)</td>
+          <td><input type="number" min="0" class="input-llevados" data-tipo="Módulo de Control - 1ra categoría" value="0"></td>
+          <td><input type="number" min="0" class="input-llevados" data-tipo="Módulo de Control - 2da categoría" value="0"></td>
+        </tr>
       </tbody>
     </table>
-    <button id="guardar-btn" class="btn-primario">Guardar los 4 de una vez</button>
+    <button id="guardar-btn" class="btn-primario">Guardar todos de una vez</button>
   </div>
 
   <p id="guardar-msg" class="resultado-msg" hidden></p>
@@ -55,7 +70,7 @@
 
   <table class="tabla-materiales">
     <thead>
-      <tr><th>OT</th><th>Tipo</th><th>Llevados</th><th>Utilizados</th><th>Vuelven</th><th></th></tr>
+      <tr><th>OT</th><th>Tipo</th><th>Categoría</th><th>Llevados</th><th>Utilizados</th><th>Vuelven</th><th></th></tr>
       <tr class="fila-filtros">
         <th><input type="text" id="filtro-ot-tabla" placeholder="Filtrar..."></th>
         <th>
@@ -64,15 +79,22 @@
             <option value="Lector Electrónico">Lector Electrónico</option>
             <option value="Cierre Electrónico">Cierre Electrónico</option>
             <option value="Batería Recargable">Batería Recargable</option>
-        <option value="Batería No Recargable">Batería No Recargable</option>
+            <option value="Batería No Recargable">Batería No Recargable</option>
             <option value="Módulo de Control">Módulo de Control</option>
           </select>
         </th>
-        <th></th><th></th><th></th>
+        <th>
+          <select id="filtro-categoria">
+            <option value="">Todas</option>
+            <option value="1ra categoría">1ra categoría</option>
+            <option value="2da categoría">2da categoría</option>
+          </select>
+        </th>
+        <th></th><th></th><th></th><th></th>
       </tr>
     </thead>
     <tbody id="materiales-tbody">
-      <tr><td colspan="6">Cargando...</td></tr>
+      <tr><td colspan="7">Cargando...</td></tr>
     </tbody>
   </table>
 </div>

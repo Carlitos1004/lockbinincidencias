@@ -37,18 +37,27 @@
   <div id="contenido" hidden>
     <h2 style="margin-top:28px;">Registrar seriales que salen (uno por línea)</h2>
     <div class="agregar-equipo-box">
-      <textarea id="pegar-textarea" rows="6" placeholder="Batería Recargable, BA2500320
-Cierre Electrónico, CE2500914
-Lector Electrónico, LE2500642"></textarea>
-      <p style="font-size:0.8rem; color:var(--gris-700); margin:6px 0;">Formato: <span class="celda-mono">Tipo, Serial</span> — un componente por línea. Tipo acepta nombre completo o código corto (LE, CE, BA-R, BA-NR, MC).</p>
+      <textarea id="pegar-textarea" rows="6" placeholder="BA2500320, 1ra categoría
+CE2500914, 2da categoría
+LE2500642, 1ra categoría"></textarea>
+      <p style="font-size:0.8rem; color:var(--gris-700); margin:6px 0;">Formato: <span class="celda-mono">Serial, Categoría</span> — un componente por línea. El tipo (Lector/Cierre/Módulo) se detecta solo por el prefijo del serial (LE/CE/MC). Las baterías (BA) quedan pendientes de clasificar Recargable/No Recargable, abajo.</p>
       <button id="registrar-pegados-btn" class="btn-primario">Registrar estos seriales</button>
     </div>
 
     <h2 style="margin-top:28px;">O sube un Excel</h2>
-    <p style="font-size:0.85rem; color:var(--gris-700);">2 columnas: <strong>Tipo</strong> y <strong>Serial</strong> (encabezados exactos en la primera fila).</p>
+    <p style="font-size:0.85rem; color:var(--gris-700);">2 columnas: <strong>Serial</strong> y <strong>Categoría</strong> (encabezados exactos en la primera fila).</p>
     <input type="file" id="excel-input" accept=".xlsx,.xls">
     <button id="subir-excel-btn" class="btn-primario">Subir Excel</button>
     <p id="registro-msg" class="resultado-msg" hidden></p>
+
+    <div id="pendientes-bateria-box" hidden style="margin-top:28px;">
+      <h2>🔋 Baterías pendientes de clasificar</h2>
+      <p style="font-size:0.85rem; color:var(--gris-700); margin-top:-8px;">El serial no dice si son Recargables o No Recargables — elige para cada una.</p>
+      <table class="tabla-revision">
+        <thead><tr><th>Serial</th><th>Categoría</th><th>Subtipo</th><th></th></tr></thead>
+        <tbody id="pendientes-bateria-tbody"></tbody>
+      </table>
+    </div>
 
     <h2 style="margin-top:32px;">Seriales de esta OT</h2>
     <table class="tabla-revision">

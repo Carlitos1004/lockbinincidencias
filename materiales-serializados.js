@@ -1,25 +1,40 @@
 // =========================================================================
 // MATERIALES SERIALIZADOS
-// Registra qué serial específico sale del almacén para una OT. El cruce
-// automático con lo reportado en campo pasa en ruta.js/reporte-tecnico.js
-// (al guardar un componente con serial_nuevo, se marca aquí como "Usado
-// en campo" si coincide).
+// Registra qué serial específico sale del almacén para una OT, junto con
+// su Categoría (1ra/2da). El tipo (Lector/Cierre/Módulo) se detecta solo
+// por el prefijo del serial — las baterías (prefijo BA) no dicen si son
+// Recargables o No Recargables, así que quedan "pendientes de clasificar"
+// hasta que alguien lo defina a mano abajo.
+//
+// El cruce automático con lo reportado en campo pasa en ruta.js (al
+// guardar un componente con serial_nuevo, se marca aquí como "Usado en
+// campo" si coincide).
 // =========================================================================
 
-const MAPA_TIPOS_CORTOS = {
-  "LE": "Lector Electrónico", "CE": "Cierre Electrónico",
-  "BA-R": "Batería Recargable", "BAR": "Batería Recargable",
-  "BA-NR": "Batería No Recargable", "BANR": "Batería No Recargable",
+const PREFIJOS_TIPO = {
+  "LE": "Lector Electrónico",
+  "CE": "Cierre Electrónico",
   "MC": "Módulo de Control"
+  // "BA" se maneja aparte — no dice Recargable/No Recargable por sí solo
 };
-const TIPOS_VALIDOS = ["Lector Electrónico", "Cierre Electrónico", "Batería Recargable", "Batería No Recargable", "Módulo de Control"];
 
-function resolverTipo(texto) {
-  const limpio = (texto || "").trim();
-  const porCodigo = MAPA_TIPOS_CORTOS[limpio.toUpperCase()];
-  if (porCodigo) return porCodigo;
-  const porNombre = TIPOS_VALIDOS.find(t => t.toLowerCase() === limpio.toLowerCase());
-  return porNombre || null;
+function resolverCategoria(texto) {
+  const limpio = (texto || "").trim().toUpperCase().replace(/\s+/g, " ");
+  if (limpio === "1" || limpio === "1RA" || limpio.startsWith("1RA")) return "1ra categoría";
+  if (limpio === "2" || limpio === "2DA" || limpio.startsWith("2DA")) return "2da categoría";
+  return null;
+}
+
+// A partir de un serial, arma el tipo_componente final (o el "pendiente de
+// clasificar" si es batería) combinado con la categoría.
+function resolverTipoDesdeSerial(serial, categoriaTexto) {
+  const prefijo = (serial || "").trim().toUpperCase().slice(0, 2);
+  if (prefijo === "BA") {
+    return `Batería — ${categoriaTexto} (pendiente subtipo)`;
+  }
+  const base = PREFIJOS_TIPO[prefijo];
+  if (!base) return null;
+  return `${base} - ${categoriaTexto}`;
 }
 
 let otActual = null;
@@ -52,6 +67,7 @@ async function cargarTabla() {
   }
   if (!data || data.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5">Ningún serial registrado todavía para esta OT.</td></tr>`;
+    renderPendientesBateria([]);
     return;
   }
 
@@ -74,6 +90,62 @@ async function cargarTabla() {
       cargarTabla();
     });
   });
+
+  renderPendientesBateria(data.filter(s => s.tipo_componente.includes("(pendiente subtipo)")));
+}
+
+function renderPendientesBateria(pendientes) {
+  const box = document.getElementById("pendientes-bateria-box");
+  const tbody = document.getElementById("pendientes-bateria-tbody");
+
+  if (pendientes.length === 0) {
+    box.hidden = true;
+    return;
+  }
+
+  box.hidden = false;
+  tbody.innerHTML = pendientes.map(s => `
+    <tr data-id="${s.id}">
+      <td class="celda-mono">${s.serial}</td>
+      <td>${s.tipo_componente.includes("1ra") ? "1ra categoría" : "2da categoría"}</td>
+      <td>
+        <select class="input-subtipo-bateria">
+          <option value="">— Elige —</option>
+          <option value="Batería Recargable">Recargable</option>
+          <option value="Batería No Recargable">No Recargable</option>
+        </select>
+      </td>
+      <td><button class="btn-clasificar-bateria" data-id="${s.id}">Guardar</button></td>
+    </tr>
+  `).join("");
+
+  tbody.querySelectorAll(".btn-clasificar-bateria").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const fila = btn.closest("tr");
+      const subtipo = fila.querySelector(".input-subtipo-bateria").value;
+      if (!subtipo) { alert("Elige Recargable o No Recargable."); return; }
+
+      const categoriaTexto = fila.children[1].textContent.trim();
+      const nuevoTipo = `${subtipo} - ${categoriaTexto}`;
+
+      btn.disabled = true;
+      btn.textContent = "Guardando...";
+
+      const { error } = await supabaseClient
+        .from("materiales_serializados")
+        .update({ tipo_componente: nuevoTipo })
+        .eq("id", btn.dataset.id);
+
+      if (error) {
+        alert("Error: " + error.message);
+        btn.disabled = false;
+        btn.textContent = "Guardar";
+        return;
+      }
+
+      cargarTabla();
+    });
+  });
 }
 
 async function registrarLote(filas) {
@@ -84,16 +156,20 @@ async function registrarLote(filas) {
   const errores = [];
 
   filas.forEach((f, i) => {
-    const tipo = resolverTipo(f.tipo);
-    if (!tipo || !f.serial) {
-      errores.push(`Línea ${i + 1}: datos inválidos — "${f.tipo || ""}, ${f.serial || ""}"`);
+    const serial = (f.serial || "").trim().toUpperCase();
+    const categoriaTexto = resolverCategoria(f.categoria);
+
+    if (!serial || !categoriaTexto) {
+      errores.push(`Línea ${i + 1}: datos inválidos — "${f.serial || ""}, ${f.categoria || ""}" (categoría debe ser "1ra categoría" o "2da categoría")`);
       return;
     }
-    buenas.push({
-      id_ot: otActual,
-      tipo_componente: tipo,
-      serial: f.serial.trim().toUpperCase()
-    });
+    const tipo = resolverTipoDesdeSerial(serial, categoriaTexto);
+    if (!tipo) {
+      errores.push(`Línea ${i + 1}: no reconozco el prefijo del serial "${serial}" (debe empezar con LE, CE, BA o MC)`);
+      return;
+    }
+
+    buenas.push({ id_ot: otActual, tipo_componente: tipo, serial: serial });
   });
 
   if (buenas.length === 0) {
@@ -104,7 +180,6 @@ async function registrarLote(filas) {
   const { data: { user } } = await supabaseClient.auth.getUser();
   const conRegistrador = buenas.map(b => ({ ...b, registrado_por: user.email }));
 
-  // upsert por (id_ot, serial) para poder repetir la carga sin duplicar
   const { error } = await supabaseClient
     .from("materiales_serializados")
     .upsert(conRegistrador, { onConflict: "id_ot,serial", ignoreDuplicates: true });
@@ -114,7 +189,12 @@ async function registrarLote(filas) {
     return;
   }
 
-  mostrarMensaje(msg, `✅ ${buenas.length} serial(es) registrado(s).` + (errores.length > 0 ? `<br>⚠️ ${errores.length} línea(s) con error:<br>` + errores.join("<br>") : ""), false);
+  const bateriasPendientes = buenas.filter(b => b.tipo_componente.includes("(pendiente subtipo)")).length;
+  mostrarMensaje(msg,
+    `✅ ${buenas.length} serial(es) registrado(s).` +
+    (bateriasPendientes > 0 ? ` ${bateriasPendientes} batería(s) quedaron pendientes de clasificar Recargable/No Recargable, más abajo.` : "") +
+    (errores.length > 0 ? `<br>⚠️ ${errores.length} línea(s) con error:<br>` + errores.join("<br>") : ""),
+    false);
   cargarTabla();
 }
 
@@ -122,8 +202,8 @@ document.getElementById("registrar-pegados-btn").addEventListener("click", () =>
   const texto = document.getElementById("pegar-textarea").value;
   const lineas = texto.split("\n").map(l => l.trim()).filter(Boolean);
   const filas = lineas.map(l => {
-    const [tipo, serial] = l.split(",").map(p => p.trim());
-    return { tipo, serial };
+    const [serial, categoria] = l.split(",").map(p => p.trim());
+    return { serial, categoria };
   });
   registrarLote(filas);
   document.getElementById("pegar-textarea").value = "";
@@ -140,8 +220,8 @@ document.getElementById("subir-excel-btn").addEventListener("click", async () =>
   const filasExcel = XLSX.utils.sheet_to_json(hoja);
 
   const filas = filasExcel.map(f => ({
-    tipo: f["Tipo"] || f["tipo"],
-    serial: String(f["Serial"] || f["serial"] || "")
+    serial: String(f["Serial"] || f["serial"] || ""),
+    categoria: f["Categoría"] || f["Categoria"] || f["categoria"] || ""
   }));
 
   registrarLote(filas);

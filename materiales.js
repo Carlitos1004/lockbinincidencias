@@ -97,16 +97,19 @@ async function cargarMateriales() {
   if (filtro) query = query.ilike("id_ot", `%${filtro}%`);
 
   const tipoComponente = document.getElementById("filtro-tipo-componente").value;
-  if (tipoComponente) query = query.eq("tipo_componente", tipoComponente);
+  if (tipoComponente) query = query.like("tipo_componente", `${tipoComponente} - %`);
+
+  const categoria = document.getElementById("filtro-categoria").value;
+  if (categoria) query = query.ilike("tipo_componente", `%${categoria}%`);
 
   const { data, error } = await query;
 
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="6">Error: ${error.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
     return;
   }
   if (!data || data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6">No hay materiales registrados todavía.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">No hay materiales registrados todavía.</td></tr>`;
     return;
   }
 
@@ -123,12 +126,16 @@ async function cargarMateriales() {
 
   tbody.innerHTML = data.map(m => {
     const esLibre = mapaOrigen[m.id_ot] === "libre";
+    const [tipoBase, categoriaTexto] = m.tipo_componente.includes(" - ")
+      ? m.tipo_componente.split(" - ")
+      : [m.tipo_componente, "—"];
 
     if (!esLibre) {
       return `
         <tr class="${m.vuelven < 0 ? 'fila-alerta' : ''}">
           <td>${m.id_ot}</td>
-          <td>${m.tipo_componente}</td>
+          <td>${tipoBase}</td>
+          <td>${categoriaTexto}</td>
           <td>${m.llevados}</td>
           <td>${m.utilizados}</td>
           <td>${m.vuelven}</td>
@@ -140,7 +147,8 @@ async function cargarMateriales() {
     return `
       <tr class="${m.vuelven < 0 ? 'fila-alerta' : ''}" data-id="${m.id}">
         <td>${m.id_ot}</td>
-        <td>${m.tipo_componente}</td>
+        <td>${tipoBase}</td>
+        <td>${categoriaTexto}</td>
         <td><input type="number" min="0" class="input-mat-llevados" value="${m.llevados}"></td>
         <td><input type="number" min="0" class="input-mat-utilizados" value="${m.utilizados}"></td>
         <td><input type="number" class="input-mat-vuelven" value="${m.vuelven}"></td>
@@ -185,5 +193,4 @@ function mostrarMensaje(texto, esError) {
 cargarMateriales();
 
 document.getElementById("filtro-tipo-componente").addEventListener("change", cargarMateriales);
-
-// --- Filtro modal ---
+document.getElementById("filtro-categoria").addEventListener("change", cargarMateriales);
