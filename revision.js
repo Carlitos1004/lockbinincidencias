@@ -60,6 +60,7 @@ async function buscarComponentes() {
   const idOt = otInput.value.trim().toUpperCase();
   buscarMsg.hidden = true;
   tabla.hidden = true;
+  document.getElementById("guardar-todo-btn").hidden = true;
 
   if (!idOt) {
     mostrarMensaje("⚠️ Escribe un número de OT.", true);
@@ -93,6 +94,7 @@ async function buscarComponentes() {
 
   renderTabla(normales);
   tabla.hidden = normales.length === 0;
+  document.getElementById("guardar-todo-btn").hidden = normales.length === 0;
   if (normales.length === 0 && faltantes.length > 0) {
     mostrarMensaje("Todos los componentes de esta OT son faltantes/perdidos — no hay nada que revisar (ver abajo).", false);
   }
@@ -381,3 +383,42 @@ function escaparHtml(texto) {
   div.textContent = texto;
   return div.innerHTML;
 }
+
+// --- Guardar todas las filas editables de golpe ---
+document.getElementById("guardar-todo-btn").addEventListener("click", async () => {
+  const btnTodo = document.getElementById("guardar-todo-btn");
+  const botonesFila = [...document.querySelectorAll(".btn-guardar-fila:not(:disabled)")];
+
+  if (botonesFila.length === 0) {
+    alert("No hay ninguna fila editable para guardar (todas están bloqueadas o vacías).");
+    return;
+  }
+
+  btnTodo.disabled = true;
+  btnTodo.textContent = "Guardando todo...";
+
+  let guardadas = 0;
+  let saltadas = 0;
+
+  for (const btn of botonesFila) {
+    const fila = btn.closest("tr");
+    const destino = fila.querySelector(".input-destino").value;
+    if (!destino) { saltadas++; continue; } // sin Destino elegido — se salta sin interrumpir con una alerta
+
+    if (destino === DESTINO_AMMI) {
+      const categoriaAmmi = fila.querySelector(".input-categoria-ammi")?.value;
+      const garantiaCliente = fila.querySelector(".input-garantia-cliente")?.value;
+      if (!categoriaAmmi || !garantiaCliente) { saltadas++; continue; }
+    }
+
+    await guardarFila(btn);
+    guardadas++;
+  }
+
+  btnTodo.disabled = false;
+  btnTodo.textContent = "💾 Guardar todo";
+
+  if (saltadas > 0) {
+    alert(`✅ ${guardadas} fila(s) guardada(s).\n⚠️ ${saltadas} fila(s) sin Destino elegido — no se guardaron, elígeles un Destino y usa "Guardar todo" de nuevo.`);
+  }
+});
