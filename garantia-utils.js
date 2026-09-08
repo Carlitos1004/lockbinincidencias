@@ -21,9 +21,9 @@ function calcularEstadoFinalGarantia(criterioRevision, fechaEntrega) {
   if (!criterioRevision) return "";
   if (criterioRevision.toLowerCase().includes("con garantía")) {
     const tiempo = calcularGarantiaTiempo(fechaEntrega);
-    return tiempo === "SÍ (Vigente)"
-      ? "✅ APLICAR GARANTÍA"
-      : "❌ GARANTÍA DENEGADA (Tiempo Vencido)";
+    if (tiempo === "SÍ (Vigente)") return "✅ APLICAR GARANTÍA";
+    if (tiempo === "Sin Registro") return "⚠️ REVISAR ANTIGÜEDAD DEL EQUIPO (sin fecha registrada)";
+    return "❌ GARANTÍA DENEGADA (Tiempo Vencido)";
   }
   return "❌ NO APLICA (Daño por mal uso / Criterio Técnico)";
 }
