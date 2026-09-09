@@ -15,6 +15,40 @@ const reporteContenido = document.getElementById("reporte-contenido");
 generarBtn.addEventListener("click", generarReporte);
 otInput.addEventListener("keypress", (e) => { if (e.key === "Enter") generarReporte(); });
 
+// =========================================================================
+// Nomenclatura oficial de componentes — SOLO para mostrar en este reporte
+// (Control de Materiales y Control Stock de Destino). En el resto de la
+// app (Materiales, Revisión de Taller, Inventario) se sigue usando el
+// nombre normal — este mapeo no los toca.
+// =========================================================================
+const MAPA_NOMBRES_OFICIALES = {
+  "Cierre Electrónico|1ra categoría": "LB A R00 Modulo Cerradura Std. 1ª",
+  "Cierre Electrónico|2da categoría": "LB A R00 Modulo Cerradura Std. 2ª",
+  "Lector Electrónico|1ra categoría": "LB B R01 Modulo Identificación 1ª",
+  "Lector Electrónico|2da categoría": "LB B R01 Modulo Identificación 2ª",
+  "Módulo de Control|1ra categoría": "LB C R00 Modulo Control 1ª",
+  "Módulo de Control|2da categoría": "LB C R00 Modulo Control 2ª",
+  "Batería Recargable|1ra categoría": "LB D R00 Modulo Batería Recargable 1ª",
+  "Batería Recargable|2da categoría": "LB D R00 Modulo Batería Recargable 2ª",
+  "Batería No Recargable|1ra categoría": "LB D R00 Modulo Batería No Recargable 1ª",
+  "Batería No Recargable|2da categoría": "LB D R00 Modulo Batería No Recargable 2ª"
+};
+
+// Recibe el tipo base ("Lector Electrónico") y la categoría ("1ra
+// categoría") por separado, y devuelve el nombre oficial si existe.
+function nombreOficial(tipoBase, categoria) {
+  const clave = `${tipoBase}|${categoria}`;
+  return MAPA_NOMBRES_OFICIALES[clave] || `${tipoBase}${categoria ? " - " + categoria : ""}`;
+}
+
+// Para cuando el tipo ya viene combinado como en Materiales
+// ("Lector Electrónico - 1ra categoría")
+function nombreOficialDesdeCombinado(tipoCombinado) {
+  if (!tipoCombinado || !tipoCombinado.includes(" - ")) return tipoCombinado || "—";
+  const idx = tipoCombinado.lastIndexOf(" - ");
+  return nombreOficial(tipoCombinado.slice(0, idx), tipoCombinado.slice(idx + 3));
+}
+
 async function generarReporte() {
   const idOt = otInput.value.trim().toUpperCase();
   reporteMsg.hidden = true;
@@ -106,14 +140,22 @@ async function generarReporte() {
     const destino = c.destino
       || (c.estado === "Cambiado por el cliente" ? "⚙️ Cambio hecho por el cliente" : "(sin destino registrado)");
     conteoPorDestino[destino] = (conteoPorDestino[destino] || 0) + 1;
+    const nombreParaDesglose = nombreOficial(c.tipo_componente, c.categoria);
     if (!conteoPorDestinoYTipo[destino]) conteoPorDestinoYTipo[destino] = {};
-    conteoPorDestinoYTipo[destino][c.tipo_componente] = (conteoPorDestinoYTipo[destino][c.tipo_componente] || 0) + 1;
+    conteoPorDestinoYTipo[destino][nombreParaDesglose] = (conteoPorDestinoYTipo[destino][nombreParaDesglose] || 0) + 1;
   });
   const desglosePorDestino = Object.keys(conteoPorDestino).map(destino => ({
     destino,
     cantidad: conteoPorDestino[destino],
     desglose: Object.entries(conteoPorDestinoYTipo[destino]).map(([tipo, n]) => `${n} ${tipo}`).join(", ")
   }));
+
+  const materialesConNombreOficial = (materiales || []).map(m => ({
+    ...m, nombreOficial: nombreOficialDesdeCombinado(m.tipo_componente)
+  }));
+  const materiales1ra = materialesConNombreOficial.filter(m => m.tipo_componente.includes("1ra"));
+  const materiales2da = materialesConNombreOficial.filter(m => m.tipo_componente.includes("2da"));
+  const materialesSinCategoria = materialesConNombreOficial.filter(m => !m.tipo_componente.includes("1ra") && !m.tipo_componente.includes("2da"));
 
   reporteActual = {
     idOt, cliente, fecha: ot.fecha, totalEquipos: mcsUnicos.length,
@@ -124,6 +166,7 @@ async function generarReporte() {
       ["⚪ Sin estado registrado", sinEstado]
     ],
     equiposRecibidos, componentesCambiados, materiales: materiales || [],
+    materiales1ra, materiales2da, materialesSinCategoria,
     fallasRevision, garantias: garantiasOt || [], desglosePorDestino, enviadosAmmi
   };
 
@@ -139,7 +182,11 @@ function renderReporte() {
   llenarTabla("tabla-estado", r.estadoFinal.map(([e, n]) => [e, n]));
   llenarTabla("tabla-recibidos", r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
   llenarTabla("tabla-componentes", r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_nuevo || "—", c.serial_retirado, c.destino || "—"]));
-  llenarTabla("tabla-materiales", r.materiales.map(m => [m.tipo_componente, m.llevados, m.utilizados, m.vuelven]));
+  llenarTabla("tabla-materiales-1ra", r.materiales1ra.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
+  llenarTabla("tabla-materiales-2da", r.materiales2da.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
+  llenarTabla("tabla-materiales-sin-categoria", r.materialesSinCategoria.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
+  document.getElementById("titulo-materiales-sin-categoria").hidden = r.materialesSinCategoria.length === 0;
+  document.getElementById("tabla-materiales-sin-categoria").hidden = r.materialesSinCategoria.length === 0;
   llenarTabla("tabla-fallas", r.fallasRevision.map(c => [c.m_control, c.serial_retirado, c.destino || "—", c.reparacion]));
   llenarTabla("tabla-garantias-reporte", r.garantias.map(g => [
     g.m_control, g.dispositivo_danado, g.falla, g.criterio_revision || "—",
@@ -211,9 +258,19 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
     ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino"],
     r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_nuevo || "—", c.serial_retirado, c.destino || ""]));
 
-  seccion("CONTROL DE MATERIALES",
+  seccion("CONTROL DE MATERIALES - 1RA CATEGORÍA",
     ["Tipo", "Llevados", "Utilizados", "Vuelven"],
-    r.materiales.map(m => [m.tipo_componente, m.llevados, m.utilizados, m.vuelven]));
+    r.materiales1ra.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
+
+  seccion("CONTROL DE MATERIALES - 2DA CATEGORÍA",
+    ["Tipo", "Llevados", "Utilizados", "Vuelven"],
+    r.materiales2da.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
+
+  if (r.materialesSinCategoria.length > 0) {
+    seccion("CONTROL DE MATERIALES - SIN CATEGORÍA (HISTÓRICO)",
+      ["Tipo", "Llevados", "Utilizados", "Vuelven"],
+      r.materialesSinCategoria.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
+  }
 
   seccion("RESUMEN DE FALLAS Y REVISIÓN",
     ["Módulo", "Serial", "Destino", "Hallazgo"],
@@ -278,7 +335,11 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
   seccion("Resumen de Estado Final", ["Estado", "Cantidad"], r.estadoFinal);
   seccion("Resumen de Equipos Atendidos", ["Módulo", "Acción en calle", "Comentarios"], r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
   seccion("Cambios de Componentes Realizados", ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_nuevo || "—", c.serial_retirado, c.destino || "—"]));
-  seccion("Control de Materiales", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales.map(m => [m.tipo_componente, m.llevados, m.utilizados, m.vuelven]));
+  seccion("Control de Materiales — 1ra Categoría", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales1ra.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
+  seccion("Control de Materiales — 2da Categoría", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales2da.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
+  if (r.materialesSinCategoria.length > 0) {
+    seccion("Control de Materiales — Sin categoría (histórico)", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materialesSinCategoria.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
+  }
   seccion("Resumen de Fallas y Revisión", ["Módulo", "Serial", "Destino", "Hallazgo"], r.fallasRevision.map(c => [c.m_control, c.serial_retirado, c.destino || "—", c.reparacion]));
   seccion("Control de Garantías",
     ["Módulo", "Dispositivo", "Falla", "Criterio Técnico", "Garantía por Tiempo", "Estado Final", "Link Foto"],
