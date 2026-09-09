@@ -447,6 +447,15 @@ async function resolverCategoriaComponente(codigo) {
     return;
   }
 
+  // Si el cliente ya lo había cambiado por su cuenta, no sale de nuestro
+  // stock — no hace falta pedir Categoría para algo que no se va a contar
+  // en Materiales.
+  if (document.getElementById("modal-retirado-cliente").checked) {
+    categoriasPorComponente[codigo] = "n/a";
+    celda.innerHTML = `<span class="fila-serial-o">— No aplica (cambiado por el cliente, no cuenta en Materiales)</span>`;
+    return;
+  }
+
   celda.innerHTML = `<span class="fila-serial-o">Buscando categoría...</span>`;
 
   try {
@@ -736,7 +745,7 @@ modalEnviarBtn.addEventListener("click", async () => {
       if (cambioDeCategoria || cambioDeSerial || cambioDeCategoriaMaterial) {
         actualizaciones.push({
           id: filaExistente.id,
-          cambios: { estado: estadoDeseado, excluir_materiales: excluirDeseado, serial_nuevo: serialNuevoDeseado || filaExistente.serial_nuevo, tipo_componente: nombreTipo, categoria: categoriasPorComponente[codigo] || filaExistente.categoria || null }
+          cambios: { estado: estadoDeseado, excluir_materiales: excluirDeseado, serial_nuevo: serialNuevoDeseado || filaExistente.serial_nuevo, tipo_componente: nombreTipo, categoria: (categoriasPorComponente[codigo] === "n/a" ? null : categoriasPorComponente[codigo]) || filaExistente.categoria || null }
         });
       }
       return;
@@ -747,7 +756,7 @@ modalEnviarBtn.addEventListener("click", async () => {
       tipo_componente: nombreTipo, serial_retirado: serialViejoDe(codigo),
       serial_nuevo: serialNuevoDeseado, id_registro: idRegistro, id_ot: idOtActiva,
       estado: estadoDeseado, excluir_materiales: excluirDeseado,
-      categoria: categoriasPorComponente[codigo] || null
+      categoria: categoriasPorComponente[codigo] === "n/a" ? null : (categoriasPorComponente[codigo] || null)
     });
   });
 
