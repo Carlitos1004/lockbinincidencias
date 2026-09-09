@@ -464,12 +464,24 @@ async function resolverCategoriaComponente(codigo) {
       categoriasPorComponente[codigo] = categoria;
 
       // Antes de dar por buena la categoría, revisamos que este serial no
-      // esté ya puesto en OTRO equipo — un cierre/lector/batería no puede
-      // estar instalado en 2 sitios a la vez.
+      // esté ya puesto en OTRO equipo — normalmente un cierre/lector/
+      // batería no debería repetirse, pero a veces el operario usa en
+      // campo algo que "oficialmente" seguía vinculado a otro MC en la
+      // plataforma (la desvinculación se hace después) — por eso esto es
+      // un aviso con confirmación, no un bloqueo sin salida.
       const yaUsadoEn = await buscarUsoDuplicado(serial, codigo);
       if (yaUsadoEn) {
-        categoriasPorComponente[codigo] = null; // bloquea el envío hasta que se resuelva
-        celda.innerHTML = `<span style="color:#c0392b; font-weight:600;">🚫 Este serial ya está puesto en ${yaUsadoEn.m_control} (${yaUsadoEn.id_ot}) — no se puede repetir. Verifica el serial o corrige el otro registro primero.</span>`;
+        categoriasPorComponente[codigo] = null; // bloquea el envío hasta que se confirme
+        celda.innerHTML = `
+          <div style="color:#c0392b; font-weight:600;">⚠️ Este serial ya está puesto en ${yaUsadoEn.m_control} (${yaUsadoEn.id_ot}).</div>
+          <label class="opcion-check" style="font-weight:normal; color:var(--gris-950);">
+            <input type="checkbox" class="check-confirmar-reuso" data-codigo="${codigo}">
+            Sé que se repite (ej. tomé un equipo completo pero solo usé esta pieza) — usarlo de todas formas
+          </label>
+        `;
+        celda.querySelector(".check-confirmar-reuso").addEventListener("change", (e) => {
+          categoriasPorComponente[codigo] = e.target.checked ? categoria : null;
+        });
         return;
       }
 

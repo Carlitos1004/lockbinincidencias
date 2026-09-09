@@ -144,6 +144,7 @@ function renderPendientesBateria(pendientes) {
       }
 
       cargarTabla();
+      sincronizarLlevados(otActual);
     });
   });
 }
@@ -196,6 +197,7 @@ async function registrarLote(filas) {
     (errores.length > 0 ? `<br>⚠️ ${errores.length} línea(s) con error:<br>` + errores.join("<br>") : ""),
     false);
   cargarTabla();
+  sincronizarLlevados(otActual);
 }
 
 document.getElementById("registrar-pegados-btn").addEventListener("click", () => {
@@ -232,4 +234,34 @@ function mostrarMensaje(el, texto, esError) {
   el.innerHTML = texto;
   el.className = esError ? "resultado-msg resultado-error" : "resultado-msg resultado-ok";
   el.hidden = false;
+}
+
+// Recalcula "Llevados" en Materiales, contando cuántos seriales hay
+// registrados por tipo (sin contar los pendientes de clasificar, que
+// todavía no tienen un tipo final). Sigue siendo editable a mano después
+// — esto solo pone el número de partida.
+async function sincronizarLlevados(idOt) {
+  const { data, error } = await supabaseClient
+    .from("materiales_serializados")
+    .select("tipo_componente")
+    .eq("id_ot", idOt);
+
+  if (error || !data) return;
+
+  const conteoPorTipo = {};
+  data.forEach(s => {
+    if (s.tipo_componente.includes("(pendiente subtipo)")) return; // sin tipo final, no cuenta todavía
+    conteoPorTipo[s.tipo_componente] = (conteoPorTipo[s.tipo_componente] || 0) + 1;
+  });
+
+  const filas = Object.keys(conteoPorTipo).map(tipo => ({
+    id_ot: idOt,
+    tipo_componente: tipo,
+    llevados: conteoPorTipo[tipo]
+  }));
+
+  if (filas.length === 0) return;
+
+  await supabaseClient.from("materiales_ot").upsert(filas, { onConflict: "id_ot,tipo_componente" });
+  await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: idOt });
 }
