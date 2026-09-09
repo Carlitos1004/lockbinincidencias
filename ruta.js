@@ -411,7 +411,6 @@ function refrescarZonaQR() {
       </button>
       <span class="fila-serial-o">o escribe:</span>
       <input type="text" class="input-serial-manual" data-codigo="${c}" placeholder="Serial a mano" value="${serialesNuevos[c] || ""}">
-      ${serialesNuevos[c] ? `<span class="serial-confirmado">✅</span>` : ""}
     </div>
     <div class="fila-categoria-componente" id="fila-categoria-${c}" data-codigo="${c}"></div>
   `).join("");
@@ -463,6 +462,17 @@ async function resolverCategoriaComponente(codigo) {
     if (registrado) {
       const categoria = registrado.tipo_componente.includes("1ra") ? "1ra categoría" : "2da categoría";
       categoriasPorComponente[codigo] = categoria;
+
+      // Antes de dar por buena la categoría, revisamos que este serial no
+      // esté ya puesto en OTRO equipo — un cierre/lector/batería no puede
+      // estar instalado en 2 sitios a la vez.
+      const yaUsadoEn = await buscarUsoDuplicado(serial, codigo);
+      if (yaUsadoEn) {
+        categoriasPorComponente[codigo] = null; // bloquea el envío hasta que se resuelva
+        celda.innerHTML = `<span style="color:#c0392b; font-weight:600;">🚫 Este serial ya está puesto en ${yaUsadoEn.m_control} (${yaUsadoEn.id_ot}) — no se puede repetir. Verifica el serial o corrige el otro registro primero.</span>`;
+        return;
+      }
+
       celda.innerHTML = `<span class="serial-confirmado">✅ Categoría: ${categoria} (detectada de Materiales Serializados)</span>`;
       return;
     }
@@ -891,4 +901,19 @@ function buscarMCEnMapa() {
   mapa.setView(marcador.getLatLng(), 17);
   marcador.openTooltip();
   abrirModal(mc);
+}
+
+// Un mismo serial (lector/cierre/batería/módulo) no puede estar puesto en
+// más de un equipo a la vez. Busca en TODA la base (cualquier OT) si ese
+// serial ya está asignado a otro componente distinto al que se está
+// editando ahora mismo.
+async function buscarUsoDuplicado(serial, codigo) {
+  const { data, error } = await supabaseClient
+    .from("componentes_retirados")
+    .select("id_ot, m_control, id_registro")
+    .eq("serial_nuevo", serial);
+
+  if (error || !data) return null;
+
+  return data.find(c => !(c.id_registro === ticketExistente && c.m_control === equipoAbierto)) || null;
 }
