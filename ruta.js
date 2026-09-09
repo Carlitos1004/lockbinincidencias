@@ -142,11 +142,11 @@ function renderMapa() {
   marcadores = {};
 
   ordenados.forEach((p, idx) => {
-    const visitado = equipoVisitado(p.mc);
+    const estadoVisual = estadoVisualEquipo(p.mc);
 
     const icono = L.divIcon({
       className: "",
-      html: `<div class="marcador-numero ${visitado ? 'marcador-verde' : 'marcador-naranja'}">${idx + 1}</div>`,
+      html: `<div class="marcador-numero marcador-${estadoVisual}">${idx + 1}</div>`,
       iconSize: [30, 30],
       iconAnchor: [15, 15]
     });
@@ -194,20 +194,25 @@ function dibujarLineaRectaDeRespaldo(coordenadasRuta) {
   L.polyline(coordenadasRuta, { color: "#6FA827", weight: 3, dashArray: "6,6" }).addTo(mapa);
 }
 
-function equipoVisitado(mc) {
+// Devuelve "no-visitado" / "pendiente-proxima" / "resuelto" según el
+// último estado_equipo reportado para ese MC en esta OT.
+function estadoVisualEquipo(mc) {
   const info = equiposPorMC[mc];
-  if (!info) return false;
-  return info.tickets.some(t => t.estado_equipo);
+  if (!info) return "no-visitado";
+  const conReporte = info.tickets.filter(t => t.estado_equipo);
+  if (conReporte.length === 0) return "no-visitado";
+  const algunoPendiente = conReporte.some(t => t.estado_equipo !== "🟢 FUNCIONANDO");
+  return algunoPendiente ? "pendiente-proxima" : "resuelto";
 }
 
 function actualizarColorMarcador(mc) {
   const marcador = marcadores[mc];
   if (!marcador) return;
-  const visitado = equipoVisitado(mc);
+  const estadoVisual = estadoVisualEquipo(mc);
   const idx = Object.keys(marcadores).indexOf(mc);
   marcador.setIcon(L.divIcon({
     className: "",
-    html: `<div class="marcador-numero ${visitado ? 'marcador-verde' : 'marcador-naranja'}">${idx + 1}</div>`,
+    html: `<div class="marcador-numero marcador-${estadoVisual}">${idx + 1}</div>`,
     iconSize: [30, 30],
     iconAnchor: [15, 15]
   }));

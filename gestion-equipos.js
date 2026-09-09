@@ -234,8 +234,30 @@ generarBtn.addEventListener("click", async () => {
   // --- Un solo ticket por equipo, combinando todas sus fallas activas ---
   // (antes creaba uno por cada falla — resultaba en tickets duplicados del
   // mismo equipo, con la misma acción repetida varias veces)
+  //
+  // Antes de crear un ticket nuevo, revisamos si ese equipo YA tiene uno
+  // abierto de una visita anterior sin resolver — si es así, lo vinculamos
+  // a esta OT nueva en vez de duplicarlo (mismo ticket, dos OT).
+  const mcsSeleccionados = todosLosEquipos.map(eq => eq.m_control);
+  const { data: ticketsAbiertosExistentes } = await supabaseClient
+    .from("historial_fallas")
+    .select("id_registro, m_control")
+    .in("m_control", mcsSeleccionados)
+    .eq("estado", "🚨 ABIERTO");
+
+  const mapaTicketAbiertoPorMC = {};
+  (ticketsAbiertosExistentes || []).forEach(t => { mapaTicketAbiertoPorMC[t.m_control] = t.id_registro; });
+
   const nuevosTickets = [];
+  const idsAVincular = [];
+
   todosLosEquipos.forEach(eq => {
+    const ticketYaAbierto = mapaTicketAbiertoPorMC[eq.m_control];
+    if (ticketYaAbierto) {
+      idsAVincular.push(ticketYaAbierto);
+      return; // no se crea uno nuevo, se vincula el que ya existía
+    }
+
     const accionesUnicas = [...new Set(eq.fallas.map(obtenerAccionPorDefecto))];
     nuevosTickets.push({
       id_registro: "TK-" + eq.m_control + "-" + Math.floor(Math.random() * 900 + 100),
@@ -249,7 +271,16 @@ generarBtn.addEventListener("click", async () => {
     });
   });
 
-  const { error: errorTickets } = await supabaseClient.from("historial_fallas").insert(nuevosTickets);
+  if (idsAVincular.length > 0) {
+    await supabaseClient
+      .from("historial_fallas")
+      .update({ id_ot_relacionada: nuevoIdOt })
+      .in("id_registro", idsAVincular);
+  }
+
+  const { error: errorTickets } = nuevosTickets.length > 0
+    ? await supabaseClient.from("historial_fallas").insert(nuevosTickets)
+    : { error: null };
 
   generarBtn.disabled = false;
   generarBtn.textContent = "Generar OT con los equipos seleccionados";
