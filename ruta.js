@@ -78,7 +78,7 @@ async function cargarRuta() {
   const { data: tickets, error } = await supabaseClient
     .from("historial_fallas")
     .select("*")
-    .eq("id_ot", idOt);
+    .or(`id_ot.eq.${idOt},id_ot_relacionada.eq.${idOt}`);
 
   cargarBtn.disabled = false;
   cargarBtn.textContent = "Cargar ruta";

@@ -54,6 +54,15 @@
       </label>
     </div>
 
+    <div class="agregar-equipo-box" id="traer-pendientes-box" hidden>
+      <label><strong>📥 Traer equipos pendientes de otra OT</strong> — para cuando esta visita continúa lo que quedó sin resolver de una OT anterior. El ticket sigue siendo el mismo: resolverlo aquí también lo deja resuelto en la OT original.</label>
+      <div class="materiales-controles">
+        <input type="text" id="traer-ot-input" placeholder="Nº de la OT anterior (ej. OT-012)">
+        <button id="traer-buscar-btn" class="btn-secundario">Buscar pendientes</button>
+      </div>
+      <div id="traer-resultado"></div>
+    </div>
+
     <div class="instrucciones-box">
       <label for="instrucciones-textarea"><strong>Instrucciones para los operarios</strong></label>
       <textarea id="instrucciones-textarea" rows="3" placeholder="Ej: Prioridad al equipo MC2500001, cliente pidió visita antes de las 12pm..."></textarea>

@@ -45,6 +45,10 @@ async function cargarOTs() {
     if (!t.id_ot) return;
     if (!ticketsPorOt[t.id_ot]) ticketsPorOt[t.id_ot] = [];
     ticketsPorOt[t.id_ot].push(t);
+    if (t.id_ot_relacionada) {
+      if (!ticketsPorOt[t.id_ot_relacionada]) ticketsPorOt[t.id_ot_relacionada] = [];
+      ticketsPorOt[t.id_ot_relacionada].push(t);
+    }
   });
 
   otsConDatos = (ots || []).map(ot => {

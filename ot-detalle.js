@@ -37,6 +37,7 @@ document.addEventListener("perfil-listo", (e) => {
   document.getElementById("eliminar-ot-btn").hidden = !esManager;
   document.querySelector(".agregar-equipo-box").hidden = esCliente;
   document.getElementById("crear-ot-libre-box").hidden = !esManager;
+  document.getElementById("traer-pendientes-box").hidden = !esManager;
   document.getElementById("agregar-componente-box").hidden = !esManager;
 
   if (otEnUrl) buscarOT();
@@ -69,7 +70,7 @@ async function buscarOT() {
   const { data: tickets, error: errorTickets } = await supabaseClient
     .from("historial_fallas")
     .select("*")
-    .eq("id_ot", idOt)
+    .or(`id_ot.eq.${idOt},id_ot_relacionada.eq.${idOt}`)
     .order("m_control");
 
   if (errorTickets) {
@@ -133,6 +134,14 @@ function renderTabla() {
     const abierto = t.estado === "🚨 ABIERTO";
     const puedeEditar = esManager && abierto;
 
+    const idOtActualVista = otActualCargada?.id_ot;
+    let etiquetaVinculo = "";
+    if (t.id_ot !== idOtActualVista) {
+      etiquetaVinculo = `<span class="vinculo-ot-etiqueta" title="Este ticket pertenece originalmente a ${t.id_ot}">🔗 De ${t.id_ot}</span>`;
+    } else if (t.id_ot_relacionada) {
+      etiquetaVinculo = `<span class="vinculo-ot-etiqueta" title="También se está resolviendo desde esa OT">→ También en ${t.id_ot_relacionada}</span>`;
+    }
+
     const celdaAccionComentarios = puedeEditar
       ? `<textarea class="input-accion-comentarios" rows="2" data-id="${t.id_registro}">${[t.accion_calle, t.comentarios].filter(Boolean).join("\n") || ""}</textarea>
          <button class="btn-guardar-ticket" data-id="${t.id_registro}">Guardar</button>`
@@ -148,7 +157,7 @@ function renderTabla() {
 
     return `
       <tr>
-        <td>${t.m_control}</td>
+        <td>${t.m_control}${etiquetaVinculo}</td>
         <td>${t.equipos?.fraccion || "—"}</td>
         <td>${t.falla}</td>
         <td>${t.estado}${t.estado_equipo ? " — " + t.estado_equipo : ""}</td>
@@ -631,3 +640,66 @@ async function cargarComponentesSinTicket(idOt) {
 }
 
 
+
+// --- Traer equipos pendientes de una OT anterior, vinculándolos a esta ---
+document.getElementById("traer-buscar-btn").addEventListener("click", async () => {
+  const otAnterior = document.getElementById("traer-ot-input").value.trim().toUpperCase();
+  const resultadoDiv = document.getElementById("traer-resultado");
+
+  if (!otAnterior || !otActualCargada) {
+    resultadoDiv.innerHTML = `<p class="resultado-msg resultado-error" style="display:block;">⚠️ Escribe el número de la OT anterior.</p>`;
+    return;
+  }
+  if (otAnterior === otActualCargada.id_ot) {
+    resultadoDiv.innerHTML = `<p class="resultado-msg resultado-error" style="display:block;">❌ Es la misma OT que ya tienes abierta.</p>`;
+    return;
+  }
+
+  const { data: pendientes, error } = await supabaseClient
+    .from("historial_fallas")
+    .select("*")
+    .eq("id_ot", otAnterior)
+    .eq("estado", "🚨 ABIERTO");
+
+  if (error) {
+    resultadoDiv.innerHTML = `<p class="resultado-msg resultado-error" style="display:block;">❌ ${error.message}</p>`;
+    return;
+  }
+  if (!pendientes || pendientes.length === 0) {
+    resultadoDiv.innerHTML = `<p class="resultado-msg" style="display:block;">${otAnterior} no tiene ningún ticket pendiente (abierto).</p>`;
+    return;
+  }
+
+  resultadoDiv.innerHTML = `
+    <p class="resultado-msg resultado-ok" style="display:block;">${pendientes.length} pendiente(s) en ${otAnterior} — elige cuáles traer:</p>
+    ${pendientes.map(t => `
+      <label class="opcion-check">
+        <input type="checkbox" class="check-traer-pendiente" data-id="${t.id_registro}">
+        ${t.m_control} — ${t.falla}
+      </label>
+    `).join("")}
+    <button id="traer-confirmar-btn" class="btn-primario" style="margin-top:10px;">Traer seleccionados a esta OT</button>
+  `;
+
+  document.getElementById("traer-confirmar-btn").addEventListener("click", async () => {
+    const seleccionados = [...document.querySelectorAll(".check-traer-pendiente:checked")].map(c => c.dataset.id);
+    if (seleccionados.length === 0) {
+      alert("Selecciona al menos uno.");
+      return;
+    }
+
+    const { error: errorUpdate } = await supabaseClient
+      .from("historial_fallas")
+      .update({ id_ot_relacionada: otActualCargada.id_ot })
+      .in("id_registro", seleccionados);
+
+    if (errorUpdate) {
+      alert("Error: " + errorUpdate.message);
+      return;
+    }
+
+    resultadoDiv.innerHTML = `<p class="resultado-msg resultado-ok" style="display:block;">✅ ${seleccionados.length} equipo(s) traído(s) — ya aparecen abajo en la tabla.</p>`;
+    document.getElementById("traer-ot-input").value = "";
+    buscarOT();
+  });
+});

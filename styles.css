@@ -1344,6 +1344,17 @@ input[type="file"]::file-selector-button:hover {
   min-width: 160px;
 }
 
+.vinculo-ot-etiqueta {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  background: var(--ambar-bg);
+  color: var(--gris-950);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
 .modal-seccion-titulo {
   margin: 0 0 10px;
   padding-bottom: 6px;

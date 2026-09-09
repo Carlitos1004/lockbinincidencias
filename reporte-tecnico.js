@@ -68,7 +68,7 @@ async function mostrarTicketsAbiertos(mc) {
     .from("historial_fallas")
     .select("id_registro, falla")
     .eq("m_control", mc)
-    .eq("id_ot", idOt)
+    .or(`id_ot.eq.${idOt},id_ot_relacionada.eq.${idOt}`)
     .eq("estado", "🚨 ABIERTO");
 
   if (error || !data || data.length === 0) return;
