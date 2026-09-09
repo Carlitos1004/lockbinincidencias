@@ -931,3 +931,12 @@ async function buscarUsoDuplicado(serial, codigo) {
 
   return data.find(c => !(c.id_registro === ticketExistente && c.m_control === equipoAbierto)) || null;
 }
+
+// El enlace de "página principal" apunta a un lugar distinto según el rol
+// — para el operario, la búsqueda/vista manual (que a futuro será su
+// pantalla de referencia con detalle de OT); para el manager, el panel.
+document.addEventListener("perfil-listo", (e) => {
+  const enlace = document.getElementById("link-pagina-principal");
+  if (!enlace) return;
+  enlace.href = e.detail.rol === "manager" ? "admin.html" : "tecnico.html";
+});
