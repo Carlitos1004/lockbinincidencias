@@ -448,21 +448,34 @@ async function resolverCategoriaComponente(codigo) {
 
   celda.innerHTML = `<span class="fila-serial-o">Buscando categoría...</span>`;
 
-  const { data: registrado } = await supabaseClient
-    .from("materiales_serializados")
-    .select("tipo_componente")
-    .eq("id_ot", idOtActiva)
-    .eq("serial", serial)
-    .maybeSingle();
+  try {
+    const idOtParaBusqueda = sessionStorage.getItem("lockbin_ot_activa");
 
-  if (registrado) {
-    const categoria = registrado.tipo_componente.includes("1ra") ? "1ra categoría" : "2da categoría";
-    categoriasPorComponente[codigo] = categoria;
-    celda.innerHTML = `<span class="serial-confirmado">✅ Categoría: ${categoria} (detectada de Materiales Serializados)</span>`;
-    return;
+    const { data: registrado, error: errorBusqueda } = await supabaseClient
+      .from("materiales_serializados")
+      .select("tipo_componente")
+      .eq("id_ot", idOtParaBusqueda)
+      .eq("serial", serial)
+      .maybeSingle();
+
+    if (errorBusqueda) throw errorBusqueda;
+
+    if (registrado) {
+      const categoria = registrado.tipo_componente.includes("1ra") ? "1ra categoría" : "2da categoría";
+      categoriasPorComponente[codigo] = categoria;
+      celda.innerHTML = `<span class="serial-confirmado">✅ Categoría: ${categoria} (detectada de Materiales Serializados)</span>`;
+      return;
+    }
+
+    mostrarSelectorManualCategoria(codigo, celda, "");
+  } catch (err) {
+    mostrarSelectorManualCategoria(codigo, celda, `<p style="color:var(--ambar); margin:0 0 4px;">⚠️ No se pudo buscar en Materiales Serializados (${err.message || err}) — elige a mano:</p>`);
   }
+}
 
+function mostrarSelectorManualCategoria(codigo, celda, avisoHtml) {
   celda.innerHTML = `
+    ${avisoHtml}
     <label class="fila-serial-o">Categoría de este repuesto (no estaba pre-registrado):</label>
     <select class="input-categoria-manual" data-codigo="${codigo}">
       <option value="">— Elige —</option>
