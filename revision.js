@@ -14,6 +14,7 @@ const DESTINOS = [
   "✓ Equipo OK - Stock (1ra categoría)",
   "✓ Equipo OK - Stock (2da categoría)",
   "✓ Equipo OK - Devolver al cliente",
+  "✓ Cambiado por el cliente - No llega a revisión",
   "❌ Equipo dañado - Enviar a AMMI",
   "❌ Equipo dañado - Desechar",
   "🚨 Sigue en revisión"
@@ -23,6 +24,7 @@ const MAPA_DESTINO_A_ESTADO = {
   "✓ Equipo OK - Stock (1ra categoría)": "Revisado",
   "✓ Equipo OK - Stock (2da categoría)": "Revisado",
   "✓ Equipo OK - Devolver al cliente": "Revisado",
+  "✓ Cambiado por el cliente - No llega a revisión": "Revisado",
   "❌ Equipo dañado - Enviar a AMMI": "Revisado",
   "❌ Equipo dañado - Desechar": "Descartado",
   "🚨 Sigue en revisión": "Pendiente revisión"
