@@ -133,9 +133,11 @@ function renderMapa() {
 
   if (mapa) { mapa.remove(); mapa = null; rutaControl = null; }
   mapaDiv.style.display = "block";
-  mapa = L.map(mapaDiv).setView([ordenados[0].lat, ordenados[0].lng], 12);
+  mapa = L.map(mapaDiv, { maxZoom: 21 }).setView([ordenados[0].lat, ordenados[0].lng], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap'
+    attribution: '&copy; OpenStreetMap',
+    maxZoom: 21,
+    maxNativeZoom: 19
   }).addTo(mapa);
 
   const coordenadasRuta = ordenados.map(p => [p.lat, p.lng]); // sin la oficina — solo entre equipos
