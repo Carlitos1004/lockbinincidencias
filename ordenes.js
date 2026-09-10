@@ -33,7 +33,7 @@ async function cargarOTs() {
 
   const { data: tickets, error: errorTickets } = await supabaseClient
     .from("historial_fallas")
-    .select("id_ot, cliente, m_control, estado");
+    .select("id_ot, id_ot_relacionada, cliente, m_control, estado");
 
   if (errorTickets) {
     tbody.innerHTML = `<tr><td colspan="10">Error: ${errorTickets.message}</td></tr>`;
