@@ -158,7 +158,7 @@ async function generarReporte() {
   const materialesSinCategoria = materialesConNombreOficial.filter(m => !m.tipo_componente.includes("1ra") && !m.tipo_componente.includes("2da"));
 
   reporteActual = {
-    idOt, cliente, fecha: ot.fecha, totalEquipos: mcsUnicos.length,
+    idOt, cliente, fecha: ot.fecha, totalEquipos: mcsUnicos.length, instrucciones: ot.instrucciones || "",
     estadoFinal: [
       ["🟢 Funcionando", funcionando],
       ["🟡 Cambio necesario", cambioNecesario],
@@ -178,6 +178,9 @@ function renderReporte() {
   document.getElementById("reporte-titulo").textContent = r.idOt;
   document.getElementById("reporte-meta").textContent =
     `Cliente: ${r.cliente} — Fecha: ${new Date(r.fecha).toLocaleDateString("es-ES")} — Total equipos: ${r.totalEquipos}`;
+
+  document.getElementById("instrucciones-reporte-box").hidden = !r.instrucciones;
+  document.getElementById("instrucciones-reporte-texto").textContent = r.instrucciones;
 
   llenarTabla("tabla-estado", r.estadoFinal.map(([e, n]) => [e, n]));
   llenarTabla("tabla-recibidos", r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
@@ -247,6 +250,12 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
   filaDatos(["Fecha:", new Date(r.fecha).toLocaleDateString("es-ES")]);
   filaDatos(["Total de equipos:", r.totalEquipos]);
   espacio();
+
+  if (r.instrucciones) {
+    titulo("INSTRUCCIONES / RESUMEN DE LA ACTUACIÓN");
+    filaDatos([r.instrucciones]);
+    espacio();
+  }
 
   seccion("RESUMEN DE ESTADO FINAL", ["Estado", "Cantidad"], r.estadoFinal);
 
@@ -332,6 +341,9 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
     y = doc.lastAutoTable.finalY + 12;
   };
 
+  if (r.instrucciones) {
+    seccion("Instrucciones / Resumen de la Actuación", ["Texto"], [[r.instrucciones]]);
+  }
   seccion("Resumen de Estado Final", ["Estado", "Cantidad"], r.estadoFinal);
   seccion("Resumen de Equipos Atendidos", ["Módulo", "Acción en calle", "Comentarios"], r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
   seccion("Cambios de Componentes Realizados", ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_nuevo || "—", c.serial_retirado, c.destino || "—"]));
