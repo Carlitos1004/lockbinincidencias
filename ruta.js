@@ -394,10 +394,12 @@ function refrescarZonaQR() {
         <span id="estado-busqueda-mc-nuevo"></span>
       </div>
       <p style="font-size:0.8rem; color:var(--gris-700); margin:4px 0 0;">Como el equipo ya viene configurado con sus propios Lector/Cierre/Batería, basta con el MC — lo buscamos solo en la lista de Equipos.</p>
+      <div id="fila-categoria-completo"></div>
     `;
 
     document.querySelector('[data-codigo="MC"].btn-qr').addEventListener("click", () => iniciarScanner("MC_COMPLETO"));
     document.getElementById("input-mc-nuevo-completo").addEventListener("input", (e) => buscarEquipoNuevoCompleto(e.target.value));
+    if (serialesNuevos.MC) buscarEquipoNuevoCompleto(serialesNuevos.MC);
     return;
   }
 
@@ -543,6 +545,7 @@ async function buscarEquipoNuevoCompleto(valor) {
   if (!equipoNuevo) {
     estadoSpan.innerHTML = `⚠️ No está en la lista de Equipos — anota el resto a mano en Revisión de Taller.`;
     estadoSpan.style.color = "var(--ambar)";
+    resolverCategoriaEquipoCompleto(mc);
     return;
   }
 
@@ -551,6 +554,57 @@ async function buscarEquipoNuevoCompleto(valor) {
   serialesNuevos.BA = equipoNuevo.serie_bateria || "";
   estadoSpan.innerHTML = `✅ Encontrado — Lector/Cierre/Batería completados solos.`;
   estadoSpan.style.color = "var(--verde-oscuro)";
+  resolverCategoriaEquipoCompleto(mc);
+}
+
+// Para "Equipo completo" se pide UNA sola categoría (aplica al kit
+// completo, no una por cada pieza) — busca el MC en Materiales
+// Serializados, y si no está, deja elegirla a mano.
+async function resolverCategoriaEquipoCompleto(mc) {
+  const celda = document.getElementById("fila-categoria-completo");
+  if (!celda) return;
+
+  celda.innerHTML = `<span class="fila-serial-o">Buscando categoría...</span>`;
+
+  try {
+    const idOtParaBusqueda = sessionStorage.getItem("lockbin_ot_activa");
+    const { data: registrado, error: errorBusqueda } = await supabaseClient
+      .from("materiales_serializados")
+      .select("tipo_componente")
+      .eq("id_ot", idOtParaBusqueda)
+      .eq("serial", mc)
+      .maybeSingle();
+
+    if (errorBusqueda) throw errorBusqueda;
+
+    if (registrado) {
+      const categoria = registrado.tipo_componente.includes("1ra") ? "1ra categoría" : "2da categoría";
+      ["LE", "CE", "BA", "MC"].forEach(c => { categoriasPorComponente[c] = categoria; });
+      celda.innerHTML = `<span class="serial-confirmado">✅ Categoría: ${categoria} (detectada de Materiales Serializados)</span>`;
+      return;
+    }
+
+    mostrarSelectorCategoriaCompleto(celda, "");
+  } catch (err) {
+    mostrarSelectorCategoriaCompleto(celda, `<p style="color:var(--ambar); margin:0 0 4px;">⚠️ No se pudo buscar en Materiales Serializados (${err.message || err}) — elige a mano:</p>`);
+  }
+}
+
+function mostrarSelectorCategoriaCompleto(celda, avisoHtml) {
+  celda.innerHTML = `
+    ${avisoHtml}
+    <label class="fila-serial-o">Categoría de este equipo completo (no estaba pre-registrado):</label>
+    <select id="input-categoria-completo">
+      <option value="">— Elige —</option>
+      <option value="1ra categoría">1ra categoría</option>
+      <option value="2da categoría">2da categoría</option>
+    </select>
+  `;
+  document.getElementById("input-categoria-completo").addEventListener("change", (e) => {
+    const valor = e.target.value || null;
+    ["LE", "CE", "BA", "MC"].forEach(c => { categoriasPorComponente[c] = valor; });
+    if (!valor) ["LE", "CE", "BA", "MC"].forEach(c => delete categoriasPorComponente[c]);
+  });
 }
 
 function iniciarScanner(codigo) {

@@ -64,7 +64,7 @@ async function generarReporte() {
 
   const [{ data: ot }, { data: tickets }, { data: componentes }, { data: materiales }, { data: garantiasOt }] = await Promise.all([
     supabaseClient.from("ordenes_trabajo").select("*").eq("id_ot", idOt).maybeSingle(),
-    supabaseClient.from("historial_fallas").select("*").eq("id_ot", idOt),
+    supabaseClient.from("historial_fallas").select("*").or(`id_ot.eq.${idOt},id_ot_relacionada.eq.${idOt}`),
     supabaseClient.from("componentes_retirados").select("*").eq("id_ot", idOt),
     supabaseClient.from("materiales_ot").select("*").eq("id_ot", idOt),
     supabaseClient.from("garantias").select("*").eq("id_ot", idOt)

@@ -16,13 +16,19 @@ async function llenarListaDeOTs() {
 
   const { data: tickets } = await supabaseClient
     .from("historial_fallas")
-    .select("id_ot, cliente");
+    .select("id_ot, id_ot_relacionada, cliente");
 
   const clientesPorOt = {};
   (tickets || []).forEach(t => {
-    if (!t.id_ot || !t.cliente) return;
-    if (!clientesPorOt[t.id_ot]) clientesPorOt[t.id_ot] = new Set();
-    clientesPorOt[t.id_ot].add(t.cliente);
+    if (!t.cliente) return;
+    if (t.id_ot) {
+      if (!clientesPorOt[t.id_ot]) clientesPorOt[t.id_ot] = new Set();
+      clientesPorOt[t.id_ot].add(t.cliente);
+    }
+    if (t.id_ot_relacionada) {
+      if (!clientesPorOt[t.id_ot_relacionada]) clientesPorOt[t.id_ot_relacionada] = new Set();
+      clientesPorOt[t.id_ot_relacionada].add(t.cliente);
+    }
   });
   // También el cliente guardado directo en la OT (para las OT libres, que
   // no tienen ningún ticket del que sacarlo)
