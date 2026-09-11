@@ -365,23 +365,47 @@ async function guardarFila(btn) {
   // 6. Historial de vida del equipo — cuando el Módulo de Control (el
   // identificador que "manda" del equipo) vuelve a Stock o se manda a
   // AMMI, registramos el evento solo, sin que nadie tenga que anotarlo.
+  // Un solo evento por (equipo + OT): si se vuelve a guardar la misma
+  // fila sin que cambie el destino, no duplica; si cambia el destino
+  // (ej. de Stock a AMMI) para la MISMA OT, se sobreescribe el que ya
+  // había en vez de sumar uno nuevo. Si es otra OT, sí es un evento
+  // aparte y se agrega.
   if (componente.tipo_componente === "Módulo de Control") {
     const esDestinoStock = destino === "✓ Equipo OK - Stock (1ra categoría)" || destino === "✓ Equipo OK - Stock (2da categoría)";
     if (esDestinoStock || destino === DESTINO_AMMI) {
       const mcEquipo = mcEditado || componente.m_control;
-      const { data: equipoInfo } = await supabaseClient
-        .from("equipos")
-        .select("imei")
-        .eq("m_control", mcEquipo)
+      const tipoEventoNuevo = esDestinoStock ? "Desvinculación" : "Enviado a AMMI";
+
+      const { data: eventoExistente } = await supabaseClient
+        .from("historial_equipo")
+        .select("id, tipo_evento")
+        .eq("mc", mcEquipo)
+        .eq("id_ot", componente.id_ot)
+        .in("tipo_evento", ["Desvinculación", "Enviado a AMMI"])
         .maybeSingle();
 
-      await supabaseClient.from("historial_equipo").insert({
-        imei: equipoInfo?.imei || null,
-        mc: mcEquipo,
-        tipo_evento: esDestinoStock ? "Desvinculación" : "Enviado a AMMI",
-        id_ot: componente.id_ot,
-        notas: esDestinoStock ? "Módulo de Control revisado y enviado a stock" : "Módulo de Control enviado a AMMI"
-      });
+      if (!eventoExistente || eventoExistente.tipo_evento !== tipoEventoNuevo) {
+        const { data: equipoInfo } = await supabaseClient
+          .from("equipos")
+          .select("imei")
+          .eq("m_control", mcEquipo)
+          .maybeSingle();
+
+        const datosEvento = {
+          imei: equipoInfo?.imei || null,
+          mc: mcEquipo,
+          tipo_evento: tipoEventoNuevo,
+          id_ot: componente.id_ot,
+          notas: esDestinoStock ? "Módulo de Control revisado y enviado a stock" : "Módulo de Control enviado a AMMI"
+        };
+
+        if (eventoExistente) {
+          await supabaseClient.from("historial_equipo").update(datosEvento).eq("id", eventoExistente.id);
+        } else {
+          await supabaseClient.from("historial_equipo").insert(datosEvento);
+        }
+      }
+      // si ya existía uno del mismo tipo para esta misma OT, no se toca
     }
   }
 

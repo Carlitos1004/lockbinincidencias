@@ -868,26 +868,36 @@ modalEnviarBtn.addEventListener("click", async () => {
     const imeiNuevo = equipoNuevoInfo?.imei || null;
 
     if (imeiNuevo) {
-      const { data: envioPrevioAmmi } = await supabaseClient
+      const { data: yaRegistradoRegreso } = await supabaseClient
         .from("historial_equipo")
-        .select("mc")
-        .eq("imei", imeiNuevo)
-        .eq("tipo_evento", "Enviado a AMMI")
-        .neq("mc", mcNuevo)
-        .order("fecha", { ascending: false })
-        .limit(1)
+        .select("id")
+        .eq("mc", mcNuevo)
+        .eq("id_ot", idOtActiva)
+        .eq("tipo_evento", "Regresó de AMMI")
         .maybeSingle();
 
-      if (envioPrevioAmmi) {
-        await supabaseClient.from("historial_equipo").insert({
-          imei: imeiNuevo, mc: mcNuevo, tipo_evento: "Regresó de AMMI",
-          mc_anterior: envioPrevioAmmi.mc, id_ot: idOtActiva,
-          notas: "Detectado por coincidencia de IMEI al vincular equipo completo"
-        });
+      if (!yaRegistradoRegreso) {
+        const { data: envioPrevioAmmi } = await supabaseClient
+          .from("historial_equipo")
+          .select("mc")
+          .eq("imei", imeiNuevo)
+          .eq("tipo_evento", "Enviado a AMMI")
+          .neq("mc", mcNuevo)
+          .order("fecha", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (envioPrevioAmmi) {
+          await supabaseClient.from("historial_equipo").insert({
+            imei: imeiNuevo, mc: mcNuevo, tipo_evento: "Regresó de AMMI",
+            mc_anterior: envioPrevioAmmi.mc, id_ot: idOtActiva,
+            notas: "Detectado por coincidencia de IMEI al vincular equipo completo"
+          });
+        }
       }
     }
 
-    await supabaseClient.from("historial_equipo").insert({
+    const datosVinculacion = {
       imei: imeiNuevo, mc: mcNuevo, tipo_evento: "Vinculación",
       cliente: clienteDeEsteEquipo,
       serie_lector: serialesNuevos.LE || null,
@@ -895,7 +905,21 @@ modalEnviarBtn.addEventListener("click", async () => {
       serie_bateria: serialesNuevos.BA || null,
       id_ot: idOtActiva,
       notas: "Equipo completo instalado en campo"
-    });
+    };
+
+    const { data: vinculacionExistente } = await supabaseClient
+      .from("historial_equipo")
+      .select("id")
+      .eq("mc", mcNuevo)
+      .eq("id_ot", idOtActiva)
+      .eq("tipo_evento", "Vinculación")
+      .maybeSingle();
+
+    if (vinculacionExistente) {
+      await supabaseClient.from("historial_equipo").update(datosVinculacion).eq("id", vinculacionExistente.id);
+    } else {
+      await supabaseClient.from("historial_equipo").insert(datosVinculacion);
+    }
   }
 
   // Cruce automático: si alguno de los seriales nuevos coincide con uno
