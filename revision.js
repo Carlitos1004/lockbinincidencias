@@ -362,6 +362,29 @@ async function guardarFila(btn) {
     await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: componente.id_ot });
   }
 
+  // 6. Historial de vida del equipo — cuando el Módulo de Control (el
+  // identificador que "manda" del equipo) vuelve a Stock o se manda a
+  // AMMI, registramos el evento solo, sin que nadie tenga que anotarlo.
+  if (componente.tipo_componente === "Módulo de Control") {
+    const esDestinoStock = destino === "✓ Equipo OK - Stock (1ra categoría)" || destino === "✓ Equipo OK - Stock (2da categoría)";
+    if (esDestinoStock || destino === DESTINO_AMMI) {
+      const mcEquipo = mcEditado || componente.m_control;
+      const { data: equipoInfo } = await supabaseClient
+        .from("equipos")
+        .select("imei")
+        .eq("m_control", mcEquipo)
+        .maybeSingle();
+
+      await supabaseClient.from("historial_equipo").insert({
+        imei: equipoInfo?.imei || null,
+        mc: mcEquipo,
+        tipo_evento: esDestinoStock ? "Desvinculación" : "Enviado a AMMI",
+        id_ot: componente.id_ot,
+        notas: esDestinoStock ? "Módulo de Control revisado y enviado a stock" : "Módulo de Control enviado a AMMI"
+      });
+    }
+  }
+
   btn.textContent = "✅ Guardado";
   setTimeout(() => { btn.textContent = "Guardar"; btn.disabled = false; }, 1500);
 }

@@ -852,6 +852,52 @@ modalEnviarBtn.addEventListener("click", async () => {
     await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: idOtActiva });
   }
 
+  // Historial de vida del equipo — cuando se instala un "Equipo completo"
+  // nuevo, es una vinculación (MC + cliente + LE/CE/BA de una vez). Si su
+  // IMEI coincide con uno que antes se mandó a AMMI con OTRO MC, además
+  // registramos que "regresó de AMMI" con el cambio de MC.
+  if (cambioCompleto && serialesNuevos.MC) {
+    const mcNuevo = serialesNuevos.MC;
+    const clienteDeEsteEquipo = equiposPorMC[equipoAbierto]?.equipo?.cliente || null;
+
+    const { data: equipoNuevoInfo } = await supabaseClient
+      .from("equipos")
+      .select("imei")
+      .eq("m_control", mcNuevo)
+      .maybeSingle();
+    const imeiNuevo = equipoNuevoInfo?.imei || null;
+
+    if (imeiNuevo) {
+      const { data: envioPrevioAmmi } = await supabaseClient
+        .from("historial_equipo")
+        .select("mc")
+        .eq("imei", imeiNuevo)
+        .eq("tipo_evento", "Enviado a AMMI")
+        .neq("mc", mcNuevo)
+        .order("fecha", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (envioPrevioAmmi) {
+        await supabaseClient.from("historial_equipo").insert({
+          imei: imeiNuevo, mc: mcNuevo, tipo_evento: "Regresó de AMMI",
+          mc_anterior: envioPrevioAmmi.mc, id_ot: idOtActiva,
+          notas: "Detectado por coincidencia de IMEI al vincular equipo completo"
+        });
+      }
+    }
+
+    await supabaseClient.from("historial_equipo").insert({
+      imei: imeiNuevo, mc: mcNuevo, tipo_evento: "Vinculación",
+      cliente: clienteDeEsteEquipo,
+      serie_lector: serialesNuevos.LE || null,
+      serie_cierre: serialesNuevos.CE || null,
+      serie_bateria: serialesNuevos.BA || null,
+      id_ot: idOtActiva,
+      notas: "Equipo completo instalado en campo"
+    });
+  }
+
   // Cruce automático: si alguno de los seriales nuevos coincide con uno
   // registrado como "Sacado del almacén" para esta OT, lo marcamos como
   // usado — así queda claro solo, sin que nadie tenga que anotarlo aparte.

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Vida del Equipo</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Vida del Equipo</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Busca por IMEI (recomendado, no cambia nunca) o por MC actual. Los eventos se registran solos — Vinculación al instalar un Equipo completo en Ruta, Desvinculación y Enviado a AMMI al revisar el Módulo de Control en Revisión de Taller.</p>
+
+  <div class="materiales-controles">
+    <input type="text" id="buscar-input" placeholder="IMEI o MC (ej. MC2600123)">
+    <button id="buscar-btn" class="btn-primario">Buscar</button>
+  </div>
+  <p id="buscar-msg" class="resultado-msg" hidden></p>
+
+  <div id="linea-tiempo"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="vida-equipo.js"></script>
+</body>
+</html>
