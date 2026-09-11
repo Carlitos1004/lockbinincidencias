@@ -30,8 +30,17 @@
   <div class="materiales-controles">
     <input type="text" id="buscar-input" placeholder="IMEI o MC (ej. MC2600123)">
     <button id="buscar-btn" class="btn-primario">Buscar</button>
+    <button id="ver-todos-btn" class="btn-secundario">📋 Ver todos los equipos con historial</button>
   </div>
   <p id="buscar-msg" class="resultado-msg" hidden></p>
+
+  <div id="lista-todos" hidden>
+    <h2 style="margin-top:24px;">Equipos con historial</h2>
+    <table class="tabla-revision">
+      <thead><tr><th>IMEI</th><th>MC actual</th><th>Eventos</th><th>Último evento</th><th>Fecha</th><th></th></tr></thead>
+      <tbody id="lista-todos-tbody"></tbody>
+    </table>
+  </div>
 
   <div id="linea-tiempo"></div>
 </div>

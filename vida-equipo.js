@@ -11,6 +11,60 @@ const ICONOS_EVENTO = {
 
 document.getElementById("buscar-btn").addEventListener("click", buscar);
 document.getElementById("buscar-input").addEventListener("keypress", (e) => { if (e.key === "Enter") buscar(); });
+document.getElementById("ver-todos-btn").addEventListener("click", verTodos);
+
+async function verTodos() {
+  const msg = document.getElementById("buscar-msg");
+  const listaBox = document.getElementById("lista-todos");
+  const tbody = document.getElementById("lista-todos-tbody");
+  document.getElementById("linea-tiempo").innerHTML = "";
+  msg.hidden = true;
+
+  const { data, error } = await supabaseClient
+    .from("historial_equipo")
+    .select("*")
+    .order("fecha", { ascending: false });
+
+  if (error) { mostrarMensaje(msg, "❌ " + error.message, true); return; }
+  if (!data || data.length === 0) {
+    listaBox.hidden = true;
+    mostrarMensaje(msg, "Todavía no hay ningún evento registrado.", false);
+    return;
+  }
+
+  // Agrupamos por IMEI (o por MC si ese evento no tenía IMEI todavía)
+  const grupos = {};
+  data.forEach(ev => {
+    const clave = ev.imei || ("mc:" + ev.mc);
+    if (!grupos[clave]) grupos[clave] = [];
+    grupos[clave].push(ev);
+  });
+
+  const filas = Object.values(grupos).map(eventos => {
+    const ultimo = eventos[0]; // ya viene ordenado del más nuevo al más viejo
+    return { imei: ultimo.imei, mcActual: ultimo.mc, cantidad: eventos.length, ultimo };
+  }).sort((a, b) => new Date(b.ultimo.fecha) - new Date(a.ultimo.fecha));
+
+  listaBox.hidden = false;
+  tbody.innerHTML = filas.map(f => `
+    <tr>
+      <td>${f.imei || "—"}</td>
+      <td>${f.mcActual}</td>
+      <td>${f.cantidad}</td>
+      <td>${ICONOS_EVENTO[f.ultimo.tipo_evento] || ""} ${f.ultimo.tipo_evento}</td>
+      <td>${new Date(f.ultimo.fecha).toLocaleDateString("es-ES")}</td>
+      <td><button class="btn-ver-tabla btn-ver-historial-equipo" data-valor="${f.imei || f.mcActual}">Ver historial →</button></td>
+    </tr>
+  `).join("");
+
+  tbody.querySelectorAll(".btn-ver-historial-equipo").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.getElementById("buscar-input").value = btn.dataset.valor;
+      listaBox.hidden = true;
+      buscar();
+    });
+  });
+}
 
 async function buscar() {
   const termino = document.getElementById("buscar-input").value.trim().toUpperCase();
@@ -19,6 +73,7 @@ async function buscar() {
 
   if (!termino) { mostrarMensaje(msg, "⚠️ Escribe un IMEI o un MC.", true); return; }
   contenedor.innerHTML = "";
+  document.getElementById("lista-todos").hidden = true;
   msg.hidden = true;
 
   // Si buscan por MC, primero resolvemos su IMEI actual (si lo tiene) para
