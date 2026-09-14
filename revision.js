@@ -391,8 +391,26 @@ async function guardarFila(btn) {
           .eq("m_control", mcEquipo)
           .maybeSingle();
 
+        // Si ya no está en Equipos (la plataforma lo quita al desvincular)
+        // o vino sin IMEI, buscamos el IMEI que nosotros mismos guardamos
+        // cuando ese MC se vinculó por primera vez — mientras sí estaba
+        // en la lista. Así no dependemos de exportar nada aparte.
+        let imeiFinal = equipoInfo?.imei || null;
+        if (!imeiFinal) {
+          const { data: vinculacionPrevia } = await supabaseClient
+            .from("historial_equipo")
+            .select("imei")
+            .eq("mc", mcEquipo)
+            .eq("tipo_evento", "Vinculación")
+            .not("imei", "is", null)
+            .order("fecha", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          imeiFinal = vinculacionPrevia?.imei || null;
+        }
+
         const datosEvento = {
-          imei: equipoInfo?.imei || null,
+          imei: imeiFinal,
           mc: mcEquipo,
           tipo_evento: tipoEventoNuevo,
           id_ot: componente.id_ot,
