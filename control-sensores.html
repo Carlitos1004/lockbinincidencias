@@ -63,6 +63,16 @@
   </table>
 
   <h2 style="margin-top:32px;">Historial de eventos recientes</h2>
+  <div class="materiales-controles">
+    <input type="text" id="filtro-hist-mc" placeholder="Filtrar por MC o serial...">
+    <select id="filtro-hist-tipo">
+      <option value="">Todos los eventos</option>
+      <option value="Offline detectado">Offline detectado</option>
+      <option value="Online recuperado">Online recuperado</option>
+      <option value="Desvinculado">Desvinculado</option>
+      <option value="Vinculado">Vinculado</option>
+    </select>
+  </div>
   <table class="tabla-revision">
     <thead><tr><th>Fecha</th><th>Serial</th><th>MC</th><th>Evento</th><th>OT</th></tr></thead>
     <tbody id="tbody-historial"><tr><td colspan="5">Cargando...</td></tr></tbody>

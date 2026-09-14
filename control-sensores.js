@@ -4,41 +4,73 @@
 // =========================================================================
 
 let sensoresData = [];
+let historialData = [];
 
 cargarDatos();
 
-async function cargarDatos() {
-  const [{ data: sensores, error: errorSensores }, { data: historial, error: errorHistorial }] = await Promise.all([
-    supabaseClient.from("sensores").select("*").order("fecha_actualizacion", { ascending: false }),
-    supabaseClient.from("historial_sensores").select("*").order("fecha", { ascending: false }).limit(200)
-  ]);
+async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
+  const TAM_PAGINA = 1000;
+  let desde = 0;
+  let todas = [];
+  while (true) {
+    let query = supabaseClient.from(tabla).select(columnas).range(desde, desde + TAM_PAGINA - 1);
+    if (aplicarFiltro) query = aplicarFiltro(query);
+    const { data, error } = await query;
+    if (error) throw error;
+    todas = todas.concat(data || []);
+    if (!data || data.length < TAM_PAGINA) break;
+    desde += TAM_PAGINA;
+  }
+  return todas;
+}
 
-  if (errorSensores) {
-    document.getElementById("tbody-sensores").innerHTML = `<tr><td colspan="7">Error: ${errorSensores.message}</td></tr>`;
+async function cargarDatos() {
+  try {
+    sensoresData = await traerTodasLasFilas("sensores", "*", (q) => q.order("fecha_actualizacion", { ascending: false }));
+  } catch (err) {
+    document.getElementById("tbody-sensores").innerHTML = `<tr><td colspan="7">Error: ${err.message}</td></tr>`;
     return;
   }
-
-  sensoresData = sensores || [];
   renderResumen();
   renderTablaSensores();
 
-  const tbodyHistorial = document.getElementById("tbody-historial");
-  if (errorHistorial) {
-    tbodyHistorial.innerHTML = `<tr><td colspan="4">Error: ${errorHistorial.message}</td></tr>`;
-  } else if (!historial || historial.length === 0) {
-    tbodyHistorial.innerHTML = `<tr><td colspan="5">Todavía no hay eventos registrados.</td></tr>`;
-  } else {
-    tbodyHistorial.innerHTML = historial.map(ev => `
-      <tr>
-        <td>${new Date(ev.fecha).toLocaleString("es-ES")}</td>
-        <td class="celda-mono">${ev.serial}</td>
-        <td>${ev.mc || "—"}</td>
-        <td>${ev.tipo_evento}</td>
-        <td>${ev.id_ot ? `<a href="ot-detalle.html?ot=${ev.id_ot}">${ev.id_ot}</a>` : "—"}</td>
-      </tr>
-    `).join("");
+  try {
+    historialData = await traerTodasLasFilas("historial_sensores", "*", (q) => q.order("fecha", { ascending: false }));
+  } catch (err) {
+    document.getElementById("tbody-historial").innerHTML = `<tr><td colspan="5">Error: ${err.message}</td></tr>`;
+    return;
   }
+  renderTablaHistorial();
 }
+
+function renderTablaHistorial() {
+  const fMc = document.getElementById("filtro-hist-mc").value.trim().toLowerCase();
+  const fTipo = document.getElementById("filtro-hist-tipo").value;
+
+  const filtrados = historialData.filter(ev =>
+    (!fMc || (ev.mc || "").toLowerCase().includes(fMc) || (ev.serial || "").toLowerCase().includes(fMc)) &&
+    (!fTipo || ev.tipo_evento === fTipo)
+  );
+
+  const tbodyHistorial = document.getElementById("tbody-historial");
+  if (filtrados.length === 0) {
+    tbodyHistorial.innerHTML = `<tr><td colspan="5">Ningún evento coincide.</td></tr>`;
+    return;
+  }
+  tbodyHistorial.innerHTML = filtrados.map(ev => `
+    <tr>
+      <td>${new Date(ev.fecha).toLocaleString("es-ES")}</td>
+      <td class="celda-mono">${ev.serial}</td>
+      <td>${ev.mc || "—"}</td>
+      <td>${ev.tipo_evento}</td>
+      <td>${ev.id_ot ? `<a href="ot-detalle.html?ot=${ev.id_ot}">${ev.id_ot}</a>` : "—"}</td>
+    </tr>
+  `).join("");
+}
+
+["filtro-hist-mc", "filtro-hist-tipo"].forEach(id => {
+  document.getElementById(id).addEventListener("input", renderTablaHistorial);
+});
 
 function renderResumen() {
   const online = sensoresData.filter(s => s.estado_conectividad === "ONLINE").length;
