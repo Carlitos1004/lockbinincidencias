@@ -26,7 +26,7 @@ async function cargarDatos() {
   if (errorHistorial) {
     tbodyHistorial.innerHTML = `<tr><td colspan="4">Error: ${errorHistorial.message}</td></tr>`;
   } else if (!historial || historial.length === 0) {
-    tbodyHistorial.innerHTML = `<tr><td colspan="4">Todavía no hay eventos registrados.</td></tr>`;
+    tbodyHistorial.innerHTML = `<tr><td colspan="5">Todavía no hay eventos registrados.</td></tr>`;
   } else {
     tbodyHistorial.innerHTML = historial.map(ev => `
       <tr>
@@ -34,6 +34,7 @@ async function cargarDatos() {
         <td class="celda-mono">${ev.serial}</td>
         <td>${ev.mc || "—"}</td>
         <td>${ev.tipo_evento}</td>
+        <td>${ev.id_ot ? `<a href="ot-detalle.html?ot=${ev.id_ot}">${ev.id_ot}</a>` : "—"}</td>
       </tr>
     `).join("");
   }
@@ -85,3 +86,47 @@ function renderTablaSensores() {
 ["filtro-mc", "filtro-conectividad", "filtro-vinculacion"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderTablaSensores);
 });
+
+// --- Registrar manualmente un cambio de sensor (falló uno, se puso otro) ---
+document.getElementById("registrar-cambio-btn").addEventListener("click", async () => {
+  const msg = document.getElementById("cambio-msg");
+  const mc = document.getElementById("cambio-mc").value.trim().toUpperCase();
+  const serialViejo = document.getElementById("cambio-serial-viejo").value.trim().toUpperCase();
+  const serialNuevo = document.getElementById("cambio-serial-nuevo").value.trim().toUpperCase();
+  const idOt = document.getElementById("cambio-ot").value.trim().toUpperCase() || null;
+  const notas = document.getElementById("cambio-notas").value.trim() || null;
+
+  if (!mc || !serialViejo || !serialNuevo) {
+    mostrarMensajeCambio(msg, "⚠️ Completa MC, serial viejo y serial nuevo.", true);
+    return;
+  }
+
+  const btn = document.getElementById("registrar-cambio-btn");
+  btn.disabled = true;
+  btn.textContent = "Registrando...";
+
+  const { error } = await supabaseClient.from("historial_sensores").insert([
+    { serial: serialViejo, mc: mc, tipo_evento: "Desvinculado", id_ot: idOt, notas: notas || "Reemplazado por " + serialNuevo },
+    { serial: serialNuevo, mc: mc, tipo_evento: "Vinculado", id_ot: idOt, notas: notas || "Reemplaza a " + serialViejo }
+  ]);
+
+  btn.disabled = false;
+  btn.textContent = "Registrar cambio";
+
+  if (error) {
+    mostrarMensajeCambio(msg, "❌ " + error.message, true);
+    return;
+  }
+
+  mostrarMensajeCambio(msg, "✅ Cambio registrado en el historial.", false);
+  ["cambio-mc", "cambio-serial-viejo", "cambio-serial-nuevo", "cambio-ot", "cambio-notas"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+  cargarDatos();
+});
+
+function mostrarMensajeCambio(el, texto, esError) {
+  el.textContent = texto;
+  el.className = esError ? "resultado-msg resultado-error" : "resultado-msg resultado-ok";
+  el.hidden = false;
+}

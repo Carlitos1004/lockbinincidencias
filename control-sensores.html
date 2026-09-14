@@ -29,6 +29,19 @@
 
   <div id="resumen-sensores" class="resumen-cliente"></div>
 
+  <div class="agregar-equipo-box">
+    <label><strong>🔄 Registrar cambio de sensor</strong> — para cuando uno falla y se reemplaza por otro en campo (esto no lo captura el Sheet solo).</label>
+    <div class="materiales-controles">
+      <input type="text" id="cambio-mc" placeholder="MC (ej. MC2600123)">
+      <input type="text" id="cambio-serial-viejo" placeholder="Serial que se retira">
+      <input type="text" id="cambio-serial-nuevo" placeholder="Serial nuevo">
+      <input type="text" id="cambio-ot" placeholder="OT (ej. OT-012, opcional)">
+    </div>
+    <textarea id="cambio-notas" rows="2" placeholder="Notas (opcional) — ej. motivo del cambio"></textarea>
+    <button id="registrar-cambio-btn" class="btn-primario" style="margin-top:8px;">Registrar cambio</button>
+    <p id="cambio-msg" class="resultado-msg" hidden></p>
+  </div>
+
   <div class="materiales-controles">
     <input type="text" id="filtro-mc" placeholder="Filtrar por MC...">
     <select id="filtro-conectividad">
@@ -51,8 +64,8 @@
 
   <h2 style="margin-top:32px;">Historial de eventos recientes</h2>
   <table class="tabla-revision">
-    <thead><tr><th>Fecha</th><th>Serial</th><th>MC</th><th>Evento</th></tr></thead>
-    <tbody id="tbody-historial"><tr><td colspan="4">Cargando...</td></tr></tbody>
+    <thead><tr><th>Fecha</th><th>Serial</th><th>MC</th><th>Evento</th><th>OT</th></tr></thead>
+    <tbody id="tbody-historial"><tr><td colspan="5">Cargando...</td></tr></tbody>
   </table>
 </div>
 
