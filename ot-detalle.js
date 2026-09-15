@@ -550,6 +550,7 @@ document.getElementById("agregar-componente-btn").addEventListener("click", asyn
   const mc = document.getElementById("agregar-comp-mc").value.trim().toUpperCase();
   const tipo = document.getElementById("agregar-comp-tipo").value;
   const serial = document.getElementById("agregar-comp-serial").value.trim().toUpperCase();
+  const categoria = document.getElementById("agregar-comp-categoria").value || null;
   const hallazgo = document.getElementById("agregar-comp-hallazgo").value.trim();
   const msg = document.getElementById("agregar-componente-msg");
 
@@ -568,6 +569,7 @@ document.getElementById("agregar-componente-btn").addEventListener("click", asyn
     m_control: mc || null,
     tipo_componente: tipo,
     serial_retirado: serial,
+    categoria: categoria,
     reparacion: hallazgo,
     id_registro: null, // no viene de ningún ticket
     id_ot: otActualCargada.id_ot,
@@ -587,6 +589,7 @@ document.getElementById("agregar-componente-btn").addEventListener("click", asyn
   document.getElementById("agregar-comp-mc").value = "";
   document.getElementById("agregar-comp-tipo").value = "";
   document.getElementById("agregar-comp-serial").value = "";
+  document.getElementById("agregar-comp-categoria").value = "";
   document.getElementById("agregar-comp-hallazgo").value = "";
   cargarComponentesSinTicket(otActualCargada.id_ot);
 });
