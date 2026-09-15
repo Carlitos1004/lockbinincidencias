@@ -232,18 +232,27 @@ guardarInstruccionesBtn.addEventListener("click", async () => {
 });
 
 verRutaBtn.addEventListener("click", () => {
-  const puntos = ticketsCargados
-    .map(t => t.equipos)
-    .filter(eq => eq && eq.latitud && eq.longitud)
-    .map(eq => `${eq.latitud},${eq.longitud}`);
+  const puntosConMc = ticketsCargados
+    .map(t => ({ mc: t.m_control, eq: t.equipos }))
+    .filter(p => p.eq && p.eq.latitud && p.eq.longitud);
 
-  // Quitamos duplicados (varios tickets pueden ser del mismo equipo)
-  const puntosUnicos = [...new Set(puntos)];
+  // Quitamos duplicados (varios tickets pueden ser del mismo equipo),
+  // pero conservando cuál MC corresponde a cada punto único
+  const vistos = new Set();
+  const puntosUnicosConMc = [];
+  puntosConMc.forEach(p => {
+    const clave = `${p.eq.latitud},${p.eq.longitud}`;
+    if (vistos.has(clave)) return;
+    vistos.add(clave);
+    puntosUnicosConMc.push({ mc: p.mc, coords: clave });
+  });
 
-  if (puntosUnicos.length === 0) {
+  if (puntosUnicosConMc.length === 0) {
     alert("Ninguno de los equipos de esta OT tiene coordenadas registradas.");
     return;
   }
+
+  const puntosUnicos = puntosUnicosConMc.map(p => p.coords);
 
   let origen = `${LAT_OFICINA},${LNG_OFICINA}`;
   const enlaces = [];
@@ -263,6 +272,16 @@ verRutaBtn.addEventListener("click", () => {
   if (enlaces.length > 1) {
     alert(`Esta OT tiene más paradas de las que caben en un solo link de Google Maps — se abrieron ${enlaces.length} pestañas, una por tramo, en orden.`);
   }
+
+  // Google Maps solo numera las paradas (1, 2, 3...), sin mostrar el MC —
+  // esta lista en pantalla es la referencia para saber a qué equipo
+  // corresponde cada número.
+  const listaBox = document.getElementById("lista-paradas-box");
+  const listaTbody = document.getElementById("lista-paradas-tbody");
+  listaBox.hidden = false;
+  listaTbody.innerHTML = puntosUnicosConMc.map((p, idx) => `
+    <tr><td>Parada ${idx + 1}</td><td>${p.mc}</td></tr>
+  `).join("");
 });
 
 descargarBtn.addEventListener("click", () => {
