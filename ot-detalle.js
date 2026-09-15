@@ -370,6 +370,12 @@ document.getElementById("eliminar-ot-btn").addEventListener("click", async () =>
     await supabaseClient.from("materiales_ot").delete().eq("id_ot", idOt);
     await supabaseClient.from("historial_fallas").delete().eq("id_ot", idOt);
 
+    // Si otros tickets (de OTRA OT) estaban vinculados a esta como
+    // pendiente traído/compartido, hay que soltar esa referencia — si no,
+    // queda huérfana y puede "resucitar" sola si en el futuro se crea otra
+    // OT con este mismo número.
+    await supabaseClient.from("historial_fallas").update({ id_ot_relacionada: null }).eq("id_ot_relacionada", idOt);
+
     const { data: filasBorradas, error } = await supabaseClient
       .from("ordenes_trabajo")
       .delete()

@@ -62,21 +62,25 @@
     <tbody id="tbody-sensores"><tr><td colspan="7">Cargando...</td></tr></tbody>
   </table>
 
-  <h2 style="margin-top:32px;">Historial de eventos recientes</h2>
-  <div class="materiales-controles">
-    <input type="text" id="filtro-hist-mc" placeholder="Filtrar por MC o serial...">
-    <select id="filtro-hist-tipo">
-      <option value="">Todos los eventos</option>
-      <option value="Offline detectado">Offline detectado</option>
-      <option value="Online recuperado">Online recuperado</option>
-      <option value="Desvinculado">Desvinculado</option>
-      <option value="Vinculado">Vinculado</option>
-    </select>
+  <button id="toggle-historial-btn" class="btn-secundario" style="margin-top:24px;">📜 Ver historial de eventos</button>
+
+  <div id="historial-box" hidden>
+    <h2 style="margin-top:20px;">Historial de eventos</h2>
+    <div class="materiales-controles">
+      <input type="text" id="filtro-hist-mc" placeholder="Filtrar por MC o serial...">
+      <select id="filtro-hist-tipo">
+        <option value="">Todos los eventos</option>
+        <option value="Offline detectado">Offline detectado</option>
+        <option value="Online recuperado">Online recuperado</option>
+        <option value="Desvinculado">Desvinculado</option>
+        <option value="Vinculado">Vinculado</option>
+      </select>
+    </div>
+    <table class="tabla-revision">
+      <thead><tr><th>Fecha</th><th>Serial</th><th>MC</th><th>Evento</th><th>OT</th></tr></thead>
+      <tbody id="tbody-historial"><tr><td colspan="5">Cargando...</td></tr></tbody>
+    </table>
   </div>
-  <table class="tabla-revision">
-    <thead><tr><th>Fecha</th><th>Serial</th><th>MC</th><th>Evento</th><th>OT</th></tr></thead>
-    <tbody id="tbody-historial"><tr><td colspan="5">Cargando...</td></tr></tbody>
-  </table>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

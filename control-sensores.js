@@ -33,15 +33,29 @@ async function cargarDatos() {
   }
   renderResumen();
   renderTablaSensores();
-
-  try {
-    historialData = await traerTodasLasFilas("historial_sensores", "*", (q) => q.order("fecha", { ascending: false }));
-  } catch (err) {
-    document.getElementById("tbody-historial").innerHTML = `<tr><td colspan="5">Error: ${err.message}</td></tr>`;
-    return;
-  }
-  renderTablaHistorial();
 }
+
+let historialYaCargado = false;
+
+document.getElementById("toggle-historial-btn").addEventListener("click", async () => {
+  const box = document.getElementById("historial-box");
+  const btn = document.getElementById("toggle-historial-btn");
+  const seVaAMostrar = box.hidden;
+
+  box.hidden = !seVaAMostrar;
+  btn.textContent = seVaAMostrar ? "📜 Ocultar historial de eventos" : "📜 Ver historial de eventos";
+
+  if (seVaAMostrar && !historialYaCargado) {
+    document.getElementById("tbody-historial").innerHTML = `<tr><td colspan="5">Cargando...</td></tr>`;
+    try {
+      historialData = await traerTodasLasFilas("historial_sensores", "*", (q) => q.order("fecha", { ascending: false }));
+      historialYaCargado = true;
+      renderTablaHistorial();
+    } catch (err) {
+      document.getElementById("tbody-historial").innerHTML = `<tr><td colspan="5">Error: ${err.message}</td></tr>`;
+    }
+  }
+});
 
 function renderTablaHistorial() {
   const fMc = document.getElementById("filtro-hist-mc").value.trim().toLowerCase();
