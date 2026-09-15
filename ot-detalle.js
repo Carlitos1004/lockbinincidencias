@@ -4,6 +4,9 @@
 
 // TODO: ajustar a la ubicación real de tu oficina/almacén (usada como
 // punto de partida para calcular la ruta)
+// Ya no se usan (el botón de ruta ahora exporta CSV para My Maps en vez de
+// abrir enlaces de Google Maps con paradas) — se dejan aquí por si en
+// algún momento se vuelve a necesitar ese enfoque.
 const LAT_OFICINA = 42.2985;
 const LNG_OFICINA = -7.8180;
 const MAX_PARADAS_POR_LINK = 7; // límite práctico de Google Maps por link
@@ -244,7 +247,7 @@ verRutaBtn.addEventListener("click", () => {
     const clave = `${p.eq.latitud},${p.eq.longitud}`;
     if (vistos.has(clave)) return;
     vistos.add(clave);
-    puntosUnicosConMc.push({ mc: p.mc, coords: clave });
+    puntosUnicosConMc.push({ mc: p.mc, lat: p.eq.latitud, lng: p.eq.longitud });
   });
 
   if (puntosUnicosConMc.length === 0) {
@@ -252,36 +255,26 @@ verRutaBtn.addEventListener("click", () => {
     return;
   }
 
-  const puntosUnicos = puntosUnicosConMc.map(p => p.coords);
+  // CSV para importar en Google My Maps (mymaps.google.com) — ahí sí
+  // aparece el nombre real (el MC) en cada pin dentro del mapa.
+  const encabezado = "Name,Latitude,Longitude";
+  const filas = puntosUnicosConMc.map(p => `${p.mc},${p.lat},${p.lng}`);
+  const csv = [encabezado, ...filas].join("\n");
 
-  let origen = `${LAT_OFICINA},${LNG_OFICINA}`;
-  const enlaces = [];
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const enlaceDescarga = document.createElement("a");
+  enlaceDescarga.href = URL.createObjectURL(blob);
+  enlaceDescarga.download = `Ruta_${otActualCargada.id_ot}_MyMaps.csv`;
+  enlaceDescarga.click();
 
-  for (let i = 0; i < puntosUnicos.length; i += MAX_PARADAS_POR_LINK) {
-    const tramo = puntosUnicos.slice(i, i + MAX_PARADAS_POR_LINK);
-    const destino = tramo[tramo.length - 1];
-    const paradas = tramo.slice(0, -1);
-
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origen)}&destination=${encodeURIComponent(destino)}&travelmode=driving`;
-    if (paradas.length > 0) url += `&waypoints=${encodeURIComponent(paradas.join("|"))}`;
-    enlaces.push(url);
-    origen = destino;
-  }
-
-  enlaces.forEach(url => window.open(url, "_blank"));
-  if (enlaces.length > 1) {
-    alert(`Esta OT tiene más paradas de las que caben en un solo link de Google Maps — se abrieron ${enlaces.length} pestañas, una por tramo, en orden.`);
-  }
-
-  // Google Maps solo numera las paradas (1, 2, 3...), sin mostrar el MC —
-  // esta lista en pantalla es la referencia para saber a qué equipo
-  // corresponde cada número.
-  const listaBox = document.getElementById("lista-paradas-box");
-  const listaTbody = document.getElementById("lista-paradas-tbody");
-  listaBox.hidden = false;
-  listaTbody.innerHTML = puntosUnicosConMc.map((p, idx) => `
-    <tr><td>Parada ${idx + 1}</td><td>${p.mc}</td></tr>
-  `).join("");
+  alert(
+    `Se descargó el archivo con ${puntosUnicosConMc.length} equipo(s).\n\n` +
+    `Para verlo con nombres en el mapa:\n` +
+    `1. Entra a mymaps.google.com\n` +
+    `2. Crea un mapa nuevo (o abre uno existente)\n` +
+    `3. "Importar" → sube este archivo CSV\n` +
+    `4. Comparte el enlace del mapa con el operario`
+  );
 });
 
 descargarBtn.addEventListener("click", () => {
