@@ -89,7 +89,30 @@ async function buscar() {
       porOt[ot].push({ ticket: null, componentes: [c] });
     });
 
-    renderResultados(porOt);
+    // Info adicional del/los MC involucrados: fecha de instalación (de la
+    // lista de Equipos actual, si sigue ahí) y su línea de tiempo de
+    // vinculación/desvinculación (de Vida del Equipo)
+    const mcsInvolucrados = [...new Set([
+      ...todosLosTickets.map(t => t.m_control),
+      ...(componentes || []).map(c => c.m_control)
+    ].filter(Boolean))];
+
+    let infoEquipos = {};
+    if (mcsInvolucrados.length > 0) {
+      const [{ data: equiposInfo }, { data: eventosEquipo }] = await Promise.all([
+        supabaseClient.from("equipos").select("m_control, fecha_instalacion, fecha_fabricacion, imei").in("m_control", mcsInvolucrados),
+        supabaseClient.from("historial_equipo").select("*").in("mc", mcsInvolucrados).order("fecha", { ascending: true })
+      ]);
+
+      mcsInvolucrados.forEach(mc => {
+        infoEquipos[mc] = {
+          equipo: (equiposInfo || []).find(e => e.m_control === mc) || null,
+          eventos: (eventosEquipo || []).filter(ev => ev.mc === mc)
+        };
+      });
+    }
+
+    renderResultados(porOt, infoEquipos);
   } catch (err) {
     mostrarMensaje("❌ " + err.message, true);
   } finally {
@@ -98,10 +121,46 @@ async function buscar() {
   }
 }
 
-function renderResultados(porOt) {
+const ICONOS_EVENTO_EQUIPO = {
+  "Vinculación": "🔗",
+  "Desvinculación": "🔓",
+  "Enviado a AMMI": "📦",
+  "Regresó de AMMI": "↩️"
+};
+
+function renderResultados(porOt, infoEquipos = {}) {
   const ots = Object.keys(porOt).sort();
 
-  resultados.innerHTML = `<p class="resultado-msg resultado-ok" style="display:block;">Se encontró en ${ots.length} OT.</p>` +
+  const mcsConInfo = Object.keys(infoEquipos);
+  const bloqueInfoEquipos = mcsConInfo.map(mc => {
+    const info = infoEquipos[mc];
+    const eq = info.equipo;
+    const tieneAlgo = eq?.fecha_instalacion || eq?.fecha_fabricacion || info.eventos.length > 0;
+    if (!tieneAlgo) return "";
+
+    const fechas = [
+      eq?.fecha_instalacion ? `Instalado: ${new Date(eq.fecha_instalacion).toLocaleDateString("es-ES")}` : null,
+      eq?.fecha_fabricacion ? `Fabricado: ${new Date(eq.fecha_fabricacion).toLocaleDateString("es-ES")}` : null
+    ].filter(Boolean).join(" · ");
+
+    const lineaEventos = info.eventos.map(ev => `
+      <div class="resultado-sublinea">
+        ${ICONOS_EVENTO_EQUIPO[ev.tipo_evento] || "•"} ${ev.tipo_evento} — ${new Date(ev.fecha).toLocaleDateString("es-ES")}
+        ${ev.id_ot ? ` (<a href="ot-detalle.html?ot=${ev.id_ot}">${ev.id_ot}</a>)` : ""}
+      </div>
+    `).join("");
+
+    return `
+      <div class="resultado-info-equipo">
+        <strong>📋 ${mc}</strong>${fechas ? " — " + fechas : ""}
+        ${lineaEventos}
+      </div>
+    `;
+  }).join("");
+
+  resultados.innerHTML =
+    bloqueInfoEquipos +
+    `<p class="resultado-msg resultado-ok" style="display:block;">Se encontró en ${ots.length} OT.</p>` +
     ots.map((ot, idx) => {
       const entradas = porOt[ot];
       const cliente = entradas.find(e => e.ticket?.cliente)?.ticket?.cliente

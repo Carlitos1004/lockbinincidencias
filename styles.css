@@ -875,6 +875,14 @@ td[colspan] {
 
 /* --- Buscador por serial --- */
 
+.resultado-info-equipo {
+  background: var(--verde-claro);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  font-size: 0.88rem;
+}
+
 .resultado-ot {
   border: 1.5px solid var(--gris-200);
   border-radius: 10px;
