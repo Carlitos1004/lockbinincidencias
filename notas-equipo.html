@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Notas de Equipo</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Notas de Equipo</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Notas libres por equipo (ej. "se le hizo cambio de SIM el 5/9", "no visitar hasta nueva orden"). Las notas activas se muestran solas al generar una OT nueva para ese equipo, en Gestión de Equipos.</p>
+
+  <div class="agregar-equipo-box">
+    <label><strong>Agregar nota</strong></label>
+    <div class="materiales-controles">
+      <input type="text" id="nota-mc" placeholder="MC (ej. MC2600123)">
+    </div>
+    <textarea id="nota-texto" rows="2" placeholder="Ej: Cambio de SIM realizado el 5/9. O: No visitar, cliente en obra hasta octubre."></textarea>
+    <button id="agregar-nota-btn" class="btn-primario" style="margin-top:8px;">Guardar nota</button>
+    <p id="nota-msg" class="resultado-msg" hidden></p>
+  </div>
+
+  <div class="materiales-controles" style="margin-top:20px;">
+    <input type="text" id="filtro-notas-mc" placeholder="Filtrar por MC...">
+    <select id="filtro-notas-estado">
+      <option value="activas">Solo activas</option>
+      <option value="todas">Todas (incluidas inactivas)</option>
+    </select>
+  </div>
+
+  <table class="tabla-revision">
+    <thead><tr><th>MC</th><th>Nota</th><th>Autor</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
+    <tbody id="notas-tbody"><tr><td colspan="6">Cargando...</td></tr></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="notas-equipo.js"></script>
+</body>
+</html>

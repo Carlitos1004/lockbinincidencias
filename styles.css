@@ -1356,6 +1356,13 @@ input[type="file"]::file-selector-button:hover {
   font-weight: 600;
 }
 
+.columnas-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin-top: 8px;
+}
+
 .tabs-vista {
   display: flex;
   gap: 8px;

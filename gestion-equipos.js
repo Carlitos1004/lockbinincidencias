@@ -60,6 +60,8 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
 }
 
 let equiposEncontrados = []; // [{m_control, fraccion, cliente, fallas: [...]}]
+let notasPorMC = {}; // {mc: [nota1, nota2, ...]}
+let historialPorMC = {}; // {mc: [{falla, accion_calle, comentarios, fecha, id_ot}, ...]} últimas 3
 
 const clienteSelect = document.getElementById("cliente-select");
 const filtrarBtn = document.getElementById("filtrar-btn");
@@ -140,21 +142,67 @@ filtrarBtn.addEventListener("click", async () => {
     return;
   }
 
+  // Traemos las notas ACTIVAS de estos equipos, para avisar antes de
+  // incluirlos en la OT nueva (ej. "no visitar", "ya se le hizo tal cosa")
+  const mcsEncontrados = equiposEncontrados.map(e => e.m_control);
+  const { data: notas } = await supabaseClient
+    .from("notas_equipo")
+    .select("mc, nota")
+    .in("mc", mcsEncontrados)
+    .eq("activa", true);
+
+  notasPorMC = {};
+  (notas || []).forEach(n => {
+    if (!notasPorMC[n.mc]) notasPorMC[n.mc] = [];
+    notasPorMC[n.mc].push(n.nota);
+  });
+
+  // Traemos el historial de OT anteriores de estos equipos — solo
+  // informativo, para tenerlo a la vista sin salir de esta pantalla
+  const { data: historial } = await supabaseClient
+    .from("historial_fallas")
+    .select("m_control, falla, accion_calle, comentarios, fecha, id_ot")
+    .in("m_control", mcsEncontrados)
+    .order("fecha", { ascending: false });
+
+  historialPorMC = {};
+  (historial || []).forEach(h => {
+    if (!historialPorMC[h.m_control]) historialPorMC[h.m_control] = [];
+    if (historialPorMC[h.m_control].length < 3) historialPorMC[h.m_control].push(h);
+  });
+
   renderTabla();
   resultadoFiltro.hidden = false;
 });
 
 function renderTabla() {
   totalEncontrados.textContent = `${equiposEncontrados.length} equipos encontrados`;
-  tbody.innerHTML = equiposEncontrados.map((eq, idx) => `
-    <tr>
+  tbody.innerHTML = equiposEncontrados.map((eq, idx) => {
+    const notas = notasPorMC[eq.m_control];
+    const celdaNota = notas && notas.length > 0
+      ? `<span style="color:#c0392b; font-weight:600;">⚠️ ${notas.join(" · ")}</span>`
+      : "—";
+
+    const historial = historialPorMC[eq.m_control];
+    const celdaHistorial = historial && historial.length > 0
+      ? historial.map(h => {
+          const accion = [h.accion_calle, h.comentarios].filter(Boolean).join(" — ") || "sin acción registrada";
+          return `<div style="font-size:0.78rem; margin-bottom:2px;">📅 ${new Date(h.fecha).toLocaleDateString("es-ES")} (<a href="ot-detalle.html?ot=${h.id_ot}">${h.id_ot}</a>) — ${h.falla}: ${accion}</div>`;
+        }).join("")
+      : `<span style="color:var(--gris-700); font-size:0.8rem;">Sin historial previo</span>`;
+
+    return `
+    <tr class="${notas ? 'fila-alerta' : ''}">
       <td><input type="checkbox" class="check-equipo" data-idx="${idx}" checked></td>
       <td>${eq.m_control}</td>
       <td>${eq.estado_montaje || "—"}</td>
       <td>${eq.fraccion || "—"}</td>
       <td>${eq.fallas.join(", ")}</td>
+      <td>${celdaNota}</td>
+      <td>${celdaHistorial}</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 }
 
 checkTodos.addEventListener("change", () => {

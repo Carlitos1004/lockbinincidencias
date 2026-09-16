@@ -29,7 +29,24 @@
 
   <div class="materiales-controles">
     <select id="cliente-select"><option value="">Cargando clientes...</option></select>
+    <button id="toggle-columnas-btn" class="btn-secundario">⚙️ Columnas</button>
   </div>
+
+  <div id="columnas-panel" class="agregar-equipo-box" hidden>
+    <label><strong>Columnas visibles</strong></label>
+    <div class="columnas-checklist">
+      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="mc" checked> M. de Control</label>
+      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="fraccion" checked> Fracción</label>
+      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="modelo" checked> Modelo</label>
+      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="estado" checked> Estado Montaje</label>
+      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="lector" checked> Serie Lector</label>
+      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="cierre" checked> Serie Cierre</label>
+      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="bateria" checked> Serie Batería</label>
+      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="firmware" checked> Firmware</label>
+      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="imei" checked> IMEI</label>
+    </div>
+  </div>
+
   <p id="cargar-msg" class="resultado-msg" hidden></p>
 
   <p id="total-equipos" style="font-weight:600; margin-top:16px;"></p>
@@ -37,19 +54,19 @@
   <table class="tabla-revision" id="tabla-equipos">
     <thead>
       <tr>
-        <th>M. de Control</th><th>Fracción</th><th>Modelo</th><th>Estado Montaje</th>
-        <th>Serie Lector</th><th>Serie Cierre</th><th>Serie Batería</th><th>Firmware</th><th>IMEI</th>
+        <th data-col="mc">M. de Control</th><th data-col="fraccion">Fracción</th><th data-col="modelo">Modelo</th><th data-col="estado">Estado Montaje</th>
+        <th data-col="lector">Serie Lector</th><th data-col="cierre">Serie Cierre</th><th data-col="bateria">Serie Batería</th><th data-col="firmware">Firmware</th><th data-col="imei">IMEI</th>
       </tr>
       <tr class="fila-filtros">
-        <th><input type="text" id="f-mc" placeholder="Filtrar..."></th>
-        <th><input type="text" id="f-fraccion" placeholder="Filtrar..."></th>
-        <th><input type="text" id="f-modelo" placeholder="Filtrar..."></th>
-        <th><input type="text" id="f-estado" placeholder="Filtrar..."></th>
-        <th><input type="text" id="f-lector" placeholder="Filtrar..."></th>
-        <th><input type="text" id="f-cierre" placeholder="Filtrar..."></th>
-        <th><input type="text" id="f-bateria" placeholder="Filtrar..."></th>
-        <th><input type="text" id="f-firmware" placeholder="Filtrar..."></th>
-        <th><input type="text" id="f-imei" placeholder="Filtrar..."></th>
+        <th data-col="mc"><input type="text" id="f-mc" placeholder="Filtrar..."></th>
+        <th data-col="fraccion"><input type="text" id="f-fraccion" placeholder="Filtrar..."></th>
+        <th data-col="modelo"><input type="text" id="f-modelo" placeholder="Filtrar..."></th>
+        <th data-col="estado"><input type="text" id="f-estado" placeholder="Filtrar..."></th>
+        <th data-col="lector"><input type="text" id="f-lector" placeholder="Filtrar..."></th>
+        <th data-col="cierre"><input type="text" id="f-cierre" placeholder="Filtrar..."></th>
+        <th data-col="bateria"><input type="text" id="f-bateria" placeholder="Filtrar..."></th>
+        <th data-col="firmware"><input type="text" id="f-firmware" placeholder="Filtrar..."></th>
+        <th data-col="imei"><input type="text" id="f-imei" placeholder="Filtrar..."></th>
       </tr>
     </thead>
     <tbody id="equipos-tbody"><tr><td colspan="9">Elige un cliente arriba.</td></tr></tbody>

@@ -97,19 +97,59 @@ function renderTabla() {
 
   tbody.innerHTML = filtrados.map(e => `
     <tr>
-      <td>${e.m_control}</td>
-      <td>${e.fraccion || "—"}</td>
-      <td>${e.modelo || "—"}</td>
-      <td>${e.estado_montaje || "—"}</td>
-      <td class="celda-mono">${e.serie_lector || "—"}</td>
-      <td class="celda-mono">${e.serie_cierre || "—"}</td>
-      <td class="celda-mono">${e.serie_bateria || "—"}</td>
-      <td>${e.firmware || "—"}</td>
-      <td class="celda-mono">${e.imei || "—"}</td>
+      <td data-col="mc">${e.m_control}</td>
+      <td data-col="fraccion">${e.fraccion || "—"}</td>
+      <td data-col="modelo">${e.modelo || "—"}</td>
+      <td data-col="estado">${e.estado_montaje || "—"}</td>
+      <td data-col="lector" class="celda-mono">${e.serie_lector || "—"}</td>
+      <td data-col="cierre" class="celda-mono">${e.serie_cierre || "—"}</td>
+      <td data-col="bateria" class="celda-mono">${e.serie_bateria || "—"}</td>
+      <td data-col="firmware">${e.firmware || "—"}</td>
+      <td data-col="imei" class="celda-mono">${e.imei || "—"}</td>
     </tr>
   `).join("");
+
+  aplicarColumnasVisibles();
 }
 
 ["f-mc", "f-fraccion", "f-modelo", "f-estado", "f-lector", "f-cierre", "f-bateria", "f-firmware", "f-imei"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderTabla);
 });
+
+// --- Columnas visibles: se guardan en el navegador, para no repetir la
+// elección cada vez que entras ---
+const CLAVE_COLUMNAS = "lockbin_columnas_equipos_cliente";
+
+document.getElementById("toggle-columnas-btn").addEventListener("click", () => {
+  const panel = document.getElementById("columnas-panel");
+  panel.hidden = !panel.hidden;
+});
+
+function cargarPreferenciaColumnas() {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(CLAVE_COLUMNAS) || "{}");
+    document.querySelectorAll(".check-columna").forEach(chk => {
+      if (guardado[chk.dataset.col] === false) chk.checked = false;
+    });
+  } catch (e) { /* si algo sale mal, se queda con todas visibles */ }
+}
+
+function aplicarColumnasVisibles() {
+  document.querySelectorAll(".check-columna").forEach(chk => {
+    const visible = chk.checked;
+    document.querySelectorAll(`[data-col="${chk.dataset.col}"]`).forEach(celda => {
+      celda.style.display = visible ? "" : "none";
+    });
+  });
+}
+
+document.querySelectorAll(".check-columna").forEach(chk => {
+  chk.addEventListener("change", () => {
+    aplicarColumnasVisibles();
+    const estado = {};
+    document.querySelectorAll(".check-columna").forEach(c => { estado[c.dataset.col] = c.checked; });
+    localStorage.setItem(CLAVE_COLUMNAS, JSON.stringify(estado));
+  });
+});
+
+cargarPreferenciaColumnas();
