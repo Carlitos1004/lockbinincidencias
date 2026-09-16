@@ -201,14 +201,25 @@ async function registrarLote(filas) {
 }
 
 document.getElementById("registrar-pegados-btn").addEventListener("click", () => {
-  const texto = document.getElementById("pegar-textarea").value;
-  const lineas = texto.split("\n").map(l => l.trim()).filter(Boolean);
-  const filas = lineas.map(l => {
-    const [serial, categoria] = l.split(",").map(p => p.trim());
-    return { serial, categoria };
-  });
+  const textarea1ra = document.getElementById("escaneo-1ra-textarea");
+  const textarea2da = document.getElementById("escaneo-2da-textarea");
+
+  const lineas1ra = textarea1ra.value.split("\n").map(l => l.trim()).filter(Boolean);
+  const lineas2da = textarea2da.value.split("\n").map(l => l.trim()).filter(Boolean);
+
+  const filas = [
+    ...lineas1ra.map(serial => ({ serial, categoria: "1ra categoría" })),
+    ...lineas2da.map(serial => ({ serial, categoria: "2da categoría" }))
+  ];
+
+  if (filas.length === 0) {
+    mostrarMensaje(document.getElementById("registro-msg"), "⚠️ Escanea al menos un serial en alguno de los 2 cuadros.", true);
+    return;
+  }
+
   registrarLote(filas);
-  document.getElementById("pegar-textarea").value = "";
+  textarea1ra.value = "";
+  textarea2da.value = "";
 });
 
 document.getElementById("subir-excel-btn").addEventListener("click", async () => {
@@ -265,3 +276,20 @@ async function sincronizarLlevados(idOt) {
   await supabaseClient.from("materiales_ot").upsert(filas, { onConflict: "id_ot,tipo_componente" });
   await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: idOt });
 }
+
+// Si la pistola lectora está configurada para mandar Tab en vez de Enter
+// al terminar cada código, el navegador movería el foco al siguiente
+// campo (perdiendo el escaneo). Esto lo intercepta y lo convierte en un
+// salto de línea normal, manteniendo el cursor en el mismo cuadro.
+["escaneo-1ra-textarea", "escaneo-2da-textarea"].forEach(id => {
+  const campo = document.getElementById(id);
+  campo.addEventListener("keydown", (e) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const inicio = campo.selectionStart;
+      const fin = campo.selectionEnd;
+      campo.value = campo.value.slice(0, inicio) + "\n" + campo.value.slice(fin);
+      campo.selectionStart = campo.selectionEnd = inicio + 1;
+    }
+  });
+});

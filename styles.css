@@ -1356,6 +1356,21 @@ input[type="file"]::file-selector-button:hover {
   font-weight: 600;
 }
 
+.fila-categorias-escaneo {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.fila-categorias-escaneo .agregar-equipo-box {
+  flex: 1;
+  min-width: 240px;
+}
+
+.fila-categorias-escaneo textarea {
+  font-family: var(--fuente-mono);
+}
+
 .linea-tiempo-lista {
   display: flex;
   flex-direction: column;

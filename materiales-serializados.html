@@ -35,14 +35,19 @@
   <p id="cargar-msg" class="resultado-msg" hidden></p>
 
   <div id="contenido" hidden>
-    <h2 style="margin-top:28px;">Registrar seriales que salen (uno por línea)</h2>
-    <div class="agregar-equipo-box">
-      <textarea id="pegar-textarea" rows="6" placeholder="BA2500320, 1ra categoría
-CE2500914, 2da categoría
-LE2500642, 1ra categoría"></textarea>
-      <p style="font-size:0.8rem; color:var(--gris-700); margin:6px 0;">Formato: <span class="celda-mono">Serial, Categoría</span> — un componente por línea. El tipo (Lector/Cierre/Módulo) se detecta solo por el prefijo del serial (LE/CE/MC). Las baterías (BA) quedan pendientes de clasificar Recargable/No Recargable, abajo.</p>
-      <button id="registrar-pegados-btn" class="btn-primario">Registrar estos seriales</button>
+    <h2 style="margin-top:28px;">Escanear seriales (pistola lectora)</h2>
+    <p style="font-size:0.8rem; color:var(--gris-700); margin:0 0 12px;">Haz clic en el cuadro que corresponda y empieza a escanear — cada disparo agrega una línea sola. El tipo (Lector/Cierre/Módulo) se detecta por el prefijo del serial (LE/CE/MC). Las baterías (BA) quedan pendientes de clasificar Recargable/No Recargable, abajo.</p>
+    <div class="fila-categorias-escaneo">
+      <div class="agregar-equipo-box">
+        <label><strong>🟢 1ra categoría</strong></label>
+        <textarea id="escaneo-1ra-textarea" rows="8" placeholder="Escanea aquí..."></textarea>
+      </div>
+      <div class="agregar-equipo-box">
+        <label><strong>🔵 2da categoría</strong></label>
+        <textarea id="escaneo-2da-textarea" rows="8" placeholder="Escanea aquí..."></textarea>
+      </div>
     </div>
+    <button id="registrar-pegados-btn" class="btn-primario" style="margin-top:10px;">Registrar todos</button>
 
     <h2 style="margin-top:28px;">O sube un Excel</h2>
     <p style="font-size:0.85rem; color:var(--gris-700);">2 columnas: <strong>Serial</strong> y <strong>Categoría</strong> (encabezados exactos en la primera fila).</p>
