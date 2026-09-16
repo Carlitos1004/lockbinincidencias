@@ -697,6 +697,16 @@ body {
   font-size: 0.85rem;
 }
 
+.tabla-revision td a {
+  color: var(--verde-oscuro);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tabla-revision td a:hover {
+  text-decoration: underline;
+}
+
 .tabla-revision th, .tabla-revision td {
   text-align: left;
   padding: 10px 12px;
