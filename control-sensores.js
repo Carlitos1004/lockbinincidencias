@@ -37,15 +37,18 @@ async function cargarDatos() {
 
 let historialYaCargado = false;
 
-document.getElementById("toggle-historial-btn").addEventListener("click", async () => {
-  const box = document.getElementById("historial-box");
-  const btn = document.getElementById("toggle-historial-btn");
-  const seVaAMostrar = box.hidden;
+document.getElementById("tab-estado-btn").addEventListener("click", () => cambiarPestana("estado"));
+document.getElementById("tab-historial-btn").addEventListener("click", () => cambiarPestana("historial"));
 
-  box.hidden = !seVaAMostrar;
-  btn.textContent = seVaAMostrar ? "📜 Ocultar historial de eventos" : "📜 Ver historial de eventos";
+async function cambiarPestana(cual) {
+  const esEstado = cual === "estado";
 
-  if (seVaAMostrar && !historialYaCargado) {
+  document.getElementById("vista-estado-box").hidden = !esEstado;
+  document.getElementById("historial-box").hidden = esEstado;
+  document.getElementById("tab-estado-btn").classList.toggle("tab-vista-activa", esEstado);
+  document.getElementById("tab-historial-btn").classList.toggle("tab-vista-activa", !esEstado);
+
+  if (!esEstado && !historialYaCargado) {
     document.getElementById("tbody-historial").innerHTML = `<tr><td colspan="5">Cargando...</td></tr>`;
     try {
       historialData = await traerTodasLasFilas("historial_sensores", "*", (q) => q.order("fecha", { ascending: false }));
@@ -55,7 +58,7 @@ document.getElementById("toggle-historial-btn").addEventListener("click", async 
       document.getElementById("tbody-historial").innerHTML = `<tr><td colspan="5">Error: ${err.message}</td></tr>`;
     }
   }
-});
+}
 
 function renderTablaHistorial() {
   const fMc = document.getElementById("filtro-hist-mc").value.trim().toLowerCase();

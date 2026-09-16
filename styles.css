@@ -1356,6 +1356,35 @@ input[type="file"]::file-selector-button:hover {
   font-weight: 600;
 }
 
+.tabs-vista {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  border-bottom: 2px solid var(--gris-200);
+}
+
+.tab-vista-btn {
+  padding: 10px 18px;
+  border: none;
+  background: none;
+  font-family: var(--fuente-titulo);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--gris-700);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+
+.tab-vista-btn:hover {
+  color: var(--verde-oscuro);
+}
+
+.tab-vista-btn.tab-vista-activa {
+  color: var(--verde-oscuro);
+  border-bottom-color: var(--verde-medio);
+}
+
 .fila-categorias-escaneo {
   display: flex;
   gap: 16px;
