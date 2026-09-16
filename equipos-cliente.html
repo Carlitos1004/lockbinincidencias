@@ -33,44 +33,23 @@
   </div>
 
   <div id="columnas-panel" class="agregar-equipo-box" hidden>
-    <label><strong>Columnas visibles</strong></label>
-    <div class="columnas-checklist">
-      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="mc" checked> M. de Control</label>
-      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="fraccion" checked> Fracción</label>
-      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="modelo" checked> Modelo</label>
-      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="estado" checked> Estado Montaje</label>
-      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="lector" checked> Serie Lector</label>
-      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="cierre" checked> Serie Cierre</label>
-      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="bateria" checked> Serie Batería</label>
-      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="firmware" checked> Firmware</label>
-      <label class="opcion-check"><input type="checkbox" class="check-columna" data-col="imei" checked> IMEI</label>
+    <div class="materiales-controles" style="margin-bottom:10px;">
+      <label><strong>Columnas visibles</strong></label>
+      <button id="marcar-todas-btn" class="btn-secundario">Marcar todas</button>
+      <button id="desmarcar-todas-btn" class="btn-secundario">Desmarcar todas</button>
     </div>
+    <div class="columnas-checklist" id="columnas-checklist"></div>
   </div>
 
   <p id="cargar-msg" class="resultado-msg" hidden></p>
-
   <p id="total-equipos" style="font-weight:600; margin-top:16px;"></p>
 
-  <table class="tabla-revision" id="tabla-equipos">
-    <thead>
-      <tr>
-        <th data-col="mc">M. de Control</th><th data-col="fraccion">Fracción</th><th data-col="modelo">Modelo</th><th data-col="estado">Estado Montaje</th>
-        <th data-col="lector">Serie Lector</th><th data-col="cierre">Serie Cierre</th><th data-col="bateria">Serie Batería</th><th data-col="firmware">Firmware</th><th data-col="imei">IMEI</th>
-      </tr>
-      <tr class="fila-filtros">
-        <th data-col="mc"><input type="text" id="f-mc" placeholder="Filtrar..."></th>
-        <th data-col="fraccion"><input type="text" id="f-fraccion" placeholder="Filtrar..."></th>
-        <th data-col="modelo"><input type="text" id="f-modelo" placeholder="Filtrar..."></th>
-        <th data-col="estado"><input type="text" id="f-estado" placeholder="Filtrar..."></th>
-        <th data-col="lector"><input type="text" id="f-lector" placeholder="Filtrar..."></th>
-        <th data-col="cierre"><input type="text" id="f-cierre" placeholder="Filtrar..."></th>
-        <th data-col="bateria"><input type="text" id="f-bateria" placeholder="Filtrar..."></th>
-        <th data-col="firmware"><input type="text" id="f-firmware" placeholder="Filtrar..."></th>
-        <th data-col="imei"><input type="text" id="f-imei" placeholder="Filtrar..."></th>
-      </tr>
-    </thead>
-    <tbody id="equipos-tbody"><tr><td colspan="9">Elige un cliente arriba.</td></tr></tbody>
-  </table>
+  <div style="overflow-x:auto;">
+    <table class="tabla-revision" id="tabla-equipos">
+      <thead id="tabla-equipos-head"></thead>
+      <tbody id="equipos-tbody"><tr><td>Elige un cliente arriba.</td></tr></tbody>
+    </table>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

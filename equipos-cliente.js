@@ -1,9 +1,65 @@
 // =========================================================================
-// EQUIPOS POR CLIENTE — solo lectura, con filtro por columna
+// EQUIPOS POR CLIENTE — solo lectura, con TODAS las columnas de la tabla
+// equipos disponibles para elegir, no un subconjunto fijo.
 // =========================================================================
 
-let equiposCargados = [];
+const TODAS_LAS_COLUMNAS = [
+  { key: "m_control", label: "M. de Control" },
+  { key: "cliente", label: "Cliente" },
+  { key: "fraccion", label: "Fracción" },
+  { key: "modelo", label: "Modelo" },
+  { key: "estado", label: "Estado" },
+  { key: "estado_montaje", label: "Estado Montaje" },
+  { key: "serie_lector", label: "Serie Lector" },
+  { key: "serie_cierre", label: "Serie Cierre" },
+  { key: "serie_bateria", label: "Serie Batería" },
+  { key: "serie_contenedor", label: "Serie Contenedor" },
+  { key: "modelo_lector", label: "Modelo Lector" },
+  { key: "modelo_cierre", label: "Modelo Cierre" },
+  { key: "modelo_bateria", label: "Modelo Batería" },
+  { key: "firmware", label: "Firmware" },
+  { key: "hardware", label: "Hardware" },
+  { key: "fabricante", label: "Fabricante" },
+  { key: "lote", label: "Lote" },
+  { key: "secuencial", label: "Secuencial" },
+  { key: "imei", label: "IMEI" },
+  { key: "sim", label: "SIM" },
+  { key: "broker", label: "Broker" },
+  { key: "tipo_comunicacion", label: "Tipo Comunicación" },
+  { key: "tipo_carga", label: "Tipo Carga" },
+  { key: "latitud", label: "Latitud" },
+  { key: "longitud", label: "Longitud" },
+  { key: "fecha_fabricacion", label: "Fecha Fabricación" },
+  { key: "fecha_instalacion", label: "Fecha Instalación" },
+  { key: "ultima_comunicacion", label: "Última Comunicación" },
+  { key: "ultima_apertura", label: "Última Apertura" },
+  { key: "lecturas_bateria", label: "Lecturas Batería" },
+  { key: "actualizado_en", label: "Actualizado En" },
+  { key: "alarma_bloqueado", label: "Alarma: Bloqueado" },
+  { key: "alarma_cambiar_bateria", label: "Alarma: Cambiar Batería" },
+  { key: "alarma_cambiar_ubicacion", label: "Alarma: Cambiar Ubicación" },
+  { key: "alarma_error_servo", label: "Alarma: Error Servo" },
+  { key: "alarma_incendio", label: "Alarma: Incendio" },
+  { key: "alarma_no_comunica", label: "Alarma: No Comunica" },
+  { key: "alarma_operacion_erratica", label: "Alarma: Operación Errática" },
+  { key: "alarma_revisar_comunicacion", label: "Alarma: Revisar Comunicación" },
+  { key: "alarma_sin_bateria", label: "Alarma: Sin Batería" },
+  { key: "alarma_tapa_abierta", label: "Alarma: Tapa Abierta" },
+  { key: "alarma_vuelco", label: "Alarma: Vuelco" }
+];
 
+const COLUMNAS_VISIBLES_POR_DEFECTO = new Set([
+  "m_control", "fraccion", "modelo", "estado_montaje",
+  "serie_lector", "serie_cierre", "serie_bateria", "firmware", "imei"
+]);
+
+const CLAVE_COLUMNAS = "lockbin_columnas_equipos_cliente_v2";
+
+let equiposCargados = [];
+let columnasVisibles = new Set(COLUMNAS_VISIBLES_POR_DEFECTO);
+
+cargarPreferenciaColumnas();
+construirChecklistColumnas();
 cargarClientes();
 
 async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
@@ -42,114 +98,134 @@ async function cargarEquiposDelCliente() {
   const totalTexto = document.getElementById("total-equipos");
 
   if (!cliente) {
-    tbody.innerHTML = `<tr><td colspan="9">Elige un cliente arriba.</td></tr>`;
+    tbody.innerHTML = `<tr><td>Elige un cliente arriba.</td></tr>`;
     totalTexto.textContent = "";
     return;
   }
 
-  tbody.innerHTML = `<tr><td colspan="9">Cargando...</td></tr>`;
+  tbody.innerHTML = `<tr><td>Cargando...</td></tr>`;
 
   try {
     equiposCargados = await traerTodasLasFilas(
-      "equipos",
-      "m_control, fraccion, modelo, estado_montaje, serie_lector, serie_cierre, serie_bateria, firmware, imei",
+      "equipos", "*",
       (q) => q.eq("cliente", cliente).order("m_control")
     );
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="9">Error: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td>Error: ${err.message}</td></tr>`;
     return;
   }
 
   totalTexto.textContent = `${equiposCargados.length} equipo(s) para ${cliente}`;
+  renderEncabezado();
   renderTabla();
 }
 
-function renderTabla() {
-  const filtros = {
-    mc: document.getElementById("f-mc").value.trim().toLowerCase(),
-    fraccion: document.getElementById("f-fraccion").value.trim().toLowerCase(),
-    modelo: document.getElementById("f-modelo").value.trim().toLowerCase(),
-    estado: document.getElementById("f-estado").value.trim().toLowerCase(),
-    lector: document.getElementById("f-lector").value.trim().toLowerCase(),
-    cierre: document.getElementById("f-cierre").value.trim().toLowerCase(),
-    bateria: document.getElementById("f-bateria").value.trim().toLowerCase(),
-    firmware: document.getElementById("f-firmware").value.trim().toLowerCase(),
-    imei: document.getElementById("f-imei").value.trim().toLowerCase()
-  };
-
-  const filtrados = equiposCargados.filter(e =>
-    (e.m_control || "").toLowerCase().includes(filtros.mc) &&
-    (e.fraccion || "").toLowerCase().includes(filtros.fraccion) &&
-    (e.modelo || "").toLowerCase().includes(filtros.modelo) &&
-    (e.estado_montaje || "").toLowerCase().includes(filtros.estado) &&
-    (e.serie_lector || "").toLowerCase().includes(filtros.lector) &&
-    (e.serie_cierre || "").toLowerCase().includes(filtros.cierre) &&
-    (e.serie_bateria || "").toLowerCase().includes(filtros.bateria) &&
-    (e.firmware || "").toLowerCase().includes(filtros.firmware) &&
-    (e.imei || "").toLowerCase().includes(filtros.imei)
-  );
-
-  const tbody = document.getElementById("equipos-tbody");
-  if (filtrados.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9">Ningún equipo coincide con el filtro.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = filtrados.map(e => `
-    <tr>
-      <td data-col="mc">${e.m_control}</td>
-      <td data-col="fraccion">${e.fraccion || "—"}</td>
-      <td data-col="modelo">${e.modelo || "—"}</td>
-      <td data-col="estado">${e.estado_montaje || "—"}</td>
-      <td data-col="lector" class="celda-mono">${e.serie_lector || "—"}</td>
-      <td data-col="cierre" class="celda-mono">${e.serie_cierre || "—"}</td>
-      <td data-col="bateria" class="celda-mono">${e.serie_bateria || "—"}</td>
-      <td data-col="firmware">${e.firmware || "—"}</td>
-      <td data-col="imei" class="celda-mono">${e.imei || "—"}</td>
-    </tr>
+// --- Selector de columnas ---
+function construirChecklistColumnas() {
+  const cont = document.getElementById("columnas-checklist");
+  cont.innerHTML = TODAS_LAS_COLUMNAS.map(col => `
+    <label class="opcion-check">
+      <input type="checkbox" class="check-columna" data-col="${col.key}" ${columnasVisibles.has(col.key) ? "checked" : ""}>
+      ${col.label}
+    </label>
   `).join("");
 
-  aplicarColumnasVisibles();
+  cont.querySelectorAll(".check-columna").forEach(chk => {
+    chk.addEventListener("change", () => {
+      if (chk.checked) columnasVisibles.add(chk.dataset.col);
+      else columnasVisibles.delete(chk.dataset.col);
+      guardarPreferenciaColumnas();
+      renderEncabezado();
+      renderTabla();
+    });
+  });
 }
-
-["f-mc", "f-fraccion", "f-modelo", "f-estado", "f-lector", "f-cierre", "f-bateria", "f-firmware", "f-imei"].forEach(id => {
-  document.getElementById(id).addEventListener("input", renderTabla);
-});
-
-// --- Columnas visibles: se guardan en el navegador, para no repetir la
-// elección cada vez que entras ---
-const CLAVE_COLUMNAS = "lockbin_columnas_equipos_cliente";
 
 document.getElementById("toggle-columnas-btn").addEventListener("click", () => {
   const panel = document.getElementById("columnas-panel");
   panel.hidden = !panel.hidden;
 });
 
-function cargarPreferenciaColumnas() {
-  try {
-    const guardado = JSON.parse(localStorage.getItem(CLAVE_COLUMNAS) || "{}");
-    document.querySelectorAll(".check-columna").forEach(chk => {
-      if (guardado[chk.dataset.col] === false) chk.checked = false;
-    });
-  } catch (e) { /* si algo sale mal, se queda con todas visibles */ }
-}
-
-function aplicarColumnasVisibles() {
-  document.querySelectorAll(".check-columna").forEach(chk => {
-    const visible = chk.checked;
-    document.querySelectorAll(`[data-col="${chk.dataset.col}"]`).forEach(celda => {
-      celda.style.display = visible ? "" : "none";
-    });
-  });
-}
-
-document.querySelectorAll(".check-columna").forEach(chk => {
-  chk.addEventListener("change", () => {
-    aplicarColumnasVisibles();
-    const estado = {};
-    document.querySelectorAll(".check-columna").forEach(c => { estado[c.dataset.col] = c.checked; });
-    localStorage.setItem(CLAVE_COLUMNAS, JSON.stringify(estado));
-  });
+document.getElementById("marcar-todas-btn").addEventListener("click", () => {
+  columnasVisibles = new Set(TODAS_LAS_COLUMNAS.map(c => c.key));
+  construirChecklistColumnas();
+  guardarPreferenciaColumnas();
+  renderEncabezado();
+  renderTabla();
 });
 
-cargarPreferenciaColumnas();
+document.getElementById("desmarcar-todas-btn").addEventListener("click", () => {
+  columnasVisibles = new Set();
+  construirChecklistColumnas();
+  guardarPreferenciaColumnas();
+  renderEncabezado();
+  renderTabla();
+});
+
+function cargarPreferenciaColumnas() {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(CLAVE_COLUMNAS));
+    if (guardado && Array.isArray(guardado)) columnasVisibles = new Set(guardado);
+  } catch (e) { /* se queda con las de por defecto */ }
+}
+
+function guardarPreferenciaColumnas() {
+  localStorage.setItem(CLAVE_COLUMNAS, JSON.stringify([...columnasVisibles]));
+}
+
+// --- Encabezado + fila de filtros, generados según las columnas activas ---
+function renderEncabezado() {
+  const activas = TODAS_LAS_COLUMNAS.filter(c => columnasVisibles.has(c.key));
+  const head = document.getElementById("tabla-equipos-head");
+
+  head.innerHTML = `
+    <tr>${activas.map(c => `<th>${c.label}</th>`).join("")}</tr>
+    <tr class="fila-filtros">${activas.map(c => `<th><input type="text" class="filtro-col" data-col="${c.key}" placeholder="Filtrar..."></th>`).join("")}</tr>
+  `;
+
+  head.querySelectorAll(".filtro-col").forEach(input => {
+    input.addEventListener("input", renderTabla);
+  });
+}
+
+function renderTabla() {
+  const activas = TODAS_LAS_COLUMNAS.filter(c => columnasVisibles.has(c.key));
+  const tbody = document.getElementById("equipos-tbody");
+
+  if (activas.length === 0) {
+    tbody.innerHTML = `<tr><td>Elige al menos una columna en "⚙️ Columnas".</td></tr>`;
+    return;
+  }
+
+  const filtros = {};
+  document.querySelectorAll(".filtro-col").forEach(input => {
+    filtros[input.dataset.col] = input.value.trim().toLowerCase();
+  });
+
+  const filtrados = equiposCargados.filter(e =>
+    activas.every(c => {
+      const filtro = filtros[c.key];
+      if (!filtro) return true;
+      return String(e[c.key] ?? "").toLowerCase().includes(filtro);
+    })
+  );
+
+  if (filtrados.length === 0) {
+    tbody.innerHTML = `<tr><td>Ningún equipo coincide con el filtro.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtrados.map(e => `
+    <tr>${activas.map(c => `<td class="${esColumnaSerial(c.key) ? 'celda-mono' : ''}">${formatearValor(e[c.key])}</td>`).join("")}</tr>
+  `).join("");
+}
+
+function esColumnaSerial(key) {
+  return key.startsWith("serie_") || key === "imei" || key === "sim" || key === "m_control";
+}
+
+function formatearValor(valor) {
+  if (valor === null || valor === undefined || valor === "") return "—";
+  if (typeof valor === "boolean") return valor ? "✅" : "—";
+  return valor;
+}
