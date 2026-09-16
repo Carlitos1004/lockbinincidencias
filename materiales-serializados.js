@@ -77,7 +77,7 @@ async function cargarTabla() {
       <td class="celda-mono">${s.serial}</td>
       <td>${s.estado}</td>
       <td>${new Date(s.fecha_sacado).toLocaleDateString("es-ES")}</td>
-      <td>${s.estado === "Sacado del almacén" ? `<button class="btn-marcar-devuelto-mat" data-id="${s.id}">📦 Marcar devuelto</button>` : "—"}</td>
+      <td>${s.estado === "Sacado del almacén" ? `<button class="btn-marcar-devuelto-mat btn-secundario" data-id="${s.id}">📦 Marcar devuelto</button>` : "—"}</td>
     </tr>
   `).join("");
 
@@ -115,7 +115,7 @@ function renderPendientesBateria(pendientes) {
           <option value="Batería No Recargable">No Recargable</option>
         </select>
       </td>
-      <td><button class="btn-clasificar-bateria" data-id="${s.id}">Guardar</button></td>
+      <td><button class="btn-clasificar-bateria btn-primario" data-id="${s.id}">Guardar</button></td>
     </tr>
   `).join("");
 
