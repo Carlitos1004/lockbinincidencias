@@ -147,14 +147,14 @@ filtrarBtn.addEventListener("click", async () => {
   const mcsEncontrados = equiposEncontrados.map(e => e.m_control);
   const { data: notas } = await supabaseClient
     .from("notas_equipo")
-    .select("mc, nota")
+    .select("mc, nota, foto_url")
     .in("mc", mcsEncontrados)
     .eq("activa", true);
 
   notasPorMC = {};
   (notas || []).forEach(n => {
     if (!notasPorMC[n.mc]) notasPorMC[n.mc] = [];
-    notasPorMC[n.mc].push(n.nota);
+    notasPorMC[n.mc].push(n);
   });
 
   // Traemos el historial de OT anteriores de estos equipos — solo
@@ -180,7 +180,7 @@ function renderTabla() {
   tbody.innerHTML = equiposEncontrados.map((eq, idx) => {
     const notas = notasPorMC[eq.m_control];
     const celdaNota = notas && notas.length > 0
-      ? `<span style="color:#c0392b; font-weight:600;">⚠️ ${notas.join(" · ")}</span>`
+      ? notas.map(n => `<div style="color:#c0392b; font-weight:600;">⚠️ ${n.nota}${n.foto_url ? ` <a href="${n.foto_url}" target="_blank" rel="noopener">📷</a>` : ""}</div>`).join("")
       : "—";
 
     const historial = historialPorMC[eq.m_control];

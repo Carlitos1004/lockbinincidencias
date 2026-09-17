@@ -39,6 +39,7 @@ function renderTabla() {
     <tr class="${n.activa ? '' : 'fila-alerta'}">
       <td>${n.mc}</td>
       <td>${n.nota}</td>
+      <td>${n.foto_url ? `<a href="${n.foto_url}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>` : "—"}</td>
       <td>${n.autor || "—"}</td>
       <td>${new Date(n.fecha).toLocaleDateString("es-ES")}</td>
       <td>${n.activa ? "🟢 Activa" : "⚪ Inactiva"}</td>
@@ -57,6 +58,7 @@ function renderTabla() {
 document.getElementById("agregar-nota-btn").addEventListener("click", async () => {
   const mc = document.getElementById("nota-mc").value.trim().toUpperCase();
   const texto = document.getElementById("nota-texto").value.trim();
+  const archivoFoto = document.getElementById("nota-foto-input").files[0];
   const msg = document.getElementById("nota-msg");
 
   if (!mc || !texto) {
@@ -64,10 +66,31 @@ document.getElementById("agregar-nota-btn").addEventListener("click", async () =
     return;
   }
 
+  const btn = document.getElementById("agregar-nota-btn");
+  btn.disabled = true;
+  btn.textContent = "Guardando...";
+
+  let fotoUrl = null;
+  if (archivoFoto) {
+    const nombreArchivo = `nota_${Date.now()}_${archivoFoto.name}`;
+    const { error: errorSubida } = await supabaseClient.storage.from("fotos-reportes").upload(nombreArchivo, archivoFoto);
+    if (errorSubida) {
+      mostrarMensaje(msg, "❌ Error al subir la foto: " + errorSubida.message, true);
+      btn.disabled = false;
+      btn.textContent = "Guardar nota";
+      return;
+    }
+    const { data: urlData } = supabaseClient.storage.from("fotos-reportes").getPublicUrl(nombreArchivo);
+    fotoUrl = urlData.publicUrl;
+  }
+
   const { data: { user } } = await supabaseClient.auth.getUser();
   const { error } = await supabaseClient.from("notas_equipo").insert({
-    mc: mc, nota: texto, autor: user.email
+    mc: mc, nota: texto, autor: user.email, foto_url: fotoUrl
   });
+
+  btn.disabled = false;
+  btn.textContent = "Guardar nota";
 
   if (error) {
     mostrarMensaje(msg, "❌ " + error.message, true);
@@ -77,6 +100,7 @@ document.getElementById("agregar-nota-btn").addEventListener("click", async () =
   mostrarMensaje(msg, "✅ Nota guardada.", false);
   document.getElementById("nota-mc").value = "";
   document.getElementById("nota-texto").value = "";
+  document.getElementById("nota-foto-input").value = "";
   cargarNotas();
 });
 
