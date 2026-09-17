@@ -45,8 +45,8 @@ function renderTabla() {
           <td>${n.autor || "—"}</td>
           <td>${new Date(n.fecha).toLocaleDateString("es-ES")}</td>
           <td>
-            <button class="btn-guardar-edicion btn-primario" data-id="${n.id}">Guardar</button>
-            <button class="btn-cancelar-edicion btn-secundario" data-id="${n.id}">Cancelar</button>
+            <button class="btn-guardar-edicion btn-primario btn-compacto" data-id="${n.id}">Guardar</button>
+            <button class="btn-cancelar-edicion btn-secundario btn-compacto" data-id="${n.id}">Cancelar</button>
           </td>
         </tr>
       `;
@@ -60,9 +60,9 @@ function renderTabla() {
       <td>${new Date(n.fecha).toLocaleDateString("es-ES")}</td>
       <td>${n.activa ? "🟢 Activa" : "⚪ Inactiva"}</td>
       <td>
-        ${n.activa ? `<button class="btn-desactivar-nota btn-secundario" data-id="${n.id}">Desactivar</button>` : ""}
-        <button class="btn-editar-nota btn-secundario" data-id="${n.id}">Editar</button>
-        <button class="btn-borrar-nota btn-eliminar" data-id="${n.id}">Borrar</button>
+        ${n.activa ? `<button class="btn-desactivar-nota btn-secundario btn-compacto" data-id="${n.id}">Desactivar</button>` : ""}
+        <button class="btn-editar-nota btn-secundario btn-compacto" data-id="${n.id}">Editar</button>
+        <button class="btn-borrar-nota btn-eliminar btn-compacto" data-id="${n.id}">Borrar</button>
       </td>
     </tr>
   `;
