@@ -322,7 +322,8 @@ async function precargarTicket(idRegistro, btnElegido) {
     if (!codigo) return;
 
     if (esBateria && c.tipo_componente !== "Batería") {
-      document.getElementById("modal-tipo-bateria").value = c.tipo_componente;
+      const selectTipoBateria = document.getElementById("modal-tipo-bateria");
+      if (selectTipoBateria) selectTipoBateria.value = c.tipo_componente;
     }
 
     if (c.estado === "Faltante/Perdido") {
@@ -359,7 +360,8 @@ function limpiarFormularioModal() {
   modalMsg.hidden = true;
   document.getElementById("qr-zona").hidden = true;
   document.getElementById("tipo-bateria-box").hidden = true;
-  document.getElementById("modal-tipo-bateria").value = "";
+  const selectTipoBateriaLimpiar = document.getElementById("modal-tipo-bateria");
+  if (selectTipoBateriaLimpiar) selectTipoBateriaLimpiar.value = "";
 }
 
 function configurarBotonesQR() {
