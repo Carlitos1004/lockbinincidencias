@@ -158,7 +158,13 @@ async function generarReporte() {
     if (c.destino && c.destino.includes("1ra categoría")) return "1ra categoría";
     if (c.destino && c.destino.includes("2da categoría")) return "2da categoría";
     if (c.destino === "❌ Equipo dañado - Enviar a AMMI") return c.categoria_ammi || null;
-    return null;
+    // Para el resto de destinos (Desechar, Devolver al Cliente, Cambio
+    // Cliente, En Revisión, etc.) no hay una categoría propia del destino
+    // — se usa la regla: si estuvo en calle, era 2da categoría (usado);
+    // si no (estaba en nave/stock sin instalar), era 1ra categoría (nuevo).
+    if (c.estuvo_en_calle === true) return "2da categoría";
+    if (c.estuvo_en_calle === false) return "1ra categoría";
+    return null; // sin ese dato tampoco, se queda con el nombre simple
   }
   const nombreFilaDe = (c) => nombreOficial(c.tipo_componente, categoriaEfectiva(c));
 

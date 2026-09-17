@@ -101,7 +101,7 @@ async function cargarRuta() {
   if (mcsUnicos.length > 0) {
     const { data: equiposData } = await supabaseClient
       .from("equipos")
-      .select("m_control, cliente, fraccion, latitud, longitud, serie_lector, serie_cierre, serie_bateria")
+      .select("m_control, cliente, fraccion, latitud, longitud, serie_lector, serie_cierre, serie_bateria, modelo_bateria")
       .in("m_control", mcsUnicos);
     (equiposData || []).forEach(eq => { mapaEquipos[eq.m_control] = eq; });
   }
@@ -374,7 +374,29 @@ function refrescarTipoBateria() {
   const necesitaBateria = document.getElementById("modal-cambio-ba").checked
     || document.getElementById("modal-falta-ba").checked
     || document.getElementById("modal-cambio-completo").checked;
-  document.getElementById("tipo-bateria-box").hidden = !necesitaBateria;
+  const box = document.getElementById("tipo-bateria-box");
+  box.hidden = !necesitaBateria;
+  if (!necesitaBateria) return;
+
+  // El modelo de batería (ej. "BA02.01" = Recargable, "BA01.03" = No
+  // Recargable) identifica el subtipo de la batería que YA tenía este
+  // equipo — así no hace falta preguntarlo a ciegas cada vez.
+  const modeloBateria = equiposPorMC[equipoAbierto]?.equipo?.modelo_bateria || "";
+  let deteccion = null;
+  if (modeloBateria.toUpperCase().startsWith("BA02")) deteccion = "Batería Recargable";
+  else if (modeloBateria.toUpperCase().startsWith("BA01")) deteccion = "Batería No Recargable";
+
+  const yaHabiaElegido = document.getElementById("modal-tipo-bateria")?.value;
+
+  box.innerHTML = `
+    <label for="modal-tipo-bateria"><strong>¿Qué tipo de batería?</strong> ${deteccion ? `— ✅ detectado por el modelo (${modeloBateria}) en Equipos, corrige si no es correcto` : "(para que cuente bien en Materiales)"}</label>
+    <select id="modal-tipo-bateria">
+      <option value="">— Elige —</option>
+      <option value="Batería Recargable">Batería Recargable</option>
+      <option value="Batería No Recargable">Batería No Recargable</option>
+    </select>
+  `;
+  document.getElementById("modal-tipo-bateria").value = yaHabiaElegido || deteccion || "";
 }
 
 function refrescarZonaQR() {

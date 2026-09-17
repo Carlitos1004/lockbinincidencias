@@ -31,7 +31,7 @@ async function buscarEquipo() {
 
   const { data, error } = await supabaseClient
     .from("equipos")
-    .select("m_control, cliente, fraccion, serie_lector, serie_cierre, serie_bateria")
+    .select("m_control, cliente, fraccion, serie_lector, serie_cierre, serie_bateria, modelo_bateria")
     .eq("m_control", mc)
     .maybeSingle();
 
@@ -119,7 +119,26 @@ function refrescarTipoBateria() {
   const necesitaBateria = document.getElementById("cambio-ba").checked
     || document.getElementById("falta-ba").checked
     || document.getElementById("cambio-completo").checked;
-  document.getElementById("tipo-bateria-box").hidden = !necesitaBateria;
+  const box = document.getElementById("tipo-bateria-box");
+  box.hidden = !necesitaBateria;
+  if (!necesitaBateria) return;
+
+  const modeloBateria = equipoActual?.modelo_bateria || "";
+  let deteccion = null;
+  if (modeloBateria.toUpperCase().startsWith("BA02")) deteccion = "Batería Recargable";
+  else if (modeloBateria.toUpperCase().startsWith("BA01")) deteccion = "Batería No Recargable";
+
+  const yaHabiaElegido = document.getElementById("tipo-bateria")?.value;
+
+  box.innerHTML = `
+    <label for="tipo-bateria"><strong>¿Qué tipo de batería?</strong> ${deteccion ? `— ✅ detectado por el modelo (${modeloBateria}) en Equipos, corrige si no es correcto` : "(para que cuente bien en Materiales)"}</label>
+    <select id="tipo-bateria">
+      <option value="">— Elige —</option>
+      <option value="Batería Recargable">Batería Recargable</option>
+      <option value="Batería No Recargable">Batería No Recargable</option>
+    </select>
+  `;
+  document.getElementById("tipo-bateria").value = yaHabiaElegido || deteccion || "";
 }
 ["cambio-ba", "falta-ba", "cambio-completo"].forEach(id => {
   document.getElementById(id).addEventListener("change", refrescarTipoBateria);
