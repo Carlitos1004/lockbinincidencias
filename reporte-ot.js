@@ -220,7 +220,7 @@ function renderReporte() {
 
   llenarTabla("tabla-estado", r.estadoFinal.map(([e, n]) => [e, n]));
   llenarTabla("tabla-recibidos", r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
-  llenarTabla("tabla-componentes", r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_nuevo || "—", c.serial_retirado, c.destino || "—"]));
+  llenarTabla("tabla-componentes", r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || "—"]));
   llenarTabla("tabla-materiales-1ra", r.materiales1ra.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
   llenarTabla("tabla-materiales-2da", r.materiales2da.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
   llenarTabla("tabla-materiales-sin-categoria", r.materialesSinCategoria.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
@@ -254,6 +254,13 @@ function llenarTablaPivoteDestino(pivote) {
   tbody.innerHTML = pivote.filas.length > 0
     ? pivote.filas.map(f => `<tr><td>${f.tipo}</td>${f.valores.map(v => `<td>${v}</td>`).join("")}</tr>`).join("")
     : `<tr><td colspan="${pivote.encabezados.length + 1}">—</td></tr>`;
+}
+
+function serialNuevoConNota(c) {
+  if (!c.serial_nuevo) return "—";
+  if (!c.subtipo_repuesto) return c.serial_nuevo;
+  const abreviado = c.subtipo_repuesto.replace("Batería", "BA");
+  return `${c.serial_nuevo} (${abreviado})`;
 }
 
 function llenarTabla(idTabla, filas) {
@@ -315,7 +322,7 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
 
   seccion("CAMBIOS DE COMPONENTES REALIZADOS",
     ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino"],
-    r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_nuevo || "—", c.serial_retirado, c.destino || ""]));
+    r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || ""]));
 
   seccion("CONTROL DE MATERIALES - 1RA CATEGORÍA",
     ["Tipo", "Llevados", "Utilizados", "Vuelven"],
@@ -396,7 +403,7 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
   }
   seccion("Resumen de Estado Final", ["Estado", "Cantidad"], r.estadoFinal);
   seccion("Resumen de Equipos Atendidos", ["Módulo", "Acción en calle", "Comentarios"], r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
-  seccion("Cambios de Componentes Realizados", ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, c.serial_nuevo || "—", c.serial_retirado, c.destino || "—"]));
+  seccion("Cambios de Componentes Realizados", ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || "—"]));
   seccion("Control de Materiales — 1ra Categoría", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales1ra.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
   seccion("Control de Materiales — 2da Categoría", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales2da.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
   if (r.materialesSinCategoria.length > 0) {
