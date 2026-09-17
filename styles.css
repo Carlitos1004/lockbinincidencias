@@ -1374,6 +1374,10 @@ input[type="file"]::file-selector-button:hover {
   font-weight: 600;
 }
 
+#tabla-notas-equipo td:nth-child(4) {
+  word-break: break-all;
+}
+
 .columnas-checklist {
   display: flex;
   flex-wrap: wrap;
