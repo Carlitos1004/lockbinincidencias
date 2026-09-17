@@ -25,6 +25,8 @@ let fallaActual = null; // falla del ticket elegido, o la seleccionada a mano si
 let scanner = null;
 let serialesNuevos = {}; // codigo -> serial escaneado, se resetea por reporte
 let categoriasPorComponente = {}; // codigo -> "1ra categoría" / "2da categoría", auto o a mano
+let tipoRetiradaDetectado = null; // "Batería Recargable"/"No Recargable" que se retira, detectado solo
+let tipoInstaladaDetectado = null; // ídem, para la que se instala
 
 const otInput = document.getElementById("ot-input");
 const cargarBtn = document.getElementById("cargar-ruta-btn");
@@ -245,6 +247,8 @@ async function abrirModal(mc) {
   ticketExistente = null;
   serialesNuevos = {};
   categoriasPorComponente = {};
+  tipoRetiradaDetectado = null;
+  tipoInstaladaDetectado = null;
 
   const info = equiposPorMC[mc];
   modalMc.textContent = mc;
@@ -370,7 +374,7 @@ function configurarBotonesQR() {
   });
 }
 
-function refrescarTipoBateria() {
+async function refrescarTipoBateria() {
   const necesitaBateria = document.getElementById("modal-cambio-ba").checked
     || document.getElementById("modal-falta-ba").checked
     || document.getElementById("modal-cambio-completo").checked;
@@ -378,18 +382,70 @@ function refrescarTipoBateria() {
   box.hidden = !necesitaBateria;
   if (!necesitaBateria) return;
 
-  // El modelo de batería (ej. "BA02.01" = Recargable, "BA01.03" = No
-  // Recargable) identifica el subtipo de la batería que YA tenía este
-  // equipo — así no hace falta preguntarlo a ciegas cada vez.
+  // 1. La que SE RETIRA: el modelo de batería (ej. "BA02.01" = Recargable,
+  // "BA01.03" = No Recargable) que YA tenía este equipo lo dice solo.
   const modeloBateria = equiposPorMC[equipoAbierto]?.equipo?.modelo_bateria || "";
-  let deteccion = null;
-  if (modeloBateria.toUpperCase().startsWith("BA02")) deteccion = "Batería Recargable";
-  else if (modeloBateria.toUpperCase().startsWith("BA01")) deteccion = "Batería No Recargable";
+  tipoRetiradaDetectado = null;
+  if (modeloBateria.toUpperCase().startsWith("BA02")) tipoRetiradaDetectado = "Batería Recargable";
+  else if (modeloBateria.toUpperCase().startsWith("BA01")) tipoRetiradaDetectado = "Batería No Recargable";
+
+  // 2. La que SE INSTALA: primero se busca su serial en Materiales
+  // Serializados (si ya la clasificaste ahí) — si no aparece, se busca
+  // ese mismo serial en Equipos (por si ya estuvo instalada en otro
+  // equipo antes, y ahí sí conocemos su modelo).
+  tipoInstaladaDetectado = null;
+  const serialNueva = (serialesNuevos.BA || "").trim().toUpperCase();
+  if (serialNueva) {
+    const idOtParaBusqueda = sessionStorage.getItem("lockbin_ot_activa");
+    try {
+      const { data: registrado } = await supabaseClient
+        .from("materiales_serializados")
+        .select("tipo_componente")
+        .eq("id_ot", idOtParaBusqueda)
+        .eq("serial", serialNueva)
+        .maybeSingle();
+
+      if (registrado && !registrado.tipo_componente.includes("(pendiente subtipo)")) {
+        if (registrado.tipo_componente.includes("No Recargable")) tipoInstaladaDetectado = "Batería No Recargable";
+        else if (registrado.tipo_componente.includes("Recargable")) tipoInstaladaDetectado = "Batería Recargable";
+      }
+
+      if (!tipoInstaladaDetectado) {
+        const { data: equipoConEsaBateria } = await supabaseClient
+          .from("equipos")
+          .select("modelo_bateria")
+          .eq("serie_bateria", serialNueva)
+          .maybeSingle();
+        const modeloNueva = (equipoConEsaBateria?.modelo_bateria || "").toUpperCase();
+        if (modeloNueva.startsWith("BA02")) tipoInstaladaDetectado = "Batería Recargable";
+        else if (modeloNueva.startsWith("BA01")) tipoInstaladaDetectado = "Batería No Recargable";
+      }
+    } catch (e) { /* si falla la búsqueda, simplemente no se detecta y se pregunta */ }
+  }
+
+  // Si se detectaron las 2 solas, no hace falta preguntar nada
+  if (tipoRetiradaDetectado && tipoInstaladaDetectado) {
+    const mismaCosa = tipoRetiradaDetectado === tipoInstaladaDetectado;
+    box.innerHTML = mismaCosa
+      ? `<span class="serial-confirmado">✅ Batería: ${tipoRetiradaDetectado} (detectado solo, retirada e instalada son iguales)</span>`
+      : `<span class="serial-confirmado">✅ Se retira: ${tipoRetiradaDetectado} — Se instala: ${tipoInstaladaDetectado} (detectado solo)</span>`;
+    return;
+  }
+
+  const deteccion = tipoRetiradaDetectado || tipoInstaladaDetectado;
+  let etiqueta;
+  if (tipoRetiradaDetectado && !tipoInstaladaDetectado) {
+    etiqueta = `<strong>¿Qué tipo de batería se está instalando?</strong> — no se pudo detectar sola (ni en Materiales Serializados ni en Equipos)`;
+  } else if (!tipoRetiradaDetectado && tipoInstaladaDetectado) {
+    etiqueta = `<strong>¿Qué tipo de batería se está retirando?</strong> — no se pudo detectar sola (el equipo no tiene un modelo de batería registrado)`;
+  } else {
+    etiqueta = `<strong>¿Qué tipo de batería?</strong> (para que cuente bien en Materiales)`;
+  }
 
   const yaHabiaElegido = document.getElementById("modal-tipo-bateria")?.value;
 
   box.innerHTML = `
-    <label for="modal-tipo-bateria"><strong>¿Qué tipo de batería?</strong> ${deteccion ? `— ✅ detectado por el modelo (${modeloBateria}) en Equipos, corrige si no es correcto` : "(para que cuente bien en Materiales)"}</label>
+    <label for="modal-tipo-bateria">${etiqueta}</label>
     <select id="modal-tipo-bateria">
       <option value="">— Elige —</option>
       <option value="Batería Recargable">Batería Recargable</option>
@@ -449,7 +505,10 @@ function refrescarZonaQR() {
     input.addEventListener("input", () => {
       serialesNuevos[input.dataset.codigo] = input.value.trim().toUpperCase();
     });
-    input.addEventListener("change", () => resolverCategoriaComponente(input.dataset.codigo));
+    input.addEventListener("change", () => {
+      resolverCategoriaComponente(input.dataset.codigo);
+      if (input.dataset.codigo === "BA") refrescarTipoBateria();
+    });
   });
 
   // Ya con el serial que traía precargado (si estamos editando un ticket
@@ -650,6 +709,7 @@ function iniciarScanner(codigo) {
       }
       serialesNuevos[codigo] = valor;
       refrescarZonaQR();
+      if (codigo === "BA") refrescarTipoBateria();
     },
     () => {} // ignoramos errores de frames sin QR, es normal mientras enfoca
   ).catch(err => {
@@ -688,7 +748,7 @@ modalEnviarBtn.addEventListener("click", async () => {
     mostrarMensaje(modalMsg, "⚠️ Selecciona al menos una descripción de la acción (o marca un cambio de componente abajo).", true);
     return;
   }
-  if (!document.getElementById("tipo-bateria-box").hidden && !document.getElementById("modal-tipo-bateria").value) {
+  if (!document.getElementById("tipo-bateria-box").hidden && !(tipoRetiradaDetectado && tipoInstaladaDetectado) && !document.getElementById("modal-tipo-bateria")?.value) {
     mostrarMensaje(modalMsg, "⚠️ Elige el tipo de batería (Recargable o No Recargable).", true);
     return;
   }
@@ -791,10 +851,12 @@ modalEnviarBtn.addEventListener("click", async () => {
   const idsABorrar = [];
   const actualizaciones = [];
 
-  const tipoBateriaElegido = document.getElementById("modal-tipo-bateria").value;
+  const tipoBateriaElegido = document.getElementById("modal-tipo-bateria")?.value || null;
+  const tipoRetiradaFinal = tipoRetiradaDetectado || tipoBateriaElegido;
+  const tipoInstaladaFinal = tipoInstaladaDetectado || tipoBateriaElegido;
 
   Object.keys(MAPA_COMPONENTE).forEach(codigo => {
-    const nombreTipo = codigo === "BA" && tipoBateriaElegido ? tipoBateriaElegido : MAPA_COMPONENTE[codigo].nombre;
+    const nombreTipo = codigo === "BA" && tipoRetiradaFinal ? tipoRetiradaFinal : MAPA_COMPONENTE[codigo].nombre;
     const filaExistente = codigo === "BA"
       ? (yaRegistrados || []).find(c => c.tipo_componente === "Batería Recargable" || c.tipo_componente === "Batería No Recargable" || c.tipo_componente === "Batería")
       : (yaRegistrados || []).find(c => c.tipo_componente === nombreTipo);
@@ -821,7 +883,7 @@ modalEnviarBtn.addEventListener("click", async () => {
       if (cambioDeCategoria || cambioDeSerial || cambioDeCategoriaMaterial) {
         actualizaciones.push({
           id: filaExistente.id,
-          cambios: { estado: estadoDeseado, excluir_materiales: excluirDeseado, serial_nuevo: serialNuevoDeseado || filaExistente.serial_nuevo, tipo_componente: nombreTipo, categoria: (categoriasPorComponente[codigo] === "n/a" ? null : categoriasPorComponente[codigo]) || filaExistente.categoria || null }
+          cambios: { estado: estadoDeseado, excluir_materiales: excluirDeseado, serial_nuevo: serialNuevoDeseado || filaExistente.serial_nuevo, tipo_componente: nombreTipo, categoria: (categoriasPorComponente[codigo] === "n/a" ? null : categoriasPorComponente[codigo]) || filaExistente.categoria || null, subtipo_repuesto: codigo === "BA" ? (tipoInstaladaFinal || filaExistente.subtipo_repuesto || null) : null }
         });
       }
       return;
@@ -832,7 +894,8 @@ modalEnviarBtn.addEventListener("click", async () => {
       tipo_componente: nombreTipo, serial_retirado: serialViejoDe(codigo),
       serial_nuevo: serialNuevoDeseado, id_registro: idRegistro, id_ot: idOtActiva,
       estado: estadoDeseado, excluir_materiales: excluirDeseado,
-      categoria: categoriasPorComponente[codigo] === "n/a" ? null : (categoriasPorComponente[codigo] || null)
+      categoria: categoriasPorComponente[codigo] === "n/a" ? null : (categoriasPorComponente[codigo] || null),
+      subtipo_repuesto: codigo === "BA" ? (tipoInstaladaFinal || null) : null
     });
   });
 

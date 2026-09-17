@@ -254,7 +254,8 @@ enviarBtn.addEventListener("click", async () => {
       id_registro: idRegistro,
       id_ot: idOtActiva,
       estado: retiradoPorCliente ? "Cambiado por el cliente" : "Pendiente revisión",
-      excluir_materiales: retiradoPorCliente
+      excluir_materiales: retiradoPorCliente,
+      subtipo_repuesto: codigo === "BA" ? (document.getElementById("tipo-bateria")?.value || null) : null
     });
     lineasComentario.push("🔧 " + nombreTipoDe(codigo) + " retirado/asociado: " + serial);
   });
