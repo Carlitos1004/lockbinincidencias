@@ -133,22 +133,41 @@ async function generarReporte() {
   // --- Fallas y revisión (donde ya hay hallazgo escrito) ---
   const fallasRevision = componentesCambiados.filter(c => c.reparacion);
 
-  // --- Stock de destino ---
-  const conteoPorDestino = {};
-  const conteoPorDestinoYTipo = {};
-  componentesCambiados.forEach(c => {
-    const destino = c.destino
-      || (c.estado === "Cambiado por el cliente" ? "⚙️ Cambio hecho por el cliente" : "(sin destino registrado)");
-    conteoPorDestino[destino] = (conteoPorDestino[destino] || 0) + 1;
-    const nombreParaDesglose = nombreOficial(c.tipo_componente, c.categoria);
-    if (!conteoPorDestinoYTipo[destino]) conteoPorDestinoYTipo[destino] = {};
-    conteoPorDestinoYTipo[destino][nombreParaDesglose] = (conteoPorDestinoYTipo[destino][nombreParaDesglose] || 0) + 1;
+  // --- Equipos retirados y revisados, por tipo x destino (tabla pivote) ---
+  function abreviarDestino(destino) {
+    const mapa = {
+      "✓ Equipo OK - Stock (1ra categoría)": "Stock 1ra",
+      "✓ Equipo OK - Stock (2da categoría)": "Stock 2da",
+      "✓ Equipo OK - Devolver al cliente": "Devolver Cliente",
+      "✓ Cambiado por el cliente - No llega a revisión": "Cambio Cliente",
+      "❌ Equipo dañado - Enviar a AMMI": "AMMI",
+      "❌ Equipo dañado - Desechar": "Desechar",
+      "🚨 Sigue en revisión": "En Revisión",
+      "⚙️ Cambio hecho por el cliente": "Pdte. (Cliente)",
+      "(sin destino registrado)": "Sin Destino"
+    };
+    return mapa[destino] || destino;
+  }
+
+  const destinoDe = (c) => c.destino || (c.estado === "Cambiado por el cliente" ? "⚙️ Cambio hecho por el cliente" : "(sin destino registrado)");
+
+  const tiposPresentes = [...new Set(componentesCambiados.map(c => c.tipo_componente))];
+  const destinosPresentes = [...new Set(componentesCambiados.map(destinoDe))];
+
+  const matrizDestino = {};
+  tiposPresentes.forEach(tipo => {
+    matrizDestino[tipo] = {};
+    destinosPresentes.forEach(d => { matrizDestino[tipo][d] = 0; });
   });
-  const desglosePorDestino = Object.keys(conteoPorDestino).map(destino => ({
-    destino,
-    cantidad: conteoPorDestino[destino],
-    desglose: Object.entries(conteoPorDestinoYTipo[destino]).map(([tipo, n]) => `${n} ${tipo}`).join(", ")
-  }));
+  componentesCambiados.forEach(c => { matrizDestino[c.tipo_componente][destinoDe(c)]++; });
+
+  const pivoteDestino = {
+    encabezados: destinosPresentes.map(abreviarDestino),
+    filas: tiposPresentes.map(tipo => ({
+      tipo,
+      valores: destinosPresentes.map(d => matrizDestino[tipo][d])
+    }))
+  };
 
   const materialesConNombreOficial = (materiales || []).map(m => ({
     ...m, nombreOficial: nombreOficialDesdeCombinado(m.tipo_componente)
@@ -167,7 +186,7 @@ async function generarReporte() {
     ],
     equiposRecibidos, componentesCambiados, materiales: materiales || [],
     materiales1ra, materiales2da, materialesSinCategoria,
-    fallasRevision, garantias: garantiasOt || [], desglosePorDestino, enviadosAmmi
+    fallasRevision, garantias: garantiasOt || [], pivoteDestino, enviadosAmmi
   };
 
   renderReporte();
@@ -196,7 +215,7 @@ function renderReporte() {
     calcularGarantiaTiempo(g.fecha_entrega), calcularEstadoFinalGarantia(g.criterio_revision, g.fecha_entrega),
     g.foto_real || g.nombre_imagen || "—"
   ]));
-  llenarTabla("tabla-destino", r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
+  llenarTablaPivoteDestino(r.pivoteDestino);
   llenarTabla("tabla-ammi", r.enviadosAmmi.map(c => [
       c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—",
       c.estuvo_en_calle === true ? "Sí" : c.estuvo_en_calle === false ? "No" : "Sin definir",
@@ -204,6 +223,20 @@ function renderReporte() {
     ]));
 
   reporteContenido.hidden = false;
+}
+
+// La tabla de "Equipos retirados y revisados" es distinta a las demás: sus
+// columnas cambian según qué destinos aparezcan en esta OT, así que arma
+// el encabezado también, en vez de asumir uno fijo como llenarTabla().
+function llenarTablaPivoteDestino(pivote) {
+  const thead = document.querySelector("#tabla-destino thead");
+  const tbody = document.querySelector("#tabla-destino tbody");
+
+  thead.innerHTML = `<tr><th>Tipo</th>${pivote.encabezados.map(h => `<th>${h}</th>`).join("")}</tr>`;
+
+  tbody.innerHTML = pivote.filas.length > 0
+    ? pivote.filas.map(f => `<tr><td>${f.tipo}</td>${f.valores.map(v => `<td>${v}</td>`).join("")}</tr>`).join("")
+    : `<tr><td colspan="${pivote.encabezados.length + 1}">—</td></tr>`;
 }
 
 function llenarTabla(idTabla, filas) {
@@ -293,9 +326,9 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
       g.foto_real || g.nombre_imagen || "—"
     ]));
 
-  seccion("CONTROL STOCK DE DESTINO",
-    ["Destino", "Cantidad", "Desglose"],
-    r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
+  seccion("EQUIPOS RETIRADOS Y REVISADOS, POR DESTINO",
+    ["Tipo", ...r.pivoteDestino.encabezados],
+    r.pivoteDestino.filas.map(f => [f.tipo, ...f.valores]));
 
   seccion("DESGLOSE - ENVIADOS A AMMI",
     ["Serial", "Fallas detectadas en la revisión", "Categoría", "En Calle", "Cliente de Origen"],
@@ -360,7 +393,7 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
       calcularGarantiaTiempo(g.fecha_entrega), calcularEstadoFinalGarantia(g.criterio_revision, g.fecha_entrega),
       g.foto_real || g.nombre_imagen || "—"
     ]));
-  seccion("Control Stock de Destino", ["Destino", "Cantidad", "Desglose"], r.desglosePorDestino.map(d => [d.destino, d.cantidad, d.desglose]));
+  seccion("Equipos Retirados y Revisados, por Destino", ["Tipo", ...r.pivoteDestino.encabezados], r.pivoteDestino.filas.map(f => [f.tipo, ...f.valores]));
   seccion("Desglose — Enviados a AMMI", ["Serial", "Fallas detectadas en la revisión", "Categoría", "En Calle", "Cliente de Origen"], r.enviadosAmmi.map(c => [
       c.serial_retirado, c.reparacion || "—", c.categoria_ammi || "—",
       c.estuvo_en_calle === true ? "Sí" : c.estuvo_en_calle === false ? "No" : "Sin definir",
