@@ -3,6 +3,7 @@
 // =========================================================================
 
 let notasData = [];
+let editandoId = null;
 
 cargarNotas();
 
@@ -35,7 +36,22 @@ function renderTabla() {
     return;
   }
 
-  tbody.innerHTML = filtradas.map(n => `
+  tbody.innerHTML = filtradas.map(n => {
+    if (n.id === editandoId) {
+      return `
+        <tr>
+          <td><input type="text" class="input-editar-mc" value="${n.mc}" data-id="${n.id}"></td>
+          <td colspan="2"><textarea class="input-editar-nota" rows="2" data-id="${n.id}">${n.nota}</textarea></td>
+          <td>${n.autor || "—"}</td>
+          <td>${new Date(n.fecha).toLocaleDateString("es-ES")}</td>
+          <td>
+            <button class="btn-guardar-edicion btn-primario" data-id="${n.id}">Guardar</button>
+            <button class="btn-cancelar-edicion btn-secundario" data-id="${n.id}">Cancelar</button>
+          </td>
+        </tr>
+      `;
+    }
+    return `
     <tr class="${n.activa ? '' : 'fila-alerta'}">
       <td>${n.mc}</td>
       <td>${n.nota}</td>
@@ -43,13 +59,57 @@ function renderTabla() {
       <td>${n.autor || "—"}</td>
       <td>${new Date(n.fecha).toLocaleDateString("es-ES")}</td>
       <td>${n.activa ? "🟢 Activa" : "⚪ Inactiva"}</td>
-      <td>${n.activa ? `<button class="btn-desactivar-nota btn-secundario" data-id="${n.id}">Desactivar</button>` : "—"}</td>
+      <td>
+        ${n.activa ? `<button class="btn-desactivar-nota btn-secundario" data-id="${n.id}">Desactivar</button>` : ""}
+        <button class="btn-editar-nota btn-secundario" data-id="${n.id}">Editar</button>
+        <button class="btn-borrar-nota btn-eliminar" data-id="${n.id}">Borrar</button>
+      </td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 
   tbody.querySelectorAll(".btn-desactivar-nota").forEach(btn => {
     btn.addEventListener("click", async () => {
       await supabaseClient.from("notas_equipo").update({ activa: false }).eq("id", btn.dataset.id);
+      cargarNotas();
+    });
+  });
+
+  tbody.querySelectorAll(".btn-editar-nota").forEach(btn => {
+    btn.addEventListener("click", () => {
+      editandoId = btn.dataset.id;
+      renderTabla();
+    });
+  });
+
+  tbody.querySelectorAll(".btn-cancelar-edicion").forEach(btn => {
+    btn.addEventListener("click", () => {
+      editandoId = null;
+      renderTabla();
+    });
+  });
+
+  tbody.querySelectorAll(".btn-guardar-edicion").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const fila = btn.closest("tr");
+      const mcNuevo = fila.querySelector(".input-editar-mc").value.trim().toUpperCase();
+      const notaNueva = fila.querySelector(".input-editar-nota").value.trim();
+
+      if (!mcNuevo || !notaNueva) {
+        alert("El MC y la nota no pueden quedar vacíos.");
+        return;
+      }
+
+      await supabaseClient.from("notas_equipo").update({ mc: mcNuevo, nota: notaNueva }).eq("id", btn.dataset.id);
+      editandoId = null;
+      cargarNotas();
+    });
+  });
+
+  tbody.querySelectorAll(".btn-borrar-nota").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("¿Borrar esta nota para siempre? No se puede deshacer.")) return;
+      await supabaseClient.from("notas_equipo").delete().eq("id", btn.dataset.id);
       cargarNotas();
     });
   });
