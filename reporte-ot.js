@@ -151,7 +151,18 @@ async function generarReporte() {
 
   const destinoDe = (c) => c.destino || (c.estado === "Cambiado por el cliente" ? "⚙️ Cambio hecho por el cliente" : "(sin destino registrado)");
 
-  const tiposPresentes = [...new Set(componentesCambiados.map(c => c.tipo_componente))];
+  // La categoría de cada componente no vive en un solo lugar: para Stock
+  // está metida en el texto del Destino, para AMMI está en su propio
+  // campo — se calcula aquí para poder usar el nombre oficial en las filas.
+  function categoriaEfectiva(c) {
+    if (c.destino && c.destino.includes("1ra categoría")) return "1ra categoría";
+    if (c.destino && c.destino.includes("2da categoría")) return "2da categoría";
+    if (c.destino === "❌ Equipo dañado - Enviar a AMMI") return c.categoria_ammi || null;
+    return null;
+  }
+  const nombreFilaDe = (c) => nombreOficial(c.tipo_componente, categoriaEfectiva(c));
+
+  const tiposPresentes = [...new Set(componentesCambiados.map(nombreFilaDe))];
   const destinosPresentes = [...new Set(componentesCambiados.map(destinoDe))];
 
   const matrizDestino = {};
@@ -159,7 +170,7 @@ async function generarReporte() {
     matrizDestino[tipo] = {};
     destinosPresentes.forEach(d => { matrizDestino[tipo][d] = 0; });
   });
-  componentesCambiados.forEach(c => { matrizDestino[c.tipo_componente][destinoDe(c)]++; });
+  componentesCambiados.forEach(c => { matrizDestino[nombreFilaDe(c)][destinoDe(c)]++; });
 
   const pivoteDestino = {
     encabezados: destinosPresentes.map(abreviarDestino),
