@@ -3,6 +3,7 @@
 // =========================================================================
 
 let garantiasCargadas = [];
+let conteoFotosPorRegistro = {};
 
 const filtroGarantia = document.getElementById("filtro-garantia");
 const filtroVigencia = document.getElementById("filtro-vigencia");
@@ -45,10 +46,19 @@ async function cargarGarantias() {
       .select("id_registro, link_foto")
       .in("id_registro", idsRegistro);
     (historialData || []).forEach(h => { mapaHistorial[h.id_registro] = h; });
+
+    const { data: fotos } = await supabaseClient
+      .from("fotos_reporte")
+      .select("id_registro")
+      .in("id_registro", idsRegistro);
+    (fotos || []).forEach(f => {
+      conteoFotosPorRegistro[f.id_registro] = (conteoFotosPorRegistro[f.id_registro] || 0) + 1;
+    });
   }
 
   garantiasCargadas.forEach(g => {
     const componente = g.componente_id ? mapaComponentes[g.componente_id] : null;
+    g.id_registro_real = componente?.id_registro || null;
     g.foto_real = componente?.foto_revision
       || (componente?.id_registro ? mapaHistorial[componente.id_registro]?.link_foto : null)
       || (esUrlValida(g.nombre_imagen) ? g.nombre_imagen : null) // ej. links de Drive migrados de Sheets
@@ -100,9 +110,11 @@ function renderTabla() {
       <td>${vigencia}</td>
       <td>${estadoFinal || "—"}</td>
       <td><input type="text" class="input-observacion" value="${escaparAtributo(g.observacion || "")}" placeholder="Observación..."></td>
-      <td>${g.foto_real
-        ? `<a href="${g.foto_real}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>`
-        : `<input type="text" class="input-imagen" value="${escaparAtributo(g.nombre_imagen || "")}" placeholder="Nombre/link imagen...">`
+      <td>${(g.id_registro_real && conteoFotosPorRegistro[g.id_registro_real] > 1)
+        ? `<a href="ver-fotos.html?id=${encodeURIComponent(g.id_registro_real)}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver todas las fotos (${conteoFotosPorRegistro[g.id_registro_real]}) →</a>`
+        : g.foto_real
+          ? `<a href="${g.foto_real}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>`
+          : `<input type="text" class="input-imagen" value="${escaparAtributo(g.nombre_imagen || "")}" placeholder="Nombre/link imagen...">`
       }</td>
       <td><button class="btn-guardar-fila">Guardar</button></td>
     </tr>

@@ -13,6 +13,7 @@ const MAX_PARADAS_POR_LINK = 7; // límite práctico de Google Maps por link
 
 let otActualCargada = null;
 let ticketsCargados = [];
+let conteoFotosPorRegistro = {};
 
 const otInput = document.getElementById("ot-input");
 const buscarBtn = document.getElementById("buscar-btn");
@@ -98,6 +99,20 @@ async function buscarOT() {
   otActualCargada = ot;
   ticketsCargados = tickets || [];
 
+  // Conteo de fotos por ticket, para saber si mostrar "Ver foto" (una) o
+  // "Ver todas las fotos (N)" (varias)
+  conteoFotosPorRegistro = {};
+  const idsRegistro = ticketsCargados.map(t => t.id_registro).filter(Boolean);
+  if (idsRegistro.length > 0) {
+    const { data: fotos } = await supabaseClient
+      .from("fotos_reporte")
+      .select("id_registro")
+      .in("id_registro", idsRegistro);
+    (fotos || []).forEach(f => {
+      conteoFotosPorRegistro[f.id_registro] = (conteoFotosPorRegistro[f.id_registro] || 0) + 1;
+    });
+  }
+
   const fallasUnicas = [...new Set(ticketsCargados.map(t => t.falla).filter(Boolean))].sort();
   document.getElementById("filtro-falla-select").innerHTML =
     `<option value="">Todas las fallas</option>` +
@@ -150,9 +165,12 @@ function renderTabla() {
          <button class="btn-guardar-ticket" data-id="${t.id_registro}">Guardar</button>`
       : ([t.accion_calle, t.comentarios].filter(Boolean).join(" | ") || "—");
 
-    const celdaFoto = t.link_foto
-      ? `<a href="${t.link_foto}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>`
-      : "—";
+    const cantidadFotos = conteoFotosPorRegistro[t.id_registro] || 0;
+    const celdaFoto = cantidadFotos > 1
+      ? `<a href="ver-fotos.html?id=${encodeURIComponent(t.id_registro)}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver todas las fotos (${cantidadFotos}) →</a>`
+      : t.link_foto
+        ? `<a href="${t.link_foto}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>`
+        : "—";
 
     const celdaEliminar = esManager
       ? `<button class="btn-eliminar-ticket" data-id="${t.id_registro}" title="Quitar este equipo de la OT">🗑️</button>`
