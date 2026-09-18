@@ -86,6 +86,27 @@ async function generarReporte() {
   const mapaHistorialPorRegistro = {};
   (tickets || []).forEach(t => { mapaHistorialPorRegistro[t.id_registro] = t; });
 
+  const idsRegistroConComponente = [...new Set((componentes || []).map(c => c.id_registro).filter(Boolean))];
+  const conteoFotosPorRegistroReporte = {};
+  if (idsRegistroConComponente.length > 0) {
+    const { data: fotosReporte } = await supabaseClient
+      .from("fotos_reporte")
+      .select("id_registro")
+      .in("id_registro", idsRegistroConComponente);
+    (fotosReporte || []).forEach(f => {
+      conteoFotosPorRegistroReporte[f.id_registro] = (conteoFotosPorRegistroReporte[f.id_registro] || 0) + 1;
+    });
+  }
+  function fotosLinkDe(c) {
+    if (!c.id_registro) return null;
+    const cantidad = conteoFotosPorRegistroReporte[c.id_registro] || 0;
+    if (cantidad > 1) return { url: `${window.location.origin}/ver-fotos.html?origen=ticket&id=${encodeURIComponent(c.id_registro)}`, texto: `Ver todas (${cantidad})` };
+    const unica = mapaHistorialPorRegistro[c.id_registro]?.link_foto;
+    return unica ? { url: unica, texto: "Ver foto" } : null;
+  }
+  (componentes || []).forEach(c => { c.fotosLink = fotosLinkDe(c); });
+
+
   (garantiasOt || []).forEach(g => {
     const componente = g.componente_id ? mapaComponentesPorId[g.componente_id] : null;
     g.foto_real = componente?.foto_revision
@@ -220,7 +241,10 @@ function renderReporte() {
 
   llenarTabla("tabla-estado", r.estadoFinal.map(([e, n]) => [e, n]));
   llenarTabla("tabla-recibidos", r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
-  llenarTabla("tabla-componentes", r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || "—"]));
+  llenarTabla("tabla-componentes", r.componentesCambiados.map(c => {
+    const foto = c.fotosLink;
+    return [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || "—", foto ? `<a href="${foto.url}" target="_blank" rel="noopener">${foto.texto}</a>` : "—"];
+  }));
   llenarTabla("tabla-materiales-1ra", r.materiales1ra.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
   llenarTabla("tabla-materiales-2da", r.materiales2da.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
   llenarTabla("tabla-materiales-sin-categoria", r.materialesSinCategoria.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
@@ -321,8 +345,8 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
     r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
 
   seccion("CAMBIOS DE COMPONENTES REALIZADOS",
-    ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino"],
-    r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || ""]));
+    ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino", "Fotos"],
+    r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || "", c.fotosLink ? c.fotosLink.url : ""]));
 
   seccion("CONTROL DE MATERIALES - 1RA CATEGORÍA",
     ["Tipo", "Llevados", "Utilizados", "Vuelven"],
@@ -403,7 +427,7 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
   }
   seccion("Resumen de Estado Final", ["Estado", "Cantidad"], r.estadoFinal);
   seccion("Resumen de Equipos Atendidos", ["Módulo", "Acción en calle", "Comentarios"], r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
-  seccion("Cambios de Componentes Realizados", ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || "—"]));
+  seccion("Cambios de Componentes Realizados", ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino", "Fotos"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || "—", c.fotosLink ? c.fotosLink.url : "—"]));
   seccion("Control de Materiales — 1ra Categoría", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales1ra.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
   seccion("Control de Materiales — 2da Categoría", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales2da.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
   if (r.materialesSinCategoria.length > 0) {
