@@ -740,7 +740,7 @@ modalEnviarBtn.addEventListener("click", async () => {
   const accionesSeleccionadas = [...document.querySelectorAll(".accion-check:checked")].map(c => c.value);
   const comentarios = document.getElementById("modal-comentarios-input").value.trim();
   const estadoEquipo = document.getElementById("modal-estado-select").value;
-  const fotoFile = document.getElementById("modal-foto-input").files[0];
+  const fotosFiles = [...document.getElementById("modal-foto-input").files];
 
   if (!falla) { mostrarMensaje(modalMsg, "⚠️ Selecciona la falla.", true); return; }
   const hayCambioOAlgoMas = ["le", "ce", "ba", "mc", "completo"].some(c => document.getElementById("modal-cambio-" + c).checked)
@@ -775,21 +775,31 @@ modalEnviarBtn.addEventListener("click", async () => {
 
   const { data: { user } } = await supabaseClient.auth.getUser();
 
-  // Subir foto si hay
+  // Subir todas las fotos seleccionadas — la primera se guarda también en
+  // link_foto (para no romper nada de lo que ya lee ese campo), y TODAS
+  // quedan además en fotos_reporte para poder verlas todas después.
   let linkFoto = null;
-  if (fotoFile) {
+  const urlsFotosSubidas = [];
+  for (const archivo of fotosFiles) {
     try {
-      const nombreArchivo = `${Date.now()}_${fotoFile.name}`;
-      const { error: errorSubida } = await supabaseClient.storage.from("fotos-reportes").upload(nombreArchivo, fotoFile);
+      const nombreArchivo = `${Date.now()}_${archivo.name}`;
+      const { error: errorSubida } = await supabaseClient.storage.from("fotos-reportes").upload(nombreArchivo, archivo);
       if (errorSubida) throw errorSubida;
       const { data: urlData } = supabaseClient.storage.from("fotos-reportes").getPublicUrl(nombreArchivo);
-      linkFoto = urlData.publicUrl;
+      urlsFotosSubidas.push(urlData.publicUrl);
+      if (!linkFoto) linkFoto = urlData.publicUrl;
     } catch (err) {
-      mostrarMensaje(modalMsg, "⚠️ No se pudo subir la foto, pero se sigue guardando el reporte: " + err.message, true);
+      mostrarMensaje(modalMsg, "⚠️ No se pudo subir una de las fotos, pero se sigue guardando el reporte: " + err.message, true);
     }
   }
 
   const idRegistro = ticketExistente || ("TK-" + equipoAbierto + "-" + Math.floor(Math.random() * 900 + 100));
+
+  if (urlsFotosSubidas.length > 0) {
+    await supabaseClient.from("fotos_reporte").insert(
+      urlsFotosSubidas.map(url => ({ id_registro: idRegistro, url: url, subido_por: user.email }))
+    );
+  }
 
   // Si un componente está marcado como "cambio" Y "falta" a la vez (llegó
   // sin el viejo, pero se instaló uno nuevo), lo tratamos solo como
