@@ -2,7 +2,7 @@
 // VER FOTOS — galería simple de todas las fotos de un ticket
 // =========================================================================
 
-document.addEventListener("perfil-listo", cargarFotos);
+cargarFotos();
 
 async function cargarFotos() {
   const params = new URLSearchParams(window.location.search);
