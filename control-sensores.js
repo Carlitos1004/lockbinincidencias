@@ -126,6 +126,7 @@ function renderTablaSensores() {
       <td>${s.superfy_id || "—"}</td>
       <td>${s.estado_conectividad === "OFFLINE" ? "🟥 Offline" : "🟩 Online"}</td>
       <td>${s.estado_vinculacion === "DESVINCULADO" ? "❌ Desvinculado" : "🔗 Vinculado"}</td>
+      <td>${s.nivel_bateria !== null && s.nivel_bateria !== undefined ? `<span style="${s.nivel_bateria < 20 ? 'color:#c0392b; font-weight:600;' : ''}">${s.nivel_bateria}%</span>` : "—"}</td>
       <td>${s.ultima_lectura ? new Date(s.ultima_lectura).toLocaleString("es-ES") : "Sin lecturas"}</td>
       <td>${new Date(s.fecha_actualizacion).toLocaleString("es-ES")}</td>
     </tr>
