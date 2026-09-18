@@ -780,9 +780,12 @@ modalEnviarBtn.addEventListener("click", async () => {
   // quedan además en fotos_reporte para poder verlas todas después.
   let linkFoto = null;
   const urlsFotosSubidas = [];
-  for (const archivo of fotosFiles) {
+  for (let i = 0; i < fotosFiles.length; i++) {
+    const archivoOriginal = fotosFiles[i];
+    modalEnviarBtn.textContent = fotosFiles.length > 1 ? `Subiendo foto ${i + 1} de ${fotosFiles.length}...` : "Subiendo foto...";
     try {
-      const nombreArchivo = `${Date.now()}_${archivo.name}`;
+      const archivo = await comprimirImagen(archivoOriginal);
+      const nombreArchivo = `${Date.now()}_${archivoOriginal.name}`;
       const { error: errorSubida } = await supabaseClient.storage.from("fotos-reportes").upload(nombreArchivo, archivo);
       if (errorSubida) throw errorSubida;
       const { data: urlData } = supabaseClient.storage.from("fotos-reportes").getPublicUrl(nombreArchivo);
@@ -792,6 +795,7 @@ modalEnviarBtn.addEventListener("click", async () => {
       mostrarMensaje(modalMsg, "⚠️ No se pudo subir una de las fotos, pero se sigue guardando el reporte: " + err.message, true);
     }
   }
+  modalEnviarBtn.textContent = "Enviando...";
 
   const idRegistro = ticketExistente || ("TK-" + equipoAbierto + "-" + Math.floor(Math.random() * 900 + 100));
 
@@ -1170,3 +1174,42 @@ document.addEventListener("perfil-listo", (e) => {
   if (!enlace) return;
   enlace.href = e.detail.rol === "manager" ? "admin.html" : "tecnico.html";
 });
+
+// Comprime una foto antes de subirla — las fotos de celular suelen pesar
+// varios MB sin necesidad, lo que hace lenta tanto la subida como la
+// carga después al verlas. La reducimos a un máximo razonable de ancho/
+// alto y la volvemos a comprimir como JPEG de calidad media.
+function comprimirImagen(archivo) {
+  return new Promise((resolve) => {
+    // Si no es una imagen (raro, pero por si acaso) o algo falla, seguimos
+    // con el archivo original en vez de bloquear el envío.
+    if (!archivo.type || !archivo.type.startsWith("image/")) { resolve(archivo); return; }
+
+    const lector = new FileReader();
+    lector.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_LADO = 1600;
+        let ancho = img.width;
+        let alto = img.height;
+        if (ancho > MAX_LADO || alto > MAX_LADO) {
+          if (ancho > alto) { alto = Math.round(alto * (MAX_LADO / ancho)); ancho = MAX_LADO; }
+          else { ancho = Math.round(ancho * (MAX_LADO / alto)); alto = MAX_LADO; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = ancho;
+        canvas.height = alto;
+        canvas.getContext("2d").drawImage(img, 0, 0, ancho, alto);
+        canvas.toBlob(
+          (blob) => resolve(blob || archivo),
+          "image/jpeg",
+          0.75
+        );
+      };
+      img.onerror = () => resolve(archivo); // si no se pudo leer como imagen, seguimos con el original
+      img.src = e.target.result;
+    };
+    lector.onerror = () => resolve(archivo);
+    lector.readAsDataURL(archivo);
+  });
+}

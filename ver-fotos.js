@@ -39,3 +39,12 @@ async function cargarFotos() {
     </a>
   `).join("");
 }
+
+function cerrarPestana() {
+  window.close();
+  // Si el navegador no deja cerrarla por JS (pasa en algunos casos), le
+  // avisamos para que la cierre a mano en vez de que no pase nada.
+  setTimeout(() => {
+    alert("Puedes cerrar esta pestaña manualmente (el navegador no permitió cerrarla automáticamente).");
+  }, 300);
+}
