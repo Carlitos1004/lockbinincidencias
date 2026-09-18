@@ -3,6 +3,7 @@
 // =========================================================================
 
 let notasData = [];
+let conteoFotosPorNota = {};
 let editandoId = null;
 
 cargarNotas();
@@ -18,6 +19,19 @@ async function cargarNotas() {
     return;
   }
   notasData = data || [];
+
+  conteoFotosPorNota = {};
+  const idsNotas = notasData.map(n => n.id);
+  if (idsNotas.length > 0) {
+    const { data: fotos } = await supabaseClient
+      .from("fotos_nota_equipo")
+      .select("nota_id")
+      .in("nota_id", idsNotas);
+    (fotos || []).forEach(f => {
+      conteoFotosPorNota[f.nota_id] = (conteoFotosPorNota[f.nota_id] || 0) + 1;
+    });
+  }
+
   renderTabla();
 }
 
@@ -55,7 +69,12 @@ function renderTabla() {
     <tr class="${n.activa ? '' : 'fila-alerta'}">
       <td>${n.mc}</td>
       <td>${n.nota}</td>
-      <td>${n.foto_url ? `<a href="${n.foto_url}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>` : "—"}</td>
+      <td>${(conteoFotosPorNota[n.id] > 1)
+        ? `<a href="ver-fotos.html?origen=nota&id=${n.id}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver todas las fotos (${conteoFotosPorNota[n.id]}) →</a>`
+        : n.foto_url
+          ? `<a href="${n.foto_url}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>`
+          : "—"
+      }</td>
       <td>${n.autor || "—"}</td>
       <td>${new Date(n.fecha).toLocaleDateString("es-ES")}</td>
       <td>${n.activa ? "🟢 Activa" : "⚪ Inactiva"}</td>
@@ -118,7 +137,7 @@ function renderTabla() {
 document.getElementById("agregar-nota-btn").addEventListener("click", async () => {
   const mc = document.getElementById("nota-mc").value.trim().toUpperCase();
   const texto = document.getElementById("nota-texto").value.trim();
-  const archivoFoto = document.getElementById("nota-foto-input").files[0];
+  const fotosFiles = [...document.getElementById("nota-foto-input").files];
   const msg = document.getElementById("nota-msg");
 
   if (!mc || !texto) {
@@ -130,32 +149,46 @@ document.getElementById("agregar-nota-btn").addEventListener("click", async () =
   btn.disabled = true;
   btn.textContent = "Guardando...";
 
-  let fotoUrl = null;
-  if (archivoFoto) {
-    const nombreArchivo = `nota_${Date.now()}_${archivoFoto.name}`;
-    const { error: errorSubida } = await supabaseClient.storage.from("fotos-reportes").upload(nombreArchivo, archivoFoto);
-    if (errorSubida) {
-      mostrarMensaje(msg, "❌ Error al subir la foto: " + errorSubida.message, true);
-      btn.disabled = false;
-      btn.textContent = "Guardar nota";
-      return;
-    }
-    const { data: urlData } = supabaseClient.storage.from("fotos-reportes").getPublicUrl(nombreArchivo);
-    fotoUrl = urlData.publicUrl;
+  const { data: { user } } = await supabaseClient.auth.getUser();
+
+  // Primero creamos la nota (sin foto todavía), para tener su id y poder
+  // vincularle las fotos después.
+  const { data: notaCreada, error: errorNota } = await supabaseClient
+    .from("notas_equipo")
+    .insert({ mc: mc, nota: texto, autor: user.email })
+    .select()
+    .single();
+
+  if (errorNota) {
+    mostrarMensaje(msg, "❌ " + errorNota.message, true);
+    btn.disabled = false;
+    btn.textContent = "Guardar nota";
+    return;
   }
 
-  const { data: { user } } = await supabaseClient.auth.getUser();
-  const { error } = await supabaseClient.from("notas_equipo").insert({
-    mc: mc, nota: texto, autor: user.email, foto_url: fotoUrl
-  });
+  // Ahora subimos todas las fotos (comprimidas) y las vinculamos a la nota
+  let fotoUrl = null;
+  for (let i = 0; i < fotosFiles.length; i++) {
+    btn.textContent = fotosFiles.length > 1 ? `Subiendo foto ${i + 1} de ${fotosFiles.length}...` : "Subiendo foto...";
+    try {
+      const archivo = await comprimirImagen(fotosFiles[i]);
+      const nombreArchivo = `nota_${Date.now()}_${fotosFiles[i].name}`;
+      const { error: errorSubida } = await supabaseClient.storage.from("fotos-reportes").upload(nombreArchivo, archivo);
+      if (errorSubida) throw errorSubida;
+      const { data: urlData } = supabaseClient.storage.from("fotos-reportes").getPublicUrl(nombreArchivo);
+      await supabaseClient.from("fotos_nota_equipo").insert({ nota_id: notaCreada.id, url: urlData.publicUrl, subido_por: user.email });
+      if (!fotoUrl) fotoUrl = urlData.publicUrl;
+    } catch (err) {
+      mostrarMensaje(msg, "⚠️ No se pudo subir una de las fotos, pero la nota se guardó: " + err.message, true);
+    }
+  }
+
+  if (fotoUrl) {
+    await supabaseClient.from("notas_equipo").update({ foto_url: fotoUrl }).eq("id", notaCreada.id);
+  }
 
   btn.disabled = false;
   btn.textContent = "Guardar nota";
-
-  if (error) {
-    mostrarMensaje(msg, "❌ " + error.message, true);
-    return;
-  }
 
   mostrarMensaje(msg, "✅ Nota guardada.", false);
   document.getElementById("nota-mc").value = "";
@@ -173,3 +206,33 @@ function mostrarMensaje(el, texto, esError) {
 ["filtro-notas-mc", "filtro-notas-estado"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderTabla);
 });
+
+// Comprime una foto antes de subirla (mismo criterio que en Ruta) — evita
+// subidas lentas y galerías pesadas de cargar después.
+function comprimirImagen(archivo) {
+  return new Promise((resolve) => {
+    if (!archivo.type || !archivo.type.startsWith("image/")) { resolve(archivo); return; }
+    const lector = new FileReader();
+    lector.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_LADO = 1600;
+        let ancho = img.width;
+        let alto = img.height;
+        if (ancho > MAX_LADO || alto > MAX_LADO) {
+          if (ancho > alto) { alto = Math.round(alto * (MAX_LADO / ancho)); ancho = MAX_LADO; }
+          else { ancho = Math.round(ancho * (MAX_LADO / alto)); alto = MAX_LADO; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = ancho;
+        canvas.height = alto;
+        canvas.getContext("2d").drawImage(img, 0, 0, ancho, alto);
+        canvas.toBlob((blob) => resolve(blob || archivo), "image/jpeg", 0.75);
+      };
+      img.onerror = () => resolve(archivo);
+      img.src = e.target.result;
+    };
+    lector.onerror = () => resolve(archivo);
+    lector.readAsDataURL(archivo);
+  });
+}

@@ -6,19 +6,23 @@ document.addEventListener("perfil-listo", cargarFotos);
 
 async function cargarFotos() {
   const params = new URLSearchParams(window.location.search);
-  const idRegistro = params.get("id");
+  const id = params.get("id");
+  const origen = params.get("origen") || "ticket"; // "ticket" (fotos_reporte) o "nota" (fotos_nota_equipo)
   const msg = document.getElementById("cargar-msg");
   const galeria = document.getElementById("galeria");
 
-  if (!idRegistro) {
-    msg.textContent = "⚠️ Falta indicar qué ticket consultar.";
+  if (!id) {
+    msg.textContent = "⚠️ Falta indicar qué consultar.";
     return;
   }
 
+  const tabla = origen === "nota" ? "fotos_nota_equipo" : "fotos_reporte";
+  const columnaId = origen === "nota" ? "nota_id" : "id_registro";
+
   const { data, error } = await supabaseClient
-    .from("fotos_reporte")
+    .from(tabla)
     .select("*")
-    .eq("id_registro", idRegistro)
+    .eq(columnaId, id)
     .order("fecha", { ascending: true });
 
   if (error) {
@@ -27,14 +31,14 @@ async function cargarFotos() {
   }
 
   if (!data || data.length === 0) {
-    msg.textContent = "No hay fotos guardadas para este ticket.";
+    msg.textContent = "No hay fotos guardadas aquí.";
     return;
   }
 
-  msg.textContent = `${data.length} foto(s) — ${idRegistro}`;
+  msg.textContent = `${data.length} foto(s)`;
   galeria.innerHTML = data.map(f => `
     <a href="${f.url}" target="_blank" rel="noopener" class="galeria-foto-item">
-      <img src="${f.url}" alt="Foto del reporte" loading="lazy">
+      <img src="${f.url}" alt="Foto" loading="lazy">
       <span>${new Date(f.fecha).toLocaleString("es-ES")}</span>
     </a>
   `).join("");
