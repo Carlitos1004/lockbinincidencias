@@ -98,10 +98,10 @@ async function generarReporte() {
     });
   }
   function fotosLinkDe(c) {
-    if (!c.id_registro) return null;
+    if (!c.id_registro) return c.foto_revision ? { url: c.foto_revision, texto: "Ver foto" } : null;
     const cantidad = conteoFotosPorRegistroReporte[c.id_registro] || 0;
     if (cantidad > 1) return { url: `${window.location.origin}/ver-fotos.html?origen=ticket&id=${encodeURIComponent(c.id_registro)}`, texto: `Ver todas (${cantidad})` };
-    const unica = mapaHistorialPorRegistro[c.id_registro]?.link_foto;
+    const unica = c.foto_revision || mapaHistorialPorRegistro[c.id_registro]?.link_foto;
     return unica ? { url: unica, texto: "Ver foto" } : null;
   }
   (componentes || []).forEach(c => { c.fotosLink = fotosLinkDe(c); });
