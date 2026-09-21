@@ -86,7 +86,10 @@ async function generarReporte() {
   const mapaHistorialPorRegistro = {};
   (tickets || []).forEach(t => { mapaHistorialPorRegistro[t.id_registro] = t; });
 
-  const idsRegistroConComponente = [...new Set((componentes || []).map(c => c.id_registro).filter(Boolean))];
+  const idsRegistroConComponente = [...new Set([
+    ...(componentes || []).map(c => c.id_registro),
+    ...(tickets || []).map(t => t.id_registro)
+  ].filter(Boolean))];
   const conteoFotosPorRegistroReporte = {};
   if (idsRegistroConComponente.length > 0) {
     const { data: fotosReporte } = await supabaseClient
@@ -142,8 +145,14 @@ async function generarReporte() {
 
   // --- Equipos recibidos (acción/comentarios de cada ticket) ---
   const equiposRecibidos = ticketsSeguro
-    .filter(t => t.accion_calle || t.comentarios)
-    .map(t => ({ mc: t.m_control, accion: t.accion_calle || "", comentarios: t.comentarios || "" }));
+    .filter(t => t.accion_calle || t.comentarios || t.link_foto || conteoFotosPorRegistroReporte[t.id_registro])
+    .map(t => {
+      const cantidad = conteoFotosPorRegistroReporte[t.id_registro] || 0;
+      const fotosLink = cantidad > 1
+        ? { url: `${window.location.origin}/ver-fotos.html?origen=ticket&id=${encodeURIComponent(t.id_registro)}`, texto: `Ver todas (${cantidad})` }
+        : t.link_foto ? { url: t.link_foto, texto: "Ver foto" } : null;
+      return { mc: t.m_control, accion: t.accion_calle || "", comentarios: t.comentarios || "", fotosLink };
+    });
 
   // --- Componentes cambiados (excluye Faltante/Perdido) ---
   const componentesCambiados = (componentes || []).filter(c => c.estado !== "Faltante/Perdido");
@@ -240,7 +249,7 @@ function renderReporte() {
   document.getElementById("instrucciones-reporte-texto").textContent = r.instrucciones;
 
   llenarTabla("tabla-estado", r.estadoFinal.map(([e, n]) => [e, n]));
-  llenarTabla("tabla-recibidos", r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
+  llenarTabla("tabla-recibidos", r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios, e.fotosLink ? `<a href="${e.fotosLink.url}" target="_blank" rel="noopener">${e.fotosLink.texto}</a>` : "—"]));
   llenarTabla("tabla-componentes", r.componentesCambiados.map(c => {
     const foto = c.fotosLink;
     return [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || "—", foto ? `<a href="${foto.url}" target="_blank" rel="noopener">${foto.texto}</a>` : "—"];
@@ -341,8 +350,8 @@ document.getElementById("descargar-excel-btn").addEventListener("click", () => {
   seccion("RESUMEN DE ESTADO FINAL", ["Estado", "Cantidad"], r.estadoFinal);
 
   seccion("RESUMEN DE EQUIPOS ATENDIDOS",
-    ["Módulo", "Acción en calle", "Comentarios"],
-    r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
+    ["Módulo", "Acción en calle", "Comentarios", "Fotos"],
+    r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios, e.fotosLink ? e.fotosLink.url : ""]));
 
   seccion("CAMBIOS DE COMPONENTES REALIZADOS",
     ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino", "Fotos"],
@@ -426,7 +435,7 @@ document.getElementById("descargar-pdf-btn").addEventListener("click", () => {
     seccion("Instrucciones / Resumen de la Actuación", ["Texto"], [[r.instrucciones]]);
   }
   seccion("Resumen de Estado Final", ["Estado", "Cantidad"], r.estadoFinal);
-  seccion("Resumen de Equipos Atendidos", ["Módulo", "Acción en calle", "Comentarios"], r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios]));
+  seccion("Resumen de Equipos Atendidos", ["Módulo", "Acción en calle", "Comentarios", "Fotos"], r.equiposRecibidos.map(e => [e.mc, e.accion, e.comentarios, e.fotosLink ? e.fotosLink.url : "—"]));
   seccion("Cambios de Componentes Realizados", ["Módulo", "Tipo", "Serial Nuevo Instalado", "Serial Retirado", "Destino", "Fotos"], r.componentesCambiados.map(c => [c.m_control, c.tipo_componente, serialNuevoConNota(c), c.serial_retirado, c.destino || "—", c.fotosLink ? c.fotosLink.url : "—"]));
   seccion("Control de Materiales — 1ra Categoría", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales1ra.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
   seccion("Control de Materiales — 2da Categoría", ["Tipo", "Llevados", "Utilizados", "Vuelven"], r.materiales2da.map(m => [m.nombreOficial, m.llevados, m.utilizados, m.vuelven]));
