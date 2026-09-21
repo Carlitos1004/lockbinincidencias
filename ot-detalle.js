@@ -273,10 +273,33 @@ verRutaBtn.addEventListener("click", () => {
     return;
   }
 
+  // Ordenamos por cercanía (vecino más cercano, partiendo de la oficina)
+  // y después agrupamos esa secuencia en bloques de 10 — como ya van en
+  // orden de cercanía, cada bloque queda geográficamente agrupado. Así,
+  // al trazar cada ruta de 10 en My Maps, no hay que ir buscando a ojo
+  // cuáles quedan cerca entre cientos de puntos regados en el mapa.
+  const TAMANO_BLOQUE = 10;
+  const ordenadosPorCercania = [];
+  let actual = { lat: LAT_OFICINA, lng: LNG_OFICINA };
+  const restantes = [...puntosUnicosConMc];
+  while (restantes.length > 0) {
+    let iMasCercano = 0;
+    let distMinima = Infinity;
+    restantes.forEach((p, i) => {
+      const d = distanciaKm(actual.lat, actual.lng, p.lat, p.lng);
+      if (d < distMinima) { distMinima = d; iMasCercano = i; }
+    });
+    const siguiente = restantes.splice(iMasCercano, 1)[0];
+    ordenadosPorCercania.push(siguiente);
+    actual = siguiente;
+  }
+
   // CSV para importar en Google My Maps (mymaps.google.com) — ahí sí
-  // aparece el nombre real (el MC) en cada pin dentro del mapa.
-  const encabezado = "Name,Latitude,Longitude";
-  const filas = puntosUnicosConMc.map(p => `${p.mc},${p.lat},${p.lng}`);
+  // aparece el nombre real (el MC) en cada pin dentro del mapa. La
+  // columna Bloque sirve además para colorear por grupo en My Maps
+  // ("Estilo" → "Agrupar lugares por columna" → Bloque).
+  const encabezado = "Name,Latitude,Longitude,Bloque";
+  const filas = ordenadosPorCercania.map((p, idx) => `${p.mc},${p.lat},${p.lng},Bloque ${Math.floor(idx / TAMANO_BLOQUE) + 1}`);
   const csv = [encabezado, ...filas].join("\n");
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -285,8 +308,9 @@ verRutaBtn.addEventListener("click", () => {
   enlaceDescarga.download = `Ruta_${otActualCargada.id_ot}_MyMaps.csv`;
   enlaceDescarga.click();
 
+  const totalBloques = Math.ceil(ordenadosPorCercania.length / TAMANO_BLOQUE);
   alert(
-    `Se descargó el archivo con ${puntosUnicosConMc.length} equipo(s).\n\n` +
+    `Se descargó el archivo con ${ordenadosPorCercania.length} equipo(s), agrupados en ${totalBloques} bloques de hasta 10.\n\n` +
     `Para verlo con nombres en el mapa:\n` +
     `1. Entra a mymaps.google.com\n` +
     `2. Crea un mapa nuevo (o abre uno existente)\n` +
@@ -743,13 +767,6 @@ document.getElementById("traer-buscar-btn").addEventListener("click", async () =
   });
 });
 
-// =========================================================================
-// ORDEN DE VISITA SUGERIDO — "vecino más cercano" desde la oficina.
-// No es una ruta óptima de verdad (eso es un problema matemático mucho
-// más difícil, tipo "viajante"), pero para cientos de paradas donde
-// Google Maps ya no puede ayudar, esto da un orden razonable en vez de
-// ir a ojo.
-// =========================================================================
 
 function distanciaKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -758,71 +775,3 @@ function distanciaKm(lat1, lng1, lat2, lng2) {
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-
-document.getElementById("ordenar-visita-btn").addEventListener("click", () => {
-  const puntosConCoords = [];
-  const puntosSinCoords = [];
-  const vistos = new Set();
-
-  ticketsCargados.forEach(t => {
-    if (vistos.has(t.m_control)) return;
-    vistos.add(t.m_control);
-    if (t.equipos && t.equipos.latitud && t.equipos.longitud) {
-      puntosConCoords.push({ mc: t.m_control, fraccion: t.equipos.fraccion || "—", lat: t.equipos.latitud, lng: t.equipos.longitud });
-    } else {
-      puntosSinCoords.push({ mc: t.m_control, fraccion: "—" });
-    }
-  });
-
-  if (puntosConCoords.length === 0) {
-    alert("Ninguno de los equipos de esta OT tiene coordenadas registradas.");
-    return;
-  }
-
-  // Vecino más cercano: partiendo de la oficina, siempre saltamos al
-  // punto no visitado más cercano al actual.
-  const ordenados = [];
-  const distancias = [];
-  let actual = { lat: LAT_OFICINA, lng: LNG_OFICINA };
-  const restantes = [...puntosConCoords];
-
-  while (restantes.length > 0) {
-    let iMasCercano = 0;
-    let distMinima = Infinity;
-    restantes.forEach((p, i) => {
-      const d = distanciaKm(actual.lat, actual.lng, p.lat, p.lng);
-      if (d < distMinima) { distMinima = d; iMasCercano = i; }
-    });
-    const siguiente = restantes.splice(iMasCercano, 1)[0];
-    ordenados.push(siguiente);
-    distancias.push(distMinima);
-    actual = siguiente;
-  }
-
-  const box = document.getElementById("orden-visita-box");
-  const tbody = document.getElementById("orden-visita-tbody");
-  box.hidden = false;
-
-  let filasHtml = ordenados.map((p, idx) => `
-    <tr>
-      <td>${idx + 1}</td>
-      <td>${p.mc}</td>
-      <td>${p.fraccion}</td>
-      <td>${distancias[idx].toFixed(1)} km</td>
-    </tr>
-  `).join("");
-
-  if (puntosSinCoords.length > 0) {
-    filasHtml += puntosSinCoords.map(p => `
-      <tr class="fila-alerta">
-        <td>—</td>
-        <td>${p.mc}</td>
-        <td>${p.fraccion}</td>
-        <td>Sin coordenadas</td>
-      </tr>
-    `).join("");
-  }
-
-  tbody.innerHTML = filasHtml;
-  box.scrollIntoView({ behavior: "smooth", block: "start" });
-});
