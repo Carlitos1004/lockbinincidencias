@@ -742,3 +742,87 @@ document.getElementById("traer-buscar-btn").addEventListener("click", async () =
     buscarOT();
   });
 });
+
+// =========================================================================
+// ORDEN DE VISITA SUGERIDO — "vecino más cercano" desde la oficina.
+// No es una ruta óptima de verdad (eso es un problema matemático mucho
+// más difícil, tipo "viajante"), pero para cientos de paradas donde
+// Google Maps ya no puede ayudar, esto da un orden razonable en vez de
+// ir a ojo.
+// =========================================================================
+
+function distanciaKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+document.getElementById("ordenar-visita-btn").addEventListener("click", () => {
+  const puntosConCoords = [];
+  const puntosSinCoords = [];
+  const vistos = new Set();
+
+  ticketsCargados.forEach(t => {
+    if (vistos.has(t.m_control)) return;
+    vistos.add(t.m_control);
+    if (t.equipos && t.equipos.latitud && t.equipos.longitud) {
+      puntosConCoords.push({ mc: t.m_control, fraccion: t.equipos.fraccion || "—", lat: t.equipos.latitud, lng: t.equipos.longitud });
+    } else {
+      puntosSinCoords.push({ mc: t.m_control, fraccion: "—" });
+    }
+  });
+
+  if (puntosConCoords.length === 0) {
+    alert("Ninguno de los equipos de esta OT tiene coordenadas registradas.");
+    return;
+  }
+
+  // Vecino más cercano: partiendo de la oficina, siempre saltamos al
+  // punto no visitado más cercano al actual.
+  const ordenados = [];
+  const distancias = [];
+  let actual = { lat: LAT_OFICINA, lng: LNG_OFICINA };
+  const restantes = [...puntosConCoords];
+
+  while (restantes.length > 0) {
+    let iMasCercano = 0;
+    let distMinima = Infinity;
+    restantes.forEach((p, i) => {
+      const d = distanciaKm(actual.lat, actual.lng, p.lat, p.lng);
+      if (d < distMinima) { distMinima = d; iMasCercano = i; }
+    });
+    const siguiente = restantes.splice(iMasCercano, 1)[0];
+    ordenados.push(siguiente);
+    distancias.push(distMinima);
+    actual = siguiente;
+  }
+
+  const box = document.getElementById("orden-visita-box");
+  const tbody = document.getElementById("orden-visita-tbody");
+  box.hidden = false;
+
+  let filasHtml = ordenados.map((p, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${p.mc}</td>
+      <td>${p.fraccion}</td>
+      <td>${distancias[idx].toFixed(1)} km</td>
+    </tr>
+  `).join("");
+
+  if (puntosSinCoords.length > 0) {
+    filasHtml += puntosSinCoords.map(p => `
+      <tr class="fila-alerta">
+        <td>—</td>
+        <td>${p.mc}</td>
+        <td>${p.fraccion}</td>
+        <td>Sin coordenadas</td>
+      </tr>
+    `).join("");
+  }
+
+  tbody.innerHTML = filasHtml;
+  box.scrollIntoView({ behavior: "smooth", block: "start" });
+});

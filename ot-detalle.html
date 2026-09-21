@@ -72,9 +72,18 @@
 
     <div class="ruta-box">
       <button id="ver-ruta-btn" class="btn-secundario">🗺️ Descargar CSV para My Maps</button>
+      <button id="ordenar-visita-btn" class="btn-secundario">📍 Sugerir orden de visita</button>
       <button id="descargar-btn" class="btn-secundario">⬇️ Descargar como Excel</button>
       <button id="descargar-plantilla-btn" class="btn-secundario">📧 Plantilla para correo</button>
       <button id="eliminar-ot-btn" class="btn-eliminar" hidden>🗑️ Eliminar esta OT</button>
+    </div>
+
+    <div id="orden-visita-box" hidden style="margin-top:14px;">
+      <p style="font-size:0.85rem; color:var(--gris-700);">Orden sugerido por cercanía (vecino más cercano desde la oficina) — no es una ruta óptima matemática, es una guía razonable para no ir de un lado a otro sin sentido. Los equipos sin coordenadas quedan al final, sin orden.</p>
+      <table class="tabla-revision">
+        <thead><tr><th>Parada</th><th>Módulo</th><th>Fracción</th><th>Distancia al anterior</th></tr></thead>
+        <tbody id="orden-visita-tbody"></tbody>
+      </table>
     </div>
 
     <div class="agregar-equipo-box">
