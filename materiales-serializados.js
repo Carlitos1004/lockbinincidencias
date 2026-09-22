@@ -83,10 +83,42 @@ async function cargarTabla() {
 
   tbody.querySelectorAll(".btn-marcar-devuelto-mat").forEach(btn => {
     btn.addEventListener("click", async () => {
+      const fila = data.find(s => s.id === btn.dataset.id);
+
       await supabaseClient
         .from("materiales_serializados")
         .update({ estado: "Devuelto al almacén", fecha_actualizacion: new Date().toISOString() })
         .eq("id", btn.dataset.id);
+
+      // Si lo que se devuelve es un Módulo de Control, es un equipo
+      // completo que se sacó pensando instalarlo y no se usó — se
+      // desvincula solo, sin que haya pasado por Revisión de Taller.
+      if (fila && fila.tipo_componente.startsWith("Módulo de Control")) {
+        const { data: eventoExistente } = await supabaseClient
+          .from("historial_equipo")
+          .select("id, tipo_evento")
+          .eq("mc", fila.serial)
+          .eq("id_ot", otActual)
+          .in("tipo_evento", ["Desvinculación", "Enviado a AMMI"])
+          .maybeSingle();
+
+        if (!eventoExistente) {
+          const { data: equipoInfo } = await supabaseClient
+            .from("equipos")
+            .select("imei")
+            .eq("m_control", fila.serial)
+            .maybeSingle();
+
+          await supabaseClient.from("historial_equipo").insert({
+            imei: equipoInfo?.imei || null,
+            mc: fila.serial,
+            tipo_evento: "Desvinculación",
+            id_ot: otActual,
+            notas: "Equipo completo sacado del almacén y devuelto sin usar (nunca se instaló)"
+          });
+        }
+      }
+
       cargarTabla();
     });
   });
@@ -198,6 +230,36 @@ async function registrarLote(filas) {
     false);
   cargarTabla();
   sincronizarLlevados(otActual);
+
+  // Si algún serial registrado es un Módulo de Control, es un equipo
+  // completo que se está sacando del almacén para instalarlo — se
+  // vincula solo, quedando ya asociado a esta OT/cliente antes incluso
+  // de que se confirme la instalación en Ruta (si luego sí se instala,
+  // Ruta actualiza este mismo evento con los datos completos).
+  const modulosControl = buenas.filter(b => b.tipo_componente.startsWith("Módulo de Control"));
+  if (modulosControl.length > 0) {
+    const { data: otInfo } = await supabaseClient.from("ordenes_trabajo").select("cliente").eq("id_ot", otActual).maybeSingle();
+    for (const mod of modulosControl) {
+      const { data: eventoExistente } = await supabaseClient
+        .from("historial_equipo")
+        .select("id")
+        .eq("mc", mod.serial)
+        .eq("id_ot", otActual)
+        .eq("tipo_evento", "Vinculación")
+        .maybeSingle();
+      if (eventoExistente) continue; // ya estaba vinculado para esta misma OT
+
+      const { data: equipoInfo } = await supabaseClient.from("equipos").select("imei").eq("m_control", mod.serial).maybeSingle();
+      await supabaseClient.from("historial_equipo").insert({
+        imei: equipoInfo?.imei || null,
+        mc: mod.serial,
+        tipo_evento: "Vinculación",
+        cliente: otInfo?.cliente || null,
+        id_ot: otActual,
+        notas: "Equipo completo sacado del almacén, serializado para esta OT"
+      });
+    }
+  }
 }
 
 document.getElementById("registrar-pegados-btn").addEventListener("click", () => {
