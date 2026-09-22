@@ -1166,13 +1166,16 @@ async function buscarUsoDuplicado(serial, codigo) {
   return data.find(c => !(c.id_registro === ticketExistente && c.m_control === equipoAbierto)) || null;
 }
 
-// El enlace de "página principal" apunta a un lugar distinto según el rol
-// — para el operario, la búsqueda/vista manual (que a futuro será su
-// pantalla de referencia con detalle de OT); para el manager, el panel.
+// El enlace de "página principal" solo aplica al manager por ahora — el
+// operario solo va a usar Ruta, así que ese botón no le hace falta.
 document.addEventListener("perfil-listo", (e) => {
   const enlace = document.getElementById("link-pagina-principal");
   if (!enlace) return;
-  enlace.href = e.detail.rol === "manager" ? "admin.html" : "tecnico.html";
+  if (e.detail.rol === "manager") {
+    enlace.href = "admin.html";
+  } else {
+    enlace.hidden = true;
+  }
 });
 
 // Comprime una foto antes de subirla — las fotos de celular suelen pesar
