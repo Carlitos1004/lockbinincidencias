@@ -1421,6 +1421,14 @@ input[type="file"]::file-selector-button:hover {
   margin-top: 8px;
 }
 
+.condicion-fisica-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
 .tabs-vista {
   display: flex;
   gap: 8px;
@@ -1638,8 +1646,8 @@ input[type="file"]::file-selector-button:hover {
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
-.marcador-no-visitado { background: #ea580c; }
-.marcador-pendiente-proxima { background: #2563eb; }
+.marcador-no-visitado { background: #2563eb; }
+.marcador-pendiente-proxima { background: #ea580c; }
 .marcador-resuelto { background: var(--verde-medio); }
 
 /* --- Modal de reporte --- */

@@ -154,6 +154,19 @@ function renderTabla(componentes) {
       </select>
     `;
 
+    const OPCIONES_CONDICION = ["Golpe / Equipo roto", "Síntoma de agua", "Cable roto", "Conector suelto"];
+    const condicionesActuales = c.condicion_fisica || [];
+    const celdaCondicionFisica = `
+      <div class="condicion-fisica-checklist">
+        ${OPCIONES_CONDICION.map(op => `
+          <label class="opcion-check">
+            <input type="checkbox" class="input-condicion-fisica" value="${op}" ${condicionesActuales.includes(op) ? "checked" : ""} ${bloqueado ? "disabled" : ""}>
+            ${op}
+          </label>
+        `).join("")}
+      </div>
+    `;
+
     return `
       <tr data-id="${c.id}">
         <td><input type="text" class="input-mc-fila" value="${c.m_control || ""}" placeholder="Ej: MC2500642"></td>
@@ -162,6 +175,7 @@ function renderTabla(componentes) {
         <td>${c.estado}</td>
         <td>${celdaClienteHistorico}</td>
         <td>${celdaEnCalle}</td>
+        <td>${celdaCondicionFisica}</td>
         <td><textarea class="input-reparacion" rows="2" ${bloqueado ? "disabled" : ""}>${c.reparacion || ""}</textarea></td>
         <td>
           <select class="input-destino" ${bloqueado ? "disabled" : ""}>
@@ -239,6 +253,7 @@ async function guardarFila(btn) {
   const clienteOriginal = fila.querySelector(".input-cliente-original")?.value || "";
   const enCalleValor = fila.querySelector(".input-en-calle").value;
   const estuvoEnCalle = enCalleValor === "" ? null : enCalleValor === "true";
+  const condicionFisica = [...fila.querySelectorAll(".input-condicion-fisica:checked")].map(chk => chk.value);
 
   if (!destino) {
     alert("Elige un Destino antes de guardar.");
@@ -289,7 +304,8 @@ async function guardarFila(btn) {
     categoria_ammi: destino === DESTINO_AMMI ? categoriaAmmi : null,
     garantia_cliente: destino === DESTINO_AMMI ? garantiaCliente : null,
     cliente_original: clienteOriginal || null,
-    estuvo_en_calle: estuvoEnCalle
+    estuvo_en_calle: estuvoEnCalle,
+    condicion_fisica: condicionFisica.length > 0 ? condicionFisica : null
   };
   if (fotoRevisionUrl) datosActualizacion.foto_revision = fotoRevisionUrl;
 
