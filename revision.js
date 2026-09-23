@@ -156,15 +156,19 @@ function renderTabla(componentes) {
 
     const OPCIONES_CONDICION = ["Golpe / Equipo roto", "Síntoma de agua", "Cable roto", "Conector suelto"];
     const condicionesActuales = c.condicion_fisica || [];
+    const resumenCondicion = condicionesActuales.length > 0 ? condicionesActuales.join(", ") : "— Sin problema —";
     const celdaCondicionFisica = `
-      <div class="condicion-fisica-checklist">
-        ${OPCIONES_CONDICION.map(op => `
-          <label class="opcion-check">
-            <input type="checkbox" class="input-condicion-fisica" value="${op}" ${condicionesActuales.includes(op) ? "checked" : ""} ${bloqueado ? "disabled" : ""}>
-            ${op}
-          </label>
-        `).join("")}
-      </div>
+      <details class="condicion-fisica-desplegable">
+        <summary class="condicion-fisica-resumen">${resumenCondicion}</summary>
+        <div class="condicion-fisica-checklist">
+          ${OPCIONES_CONDICION.map(op => `
+            <label class="opcion-check">
+              <input type="checkbox" class="input-condicion-fisica" value="${op}" ${condicionesActuales.includes(op) ? "checked" : ""} ${bloqueado ? "disabled" : ""}>
+              ${op}
+            </label>
+          `).join("")}
+        </div>
+      </details>
     `;
 
     return `
@@ -194,6 +198,16 @@ function renderTabla(componentes) {
       </tr>
     `;
   }).join("");
+
+  tbody.querySelectorAll(".condicion-fisica-desplegable").forEach(detalle => {
+    const resumen = detalle.querySelector(".condicion-fisica-resumen");
+    detalle.querySelectorAll(".input-condicion-fisica").forEach(chk => {
+      chk.addEventListener("change", () => {
+        const marcadas = [...detalle.querySelectorAll(".input-condicion-fisica:checked")].map(c => c.value);
+        resumen.textContent = marcadas.length > 0 ? marcadas.join(", ") : "— Sin problema —";
+      });
+    });
+  });
 
   tbody.querySelectorAll(".btn-marcar-devuelto").forEach(btn => {
     btn.addEventListener("click", async () => {
