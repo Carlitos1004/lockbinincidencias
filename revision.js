@@ -474,6 +474,7 @@ async function guardarFila(btn) {
         } else {
           await supabaseClient.from("historial_equipo").insert(datosEvento);
         }
+        if (imeiFinal) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imeiFinal });
       }
       // si ya existía uno del mismo tipo para esta misma OT, no se toca
     }

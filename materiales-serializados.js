@@ -116,6 +116,7 @@ async function cargarTabla() {
             id_ot: otActual,
             notas: "Equipo completo sacado del almacén y devuelto sin usar (nunca se instaló)"
           });
+          if (equipoInfo?.imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: equipoInfo.imei });
         }
       }
 
@@ -258,6 +259,7 @@ async function registrarLote(filas) {
         id_ot: otActual,
         notas: "Equipo completo sacado del almacén, serializado para esta OT"
       });
+      if (equipoInfo?.imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: equipoInfo.imei });
     }
   }
 }

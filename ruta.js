@@ -997,7 +997,6 @@ modalEnviarBtn.addEventListener("click", async () => {
         }
       }
     }
-
     const datosVinculacion = {
       imei: imeiNuevo, mc: mcNuevo, tipo_evento: "Vinculación",
       cliente: clienteDeEsteEquipo,
@@ -1021,6 +1020,7 @@ modalEnviarBtn.addEventListener("click", async () => {
     } else {
       await supabaseClient.from("historial_equipo").insert(datosVinculacion);
     }
+    if (imeiNuevo) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imeiNuevo });
   }
 
   // Cruce automático: si alguno de los seriales nuevos coincide con uno
