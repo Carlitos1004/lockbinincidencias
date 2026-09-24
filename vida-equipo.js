@@ -10,6 +10,15 @@ const ICONOS_EVENTO = {
 };
 
 document.getElementById("buscar-btn").addEventListener("click", buscar);
+
+// Si venimos de otra pantalla (ej. Registro Maestro) que ya nos dejó un
+// IMEI/MC listo para buscar, lo usamos y disparamos la búsqueda sola.
+const prellenado = sessionStorage.getItem("lockbin_prellenar_busqueda");
+if (prellenado) {
+  sessionStorage.removeItem("lockbin_prellenar_busqueda");
+  document.getElementById("buscar-input").value = prellenado;
+  buscar();
+}
 document.getElementById("buscar-input").addEventListener("keypress", (e) => { if (e.key === "Enter") buscar(); });
 document.getElementById("ver-todos-btn").addEventListener("click", verTodos);
 

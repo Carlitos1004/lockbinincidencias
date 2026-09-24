@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Registro Maestro de Equipos</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Registro Maestro de Equipos</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Un equipo por IMEI, con su vida completa — si está instalado, si alguna vez tuvo una reparación, y cuántas incidencias ha tenido en total. Se llena solo, a partir de Vida del Equipo y Revisión de Taller.</p>
+
+  <div id="resumen-registro" class="resumen-cliente"></div>
+
+  <div class="materiales-controles">
+    <input type="text" id="filtro-mc" placeholder="Filtrar por MC o IMEI...">
+    <select id="filtro-instalado">
+      <option value="">Instalado o no (todos)</option>
+      <option value="si">Instalados</option>
+      <option value="no">No instalados</option>
+    </select>
+    <select id="filtro-reparado">
+      <option value="">Reparado o no (todos)</option>
+      <option value="si">Con reparación alguna vez</option>
+      <option value="no">Nunca reparado</option>
+    </select>
+  </div>
+
+  <table class="tabla-revision">
+    <thead><tr><th>MC Actual</th><th>IMEI</th><th>Cliente</th><th>Instalado</th><th>Incidencias</th><th>¿Reparado alguna vez?</th><th>Última incidencia</th><th></th></tr></thead>
+    <tbody id="tbody-registro"><tr><td colspan="8">Cargando...</td></tr></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="registro-maestro.js"></script>
+</body>
+</html>
