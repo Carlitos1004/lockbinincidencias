@@ -12,6 +12,15 @@ const resultados = document.getElementById("resultados");
 buscarBtn.addEventListener("click", buscar);
 busquedaInput.addEventListener("keypress", (e) => { if (e.key === "Enter") buscar(); });
 
+// Si venimos de otra pantalla (ej. Registro Maestro) con un MC/serial
+// listo para buscar, lo usamos y disparamos la búsqueda sola.
+const prellenado = sessionStorage.getItem("lockbin_prellenar_busqueda");
+if (prellenado) {
+  sessionStorage.removeItem("lockbin_prellenar_busqueda");
+  busquedaInput.value = prellenado;
+  buscar();
+}
+
 async function buscar() {
   const termino = busquedaInput.value.trim();
   buscarMsg.hidden = true;

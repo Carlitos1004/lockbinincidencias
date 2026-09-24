@@ -88,7 +88,10 @@ function renderTabla() {
       <td>${r.total_incidencias}</td>
       <td>${r.ha_sido_reparado ? "✅ Sí" : "— No"}</td>
       <td>${r.ultima_incidencia_fecha ? new Date(r.ultima_incidencia_fecha).toLocaleDateString("es-ES") : "—"}</td>
-      <td>${r.imei ? `<a href="vida-equipo.html" onclick="sessionStorage.setItem('lockbin_prellenar_busqueda', '${r.imei}')">Ver vida →</a>` : "—"}</td>
+      <td>
+        ${r.mc_actual ? `<a href="buscar-serial.html" onclick="sessionStorage.setItem('lockbin_prellenar_busqueda', '${r.mc_actual}')">Ver incidencias →</a>` : "—"}
+        ${r.imei ? `<br><a href="vida-equipo.html" onclick="sessionStorage.setItem('lockbin_prellenar_busqueda', '${r.imei}')">Ver vida →</a>` : ""}
+      </td>
     </tr>
   `).join("");
 }
