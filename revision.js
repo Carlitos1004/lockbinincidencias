@@ -171,6 +171,23 @@ function renderTabla(componentes) {
       </details>
     `;
 
+    const OPCIONES_CAUSA = ["Mal funcionamiento", "Error de manipulación (Formato Verde)", "Mal uso del cliente", "Sin carga / batería agotada"];
+    const causasActuales = c.causa_falla || [];
+    const resumenCausa = causasActuales.length > 0 ? causasActuales.join(", ") : "— Sin definir —";
+    const celdaCausaFalla = `
+      <details class="condicion-fisica-desplegable">
+        <summary class="condicion-fisica-resumen">${resumenCausa}</summary>
+        <div class="condicion-fisica-checklist">
+          ${OPCIONES_CAUSA.map(op => `
+            <label class="opcion-check">
+              <input type="checkbox" class="input-causa-falla" value="${op}" ${causasActuales.includes(op) ? "checked" : ""} ${bloqueado ? "disabled" : ""}>
+              ${op}
+            </label>
+          `).join("")}
+        </div>
+      </details>
+    `;
+
     return `
       <tr data-id="${c.id}">
         <td><input type="text" class="input-mc-fila" value="${c.m_control || ""}" placeholder="Ej: MC2500642"></td>
@@ -180,6 +197,7 @@ function renderTabla(componentes) {
         <td>${celdaClienteHistorico}</td>
         <td>${celdaEnCalle}</td>
         <td>${celdaCondicionFisica}</td>
+        <td>${celdaCausaFalla}</td>
         <td><textarea class="input-reparacion" rows="2" ${bloqueado ? "disabled" : ""}>${c.reparacion || ""}</textarea></td>
         <td>
           <select class="input-destino" ${bloqueado ? "disabled" : ""}>
@@ -201,10 +219,12 @@ function renderTabla(componentes) {
 
   tbody.querySelectorAll(".condicion-fisica-desplegable").forEach(detalle => {
     const resumen = detalle.querySelector(".condicion-fisica-resumen");
-    detalle.querySelectorAll(".input-condicion-fisica").forEach(chk => {
+    const checkClass = detalle.querySelector(".input-condicion-fisica") ? "input-condicion-fisica" : "input-causa-falla";
+    const textoVacio = checkClass === "input-condicion-fisica" ? "— Sin problema —" : "— Sin definir —";
+    detalle.querySelectorAll(`.${checkClass}`).forEach(chk => {
       chk.addEventListener("change", () => {
-        const marcadas = [...detalle.querySelectorAll(".input-condicion-fisica:checked")].map(c => c.value);
-        resumen.textContent = marcadas.length > 0 ? marcadas.join(", ") : "— Sin problema —";
+        const marcadas = [...detalle.querySelectorAll(`.${checkClass}:checked`)].map(c => c.value);
+        resumen.textContent = marcadas.length > 0 ? marcadas.join(", ") : textoVacio;
       });
     });
   });
@@ -268,6 +288,7 @@ async function guardarFila(btn) {
   const enCalleValor = fila.querySelector(".input-en-calle").value;
   const estuvoEnCalle = enCalleValor === "" ? null : enCalleValor === "true";
   const condicionFisica = [...fila.querySelectorAll(".input-condicion-fisica:checked")].map(chk => chk.value);
+  const causaFalla = [...fila.querySelectorAll(".input-causa-falla:checked")].map(chk => chk.value);
 
   if (!destino) {
     alert("Elige un Destino antes de guardar.");
@@ -319,7 +340,8 @@ async function guardarFila(btn) {
     garantia_cliente: destino === DESTINO_AMMI ? garantiaCliente : null,
     cliente_original: clienteOriginal || null,
     estuvo_en_calle: estuvoEnCalle,
-    condicion_fisica: condicionFisica.length > 0 ? condicionFisica : null
+    condicion_fisica: condicionFisica.length > 0 ? condicionFisica : null,
+    causa_falla: causaFalla.length > 0 ? causaFalla : null
   };
   if (fotoRevisionUrl) datosActualizacion.foto_revision = fotoRevisionUrl;
 
