@@ -31,6 +31,7 @@
 
   <div class="materiales-controles">
     <input type="text" id="filtro-mc" placeholder="Filtrar por MC o IMEI...">
+    <select id="filtro-cliente"><option value="">Todos los clientes</option></select>
     <select id="filtro-instalado">
       <option value="">Instalado o no (todos)</option>
       <option value="si">Instalados</option>
@@ -40,6 +41,12 @@
       <option value="">Reparado o no (todos)</option>
       <option value="si">Con reparación alguna vez</option>
       <option value="no">Nunca reparado</option>
+    </select>
+    <select id="orden-registro">
+      <option value="cliente">Ordenar por Cliente (A-Z)</option>
+      <option value="mc">Ordenar por MC</option>
+      <option value="incidencias">Más incidencias primero</option>
+      <option value="reciente">Actualizado más reciente primero</option>
     </select>
   </div>
 

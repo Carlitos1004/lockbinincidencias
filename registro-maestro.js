@@ -30,7 +30,15 @@ async function cargarRegistro() {
     return;
   }
   renderResumen();
+  llenarFiltroCliente();
   renderTabla();
+}
+
+function llenarFiltroCliente() {
+  const clientesUnicos = [...new Set(registroData.map(r => r.cliente_actual).filter(Boolean))].sort();
+  const select = document.getElementById("filtro-cliente");
+  select.innerHTML = `<option value="">Todos los clientes</option>` +
+    clientesUnicos.map(c => `<option value="${c}">${c}</option>`).join("");
 }
 
 function renderResumen() {
@@ -45,14 +53,25 @@ function renderResumen() {
 
 function renderTabla() {
   const fMc = document.getElementById("filtro-mc").value.trim().toLowerCase();
+  const fCliente = document.getElementById("filtro-cliente").value;
   const fInstalado = document.getElementById("filtro-instalado").value;
   const fReparado = document.getElementById("filtro-reparado").value;
+  const orden = document.getElementById("orden-registro").value;
 
-  const filtrados = registroData.filter(r =>
+  let filtrados = registroData.filter(r =>
     (!fMc || (r.mc_actual || "").toLowerCase().includes(fMc) || (r.imei || "").toLowerCase().includes(fMc)) &&
+    (!fCliente || r.cliente_actual === fCliente) &&
     (!fInstalado || (fInstalado === "si") === r.instalado) &&
     (!fReparado || (fReparado === "si") === r.ha_sido_reparado)
   );
+
+  const comparadores = {
+    cliente: (a, b) => (a.cliente_actual || "").localeCompare(b.cliente_actual || ""),
+    mc: (a, b) => (a.mc_actual || "").localeCompare(b.mc_actual || ""),
+    incidencias: (a, b) => b.total_incidencias - a.total_incidencias,
+    reciente: (a, b) => new Date(b.actualizado_en) - new Date(a.actualizado_en),
+  };
+  filtrados = filtrados.sort(comparadores[orden] || comparadores.cliente);
 
   const tbody = document.getElementById("tbody-registro");
   if (filtrados.length === 0) {
@@ -74,6 +93,6 @@ function renderTabla() {
   `).join("");
 }
 
-["filtro-mc", "filtro-instalado", "filtro-reparado"].forEach(id => {
+["filtro-mc", "filtro-cliente", "filtro-instalado", "filtro-reparado", "orden-registro"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderTabla);
 });
