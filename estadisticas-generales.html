@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Estadísticas Generales</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Estadísticas Generales</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Junta todo el historial de fallas y reparaciones — lo migrado del Excel de Control Defectuosos y lo que se va generando en Revisión de Taller de aquí en adelante, todo en un solo lugar.</p>
+
+  <div id="resumen-general" class="resumen-cliente"></div>
+
+  <div class="tabs-vista">
+    <button id="tab-causas-btn" class="tab-vista-btn tab-vista-activa">Causas y Condiciones</button>
+    <button id="tab-cliente-btn" class="tab-vista-btn">Por Cliente</button>
+    <button id="tab-tendencia-btn" class="tab-vista-btn">Tendencia Mensual</button>
+  </div>
+
+  <div id="vista-causas-box">
+    <div class="fila-categorias-escaneo">
+      <div class="agregar-equipo-box" style="flex:1;">
+        <label><strong>Causa de la Falla</strong></label>
+        <table class="tabla-revision">
+          <thead><tr><th>Causa</th><th>Cantidad</th></tr></thead>
+          <tbody id="tbody-causas"></tbody>
+        </table>
+      </div>
+      <div class="agregar-equipo-box" style="flex:1;">
+        <label><strong>Condición Física</strong></label>
+        <table class="tabla-revision">
+          <thead><tr><th>Condición</th><th>Cantidad</th></tr></thead>
+          <tbody id="tbody-condiciones"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="vista-cliente-box" hidden>
+    <table class="tabla-revision">
+      <thead><tr><th>Cliente</th><th>Incidencias</th></tr></thead>
+      <tbody id="tbody-cliente"></tbody>
+    </table>
+  </div>
+
+  <div id="vista-tendencia-box" hidden>
+    <table class="tabla-revision">
+      <thead><tr><th>Mes</th><th>Incidencias</th></tr></thead>
+      <tbody id="tbody-tendencia"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="estadisticas-generales.js"></script>
+</body>
+</html>
