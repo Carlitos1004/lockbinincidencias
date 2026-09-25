@@ -34,7 +34,8 @@ const PANEL_POR_ROL = {
     return;
   }
 
-  if (perfil.rol !== ROL_ESPERADO) {
+  const rolesPermitidos = Array.isArray(ROL_ESPERADO) ? ROL_ESPERADO : [ROL_ESPERADO];
+  if (!rolesPermitidos.includes(perfil.rol)) {
     // Está logueado, pero con un rol que no es el de este panel: lo mandamos
     // al panel que sí le corresponde (o al login si el rol es desconocido)
     window.location.href = PANEL_POR_ROL[perfil.rol] || "index.html";

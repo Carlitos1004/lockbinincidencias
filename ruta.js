@@ -1174,7 +1174,8 @@ document.addEventListener("perfil-listo", (e) => {
   if (e.detail.rol === "manager") {
     enlace.href = "admin.html";
   } else {
-    enlace.hidden = true;
+    enlace.href = "reposiciones.html";
+    enlace.textContent = "📦 Ir a Reposiciones";
   }
 });
 
