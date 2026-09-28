@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Registro Maestro de Componentes</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Registro Maestro de Componentes</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Un componente por serial (Lector, Cierre, Batería o Módulo de Control), con toda su historia — cada vez que se retiró, en qué equipo/OT estaba, qué se encontró y a dónde fue. Se llena solo a partir de Revisión de Taller.</p>
+
+  <div id="resumen-registro-comp" class="resumen-cliente"></div>
+
+  <div class="materiales-controles">
+    <input type="text" id="filtro-serial" placeholder="Filtrar por serial...">
+    <select id="filtro-tipo">
+      <option value="">Todos los tipos</option>
+      <option value="Lector Electrónico">Lector Electrónico</option>
+      <option value="Cierre Electrónico">Cierre Electrónico</option>
+      <option value="Batería">Batería</option>
+      <option value="Módulo de Control">Módulo de Control</option>
+    </select>
+    <select id="filtro-cliente-comp"><option value="">Todos los clientes</option></select>
+    <select id="orden-registro-comp">
+      <option value="reciente">Actualizado más reciente primero</option>
+      <option value="incidencias">Más incidencias primero</option>
+      <option value="serial">Ordenar por Serial</option>
+      <option value="tipo">Ordenar por Tipo</option>
+    </select>
+  </div>
+
+  <table class="tabla-revision">
+    <thead><tr><th>Tipo</th><th>Serial</th><th>Cliente actual</th><th>MC actual</th><th>Incidencias</th><th>Último estado</th><th>Última fecha</th><th></th></tr></thead>
+    <tbody id="tbody-registro-comp"><tr><td colspan="8">Cargando...</td></tr></tbody>
+  </table>
+
+  <div id="historial-componente"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="registro-componentes.js"></script>
+</body>
+</html>
