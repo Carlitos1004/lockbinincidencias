@@ -15,7 +15,7 @@ async function cargarNotas() {
     .order("fecha", { ascending: false });
 
   if (error) {
-    document.getElementById("notas-tbody").innerHTML = `<tr><td colspan="6">Error: ${error.message}</td></tr>`;
+    document.getElementById("notas-tbody").innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
     return;
   }
   notasData = data || [];
@@ -37,16 +37,18 @@ async function cargarNotas() {
 
 function renderTabla() {
   const fMc = document.getElementById("filtro-notas-mc").value.trim().toLowerCase();
+  const fCliente = document.getElementById("filtro-notas-cliente").value.trim().toLowerCase();
   const soloActivas = document.getElementById("filtro-notas-estado").value === "activas";
 
   const filtradas = notasData.filter(n =>
     (!fMc || n.mc.toLowerCase().includes(fMc)) &&
+    (!fCliente || (n.cliente || "").toLowerCase().includes(fCliente)) &&
     (!soloActivas || n.activa)
   );
 
   const tbody = document.getElementById("notas-tbody");
   if (filtradas.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6">Ninguna nota coincide.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8">Ninguna nota coincide.</td></tr>`;
     return;
   }
 
@@ -55,6 +57,7 @@ function renderTabla() {
       return `
         <tr>
           <td><input type="text" class="input-editar-mc" value="${n.mc}" data-id="${n.id}"></td>
+          <td>${n.cliente || "—"}</td>
           <td colspan="2"><textarea class="input-editar-nota" rows="2" data-id="${n.id}">${n.nota}</textarea></td>
           <td>${n.autor || "—"}</td>
           <td>${new Date(n.fecha).toLocaleDateString("es-ES")}</td>
@@ -68,6 +71,7 @@ function renderTabla() {
     return `
     <tr class="${n.activa ? '' : 'fila-alerta'}">
       <td>${n.mc}</td>
+      <td>${n.cliente || "—"}</td>
       <td>${n.nota}</td>
       <td>${(conteoFotosPorNota[n.id] > 1)
         ? `<a href="ver-fotos.html?origen=nota&id=${n.id}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver todas las fotos (${conteoFotosPorNota[n.id]}) →</a>`
@@ -119,7 +123,17 @@ function renderTabla() {
         return;
       }
 
-      await supabaseClient.from("notas_equipo").update({ mc: mcNuevo, nota: notaNueva }).eq("id", btn.dataset.id);
+      const { data: equipoNuevo } = await supabaseClient
+        .from("equipos")
+        .select("cliente")
+        .eq("m_control", mcNuevo)
+        .maybeSingle();
+
+      await supabaseClient.from("notas_equipo").update({
+        mc: mcNuevo,
+        nota: notaNueva,
+        cliente: equipoNuevo ? equipoNuevo.cliente : null
+      }).eq("id", btn.dataset.id);
       editandoId = null;
       cargarNotas();
     });
@@ -151,11 +165,19 @@ document.getElementById("agregar-nota-btn").addEventListener("click", async () =
 
   const { data: { user } } = await supabaseClient.auth.getUser();
 
+  // Detectamos el cliente automáticamente a partir del MC, cruzando con
+  // la tabla equipos — no hay que escribirlo a mano.
+  const { data: equipoDeLaNota } = await supabaseClient
+    .from("equipos")
+    .select("cliente")
+    .eq("m_control", mc)
+    .maybeSingle();
+
   // Primero creamos la nota (sin foto todavía), para tener su id y poder
   // vincularle las fotos después.
   const { data: notaCreada, error: errorNota } = await supabaseClient
     .from("notas_equipo")
-    .insert({ mc: mc, nota: texto, autor: user.email })
+    .insert({ mc: mc, nota: texto, autor: user.email, cliente: equipoDeLaNota ? equipoDeLaNota.cliente : null })
     .select()
     .single();
 
@@ -203,7 +225,7 @@ function mostrarMensaje(el, texto, esError) {
   el.hidden = false;
 }
 
-["filtro-notas-mc", "filtro-notas-estado"].forEach(id => {
+["filtro-notas-mc", "filtro-notas-cliente", "filtro-notas-estado"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderTabla);
 });
 
