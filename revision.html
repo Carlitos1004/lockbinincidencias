@@ -30,6 +30,7 @@
     <input type="text" id="ot-input" placeholder="Ej: OT-005" list="lista-ots">
     <datalist id="lista-ots"></datalist>
     <button id="buscar-btn">Buscar</button>
+    <button id="ver-pendientes-btn" class="btn-secundario">📋 Ver todo lo pendiente</button>
   </div>
 
   <p id="buscar-msg" class="resultado-msg" hidden></p>
@@ -40,6 +41,7 @@
     <thead>
       <tr>
         <th>Módulo</th>
+        <th id="th-ot" hidden>OT</th>
         <th>Componente</th>
         <th>Serial</th>
         <th>Estado</th>

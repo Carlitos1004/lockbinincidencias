@@ -36,6 +36,8 @@ const otInput = document.getElementById("ot-input");
 
 let clientesReales = [];
 let mostrarClienteHistorico = false;
+let modoTodosPendientes = false;
+let otsInternasLibres = new Set();
 async function cargarClientesReales() {
   const TAM_PAGINA = 1000;
   let desde = 0;
@@ -57,12 +59,60 @@ const tbody = document.getElementById("revision-tbody");
 
 buscarBtn.addEventListener("click", buscarComponentes);
 otInput.addEventListener("keypress", (e) => { if (e.key === "Enter") buscarComponentes(); });
+document.getElementById("ver-pendientes-btn").addEventListener("click", verTodosPendientes);
+
+// Si llegamos desde el enlace del dashboard ("Componentes en Pendiente
+// revisión"), mostramos directo la lista completa sin que haya que buscar.
+if (new URLSearchParams(window.location.search).get("pendientes") === "1") {
+  verTodosPendientes();
+}
+
+async function verTodosPendientes() {
+  otInput.value = "";
+  buscarMsg.hidden = true;
+  tabla.hidden = true;
+  document.getElementById("guardar-todo-btn").hidden = true;
+  document.getElementById("faltantes-box").hidden = true;
+  modoTodosPendientes = true;
+
+  const { data, error } = await supabaseClient
+    .from("componentes_retirados")
+    .select("*")
+    .eq("estado", "Pendiente revisión")
+    .order("fecha", { ascending: true });
+
+  if (error) {
+    mostrarMensaje("❌ " + error.message, true);
+    return;
+  }
+  if (!data || data.length === 0) {
+    mostrarMensaje("🎉 No hay ningún componente pendiente de revisión en este momento.", false);
+    return;
+  }
+
+  // Algunas OT "libres" internas usan un select de Cliente Histórico en
+  // vez del cliente normal — detectamos cuáles, para mostrarlo solo en
+  // esas filas (antes esto se decidía una sola vez por OT buscada).
+  const idsOt = [...new Set(data.map(c => c.id_ot).filter(Boolean))];
+  const { data: ots } = idsOt.length > 0
+    ? await supabaseClient.from("ordenes_trabajo").select("id_ot, cliente, origen").in("id_ot", idsOt)
+    : { data: [] };
+  otsInternasLibres = new Set(
+    (ots || []).filter(o => o.origen === "libre" && o.cliente === "INTERNO").map(o => o.id_ot)
+  );
+
+  renderTabla(data, true);
+  tabla.hidden = false;
+  document.getElementById("guardar-todo-btn").hidden = false;
+  mostrarMensaje(`Mostrando ${data.length} componente(s) pendientes de revisión, de todas las OT.`, false);
+}
 
 async function buscarComponentes() {
   const idOt = otInput.value.trim().toUpperCase();
   buscarMsg.hidden = true;
   tabla.hidden = true;
   document.getElementById("guardar-todo-btn").hidden = true;
+  modoTodosPendientes = false;
 
   if (!idOt) {
     mostrarMensaje("⚠️ Escribe un número de OT.", true);
@@ -104,8 +154,13 @@ async function buscarComponentes() {
   renderFaltantes(faltantes);
 }
 
-function renderTabla(componentes) {
+function renderTabla(componentes, mostrarOt = false) {
+  document.getElementById("th-ot").hidden = !mostrarOt;
+
   tbody.innerHTML = componentes.map(c => {
+    const celdaOt = mostrarOt
+      ? `<td><a href="ot-detalle.html?ot=${c.id_ot}" target="_blank" rel="noopener">${c.id_ot || "—"}</a></td>`
+      : "";
     const opciones = DESTINOS.map(d =>
       `<option value="${escaparHtml(d)}" ${c.destino === d ? "selected" : ""}>${escaparHtml(d)}</option>`
     ).join("");
@@ -139,7 +194,8 @@ function renderTabla(componentes) {
       `<option value="${escaparHtml(cl)}" ${c.cliente_original === cl ? "selected" : ""}>${escaparHtml(cl)}</option>`
     ).join("");
 
-    const celdaClienteHistorico = mostrarClienteHistorico
+    const clienteHistoricoVisibleFila = modoTodosPendientes ? otsInternasLibres.has(c.id_ot) : mostrarClienteHistorico;
+    const celdaClienteHistorico = clienteHistoricoVisibleFila
       ? `<select class="input-cliente-original" ${bloqueado ? "disabled" : ""}>
           <option value="">— Cliente histórico —</option>
           ${opcionesCliente}
@@ -191,6 +247,7 @@ function renderTabla(componentes) {
     return `
       <tr data-id="${c.id}">
         <td><input type="text" class="input-mc-fila" value="${c.m_control || ""}" placeholder="Ej: MC2500642"></td>
+        ${celdaOt}
         <td>${c.tipo_componente}</td>
         <td><input type="text" class="input-serial-fila celda-mono" value="${c.serial_retirado || ""}"></td>
         <td>${c.estado}</td>
@@ -243,7 +300,7 @@ function renderTabla(componentes) {
         btn.textContent = "📦 Listo — Marcar como devuelto";
         return;
       }
-      buscarComponentes();
+      refrescarListaActual();
     });
   });
 
@@ -259,7 +316,7 @@ function renderTabla(componentes) {
         alert("Error al eliminar: " + error.message);
         return;
       }
-      buscarComponentes();
+      refrescarListaActual();
     });
   });
 
@@ -502,6 +559,14 @@ function renderFaltantes(faltantes) {
       <td>${new Date(c.fecha).toLocaleDateString("es-ES")}</td>
     </tr>
   `).join("");
+}
+
+function refrescarListaActual() {
+  if (modoTodosPendientes) {
+    verTodosPendientes();
+  } else {
+    buscarComponentes();
+  }
 }
 
 function mostrarMensaje(texto, esError) {

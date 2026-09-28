@@ -1811,6 +1811,17 @@ input[type="file"]::file-selector-button:hover {
   display: flex;
   flex-direction: column;
   min-width: 140px;
+  text-decoration: none;
+  color: inherit;
+}
+
+a.tarjeta-resumen {
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+a.tarjeta-resumen:hover {
+  filter: brightness(0.96);
 }
 
 .tarjeta-resumen strong {
