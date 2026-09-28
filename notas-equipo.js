@@ -15,7 +15,7 @@ async function cargarNotas() {
     .order("fecha", { ascending: false });
 
   if (error) {
-    document.getElementById("notas-tbody").innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
+    document.getElementById("notas-tbody").innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
     return;
   }
   notasData = data || [];
@@ -48,7 +48,7 @@ function renderTabla() {
 
   const tbody = document.getElementById("notas-tbody");
   if (filtradas.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8">Ninguna nota coincide.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">Ninguna nota coincide.</td></tr>`;
     return;
   }
 
@@ -59,7 +59,6 @@ function renderTabla() {
           <td><input type="text" class="input-editar-mc" value="${n.mc}" data-id="${n.id}"></td>
           <td>${n.cliente || "—"}</td>
           <td colspan="2"><textarea class="input-editar-nota" rows="2" data-id="${n.id}">${n.nota}</textarea></td>
-          <td>${n.autor || "—"}</td>
           <td>${new Date(n.fecha).toLocaleDateString("es-ES")}</td>
           <td>
             <button class="btn-guardar-edicion btn-primario btn-compacto" data-id="${n.id}">Guardar</button>
@@ -79,7 +78,6 @@ function renderTabla() {
           ? `<a href="${n.foto_url}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>`
           : "—"
       }</td>
-      <td>${n.autor || "—"}</td>
       <td>${new Date(n.fecha).toLocaleDateString("es-ES")}</td>
       <td>${n.activa ? "🟢 Activa" : "⚪ Inactiva"}</td>
       <td>
