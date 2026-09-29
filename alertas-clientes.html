@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Alertas de Clientes</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Alertas de Clientes</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="operacion-diaria.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Operación Diaria</a>
+
+  <p style="margin-top:20px;">Lo que los clientes reportan desde su propio panel. Esto NO crea tickets ni OT automáticamente — es una bandeja que ustedes revisan y decide qué hacer con cada reporte.</p>
+
+  <div class="resumen-cliente" id="resumen-alertas"></div>
+
+  <div class="tabs-vista" style="margin-top:16px;">
+    <button id="tab-fallas-btn" class="tab-vista-btn tab-vista-activa">🚨 Reportes de fallas</button>
+    <button id="tab-cambios-btn" class="tab-vista-btn">🔧 Cambios reportados</button>
+  </div>
+
+  <!-- ================= REPORTES DE FALLAS ================= -->
+  <div id="vista-fallas-box">
+    <div class="materiales-controles" style="margin-top:12px;">
+      <input type="text" id="filtro-fallas-cliente" placeholder="Filtrar por cliente...">
+      <select id="filtro-fallas-estado">
+        <option value="">Todos los estados</option>
+        <option value="Nueva">Nueva</option>
+        <option value="Vista">Vista</option>
+        <option value="Atendida">Atendida</option>
+      </select>
+    </div>
+    <table class="tabla-revision" id="tabla-fallas-cliente">
+      <thead><tr><th>Fecha</th><th>Cliente</th><th>Módulo</th><th>Mensaje</th><th>Estado</th><th style="width:220px;"></th></tr></thead>
+      <tbody id="fallas-cliente-tbody"><tr><td colspan="6">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- ================= CAMBIOS REPORTADOS ================= -->
+  <div id="vista-cambios-box" hidden>
+    <div class="materiales-controles" style="margin-top:12px;">
+      <input type="text" id="filtro-cambios-cliente" placeholder="Filtrar por cliente...">
+      <select id="filtro-cambios-estado">
+        <option value="">Todos los estados</option>
+        <option value="Nueva">Nueva</option>
+        <option value="Vista">Vista</option>
+        <option value="Aplicado en equipos">Aplicado en equipos</option>
+      </select>
+    </div>
+    <table class="tabla-revision" id="tabla-cambios-cliente-mgr">
+      <thead><tr><th>Fecha</th><th>Cliente</th><th>Módulo</th><th>Componente</th><th>Serial anterior → nuevo</th><th>Descripción</th><th>Estado</th><th style="width:220px;"></th></tr></thead>
+      <tbody id="cambios-cliente-mgr-tbody"><tr><td colspan="8">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="alertas-clientes.js"></script>
+
+<footer class="footer-fv">
+  <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="footer-fv-logo">
+  <span>Un producto de Formato Verde</span>
+</footer>
+</body>
+</html>

@@ -19,7 +19,15 @@ const MAPA_ALARMAS = {
   alarma_operacion_erratica: "Operación errática"
 };
 
+const ICONOS_ESTADO_CLIENTE = {
+  "Nueva": "🆕 Nueva",
+  "Vista": "👀 Vista",
+  "Atendida": "✅ Atendida",
+  "Aplicado en equipos": "✅ Aplicado en equipos"
+};
+
 let equiposCliente = [];
+let nombreClienteActual = null;
 
 // Trae TODAS las filas sin toparse con el límite de 1000 por página que
 // aplica Supabase por defecto — necesario porque "equipos" ya pasa de 5000.
@@ -48,18 +56,21 @@ async function cargarPanelCliente() {
     .eq("id", user.id)
     .single();
 
+  nombreClienteActual = perfil?.cliente_nombre || null;
+
   // El saludo usa cliente_nombre en vez de "nombre" — el campo "nombre" del
   // perfil puede tener cosas como "Contacto Porto" (como lo haya escrito
   // el Manager al crear el usuario), mientras que cliente_nombre siempre
   // es el nombre limpio del cliente.
   const spanSaludo = document.getElementById("nombre-usuario");
-  if (spanSaludo) spanSaludo.textContent = perfil?.cliente_nombre || "—";
+  if (spanSaludo) spanSaludo.textContent = nombreClienteActual || "—";
 
   const tbodyEquipos = document.getElementById("equipos-cliente-tbody");
   try {
     equiposCliente = await traerTodasLasFilas("equipos", "*", (q) => q.order("m_control"));
     renderResumen();
     renderEquipos();
+    llenarSelectsDeEquipos();
   } catch (err) {
     tbodyEquipos.innerHTML = `<tr><td colspan="5">Error: ${err.message}</td></tr>`;
   }
@@ -86,6 +97,9 @@ async function cargarPanelCliente() {
       </tr>
     `).join("");
   }
+
+  cargarCambiosPropios();
+  cargarAlertasPropias();
 }
 
 function renderResumen() {
@@ -125,5 +139,164 @@ function renderEquipos() {
 }
 
 document.getElementById("filtro-equipos").addEventListener("input", renderEquipos);
+
+// Llena los 2 desplegables de "elige tu módulo" (cambios y fallas) con la
+// lista de equipos que ya tenemos cargada — evita que el cliente tenga que
+// escribir el MC a mano y se equivoque.
+function llenarSelectsDeEquipos() {
+  const opciones = equiposCliente
+    .map(eq => `<option value="${eq.m_control}">${eq.m_control}${eq.fraccion ? " — " + eq.fraccion : ""}</option>`)
+    .join("");
+
+  const selectCambio = document.getElementById("cambio-mc");
+  const selectFalla = document.getElementById("falla-mc");
+  selectCambio.innerHTML = `<option value="">Selecciona el módulo (MC)...</option>` + opciones;
+  selectFalla.innerHTML = `<option value="">Selecciona el módulo (MC)...</option>` + opciones;
+}
+
+function mostrarMensaje(el, texto, esError) {
+  el.textContent = texto;
+  el.className = esError ? "resultado-msg resultado-error" : "resultado-msg resultado-ok";
+  el.hidden = false;
+}
+
+// ================= CAMBIO DE EQUIPOS Y COMPONENTES =================
+
+async function cargarCambiosPropios() {
+  const tbody = document.getElementById("cambios-cliente-tbody");
+  const { data, error } = await supabaseClient
+    .from("cambios_cliente")
+    .select("*")
+    .order("fecha", { ascending: false });
+
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${error.message}</td></tr>`;
+    return;
+  }
+  if (!data || data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6">Todavía no has reportado ningún cambio.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.map(c => `
+    <tr>
+      <td>${new Date(c.fecha).toLocaleDateString("es-ES")}</td>
+      <td>${c.m_control}</td>
+      <td>${c.tipo_componente || "—"}</td>
+      <td>${c.serial_anterior || "—"} → ${c.serial_nuevo || "—"}</td>
+      <td>${c.descripcion || "—"}</td>
+      <td>${ICONOS_ESTADO_CLIENTE[c.estado] || c.estado}</td>
+    </tr>
+  `).join("");
+}
+
+document.getElementById("cambio-btn").addEventListener("click", async () => {
+  const mc = document.getElementById("cambio-mc").value;
+  const tipo = document.getElementById("cambio-tipo").value;
+  const serialAnterior = document.getElementById("cambio-serial-anterior").value.trim();
+  const serialNuevo = document.getElementById("cambio-serial-nuevo").value.trim();
+  const descripcion = document.getElementById("cambio-descripcion").value.trim();
+  const msg = document.getElementById("cambio-msg");
+
+  if (!mc || !tipo) {
+    mostrarMensaje(msg, "⚠️ Selecciona el módulo y el tipo de componente.", true);
+    return;
+  }
+  if (!serialAnterior && !serialNuevo && !descripcion) {
+    mostrarMensaje(msg, "⚠️ Cuéntanos al menos algo: un serial o una descripción del cambio.", true);
+    return;
+  }
+
+  const btn = document.getElementById("cambio-btn");
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+
+  const { error } = await supabaseClient.from("cambios_cliente").insert({
+    cliente: nombreClienteActual,
+    m_control: mc,
+    tipo_componente: tipo,
+    serial_anterior: serialAnterior || null,
+    serial_nuevo: serialNuevo || null,
+    descripcion: descripcion || null
+  });
+
+  btn.disabled = false;
+  btn.textContent = "Enviar reporte de cambio";
+
+  if (error) {
+    mostrarMensaje(msg, "❌ " + error.message, true);
+    return;
+  }
+
+  mostrarMensaje(msg, "✅ Cambio reportado. Lo revisaremos y actualizaremos el sistema.", false);
+  document.getElementById("cambio-mc").value = "";
+  document.getElementById("cambio-tipo").value = "";
+  document.getElementById("cambio-serial-anterior").value = "";
+  document.getElementById("cambio-serial-nuevo").value = "";
+  document.getElementById("cambio-descripcion").value = "";
+  cargarCambiosPropios();
+});
+
+// ================= REPORTE / FORMULARIO DE FALLAS =================
+
+async function cargarAlertasPropias() {
+  const tbody = document.getElementById("alertas-cliente-tbody");
+  const { data, error } = await supabaseClient
+    .from("alertas_cliente")
+    .select("*")
+    .order("fecha", { ascending: false });
+
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="4">Error: ${error.message}</td></tr>`;
+    return;
+  }
+  if (!data || data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4">Todavía no has reportado ninguna falla.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.map(a => `
+    <tr>
+      <td>${new Date(a.fecha).toLocaleDateString("es-ES")}</td>
+      <td>${a.m_control}</td>
+      <td>${a.mensaje}</td>
+      <td>${ICONOS_ESTADO_CLIENTE[a.estado] || a.estado}</td>
+    </tr>
+  `).join("");
+}
+
+document.getElementById("falla-btn").addEventListener("click", async () => {
+  const mc = document.getElementById("falla-mc").value;
+  const mensaje = document.getElementById("falla-mensaje").value.trim();
+  const msg = document.getElementById("falla-msg");
+
+  if (!mc || !mensaje) {
+    mostrarMensaje(msg, "⚠️ Selecciona el módulo y describe la falla.", true);
+    return;
+  }
+
+  const btn = document.getElementById("falla-btn");
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+
+  const { error } = await supabaseClient.from("alertas_cliente").insert({
+    cliente: nombreClienteActual,
+    m_control: mc,
+    mensaje: mensaje
+  });
+
+  btn.disabled = false;
+  btn.textContent = "Enviar reporte de falla";
+
+  if (error) {
+    mostrarMensaje(msg, "❌ " + error.message, true);
+    return;
+  }
+
+  mostrarMensaje(msg, "✅ Falla reportada. La revisaremos pronto.", false);
+  document.getElementById("falla-mc").value = "";
+  document.getElementById("falla-mensaje").value = "";
+  cargarAlertasPropias();
+});
 
 cargarPanelCliente();

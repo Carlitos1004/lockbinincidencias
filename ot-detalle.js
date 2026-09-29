@@ -557,7 +557,21 @@ async function cargarClientesParaSelect() {
   select.innerHTML = `<option value="">— Selecciona un cliente —</option>` +
     clientesUnicos.map(c => `<option value="${c}">${c}</option>`).join("");
 }
-cargarClientesParaSelect();
+cargarClientesParaSelect().then(aplicarPrellenadoOtLibre);
+
+// Si se llegó aquí desde "Alertas de Clientes" con un ➜ Crear OT, se trae
+// el cliente y un motivo ya redactado (a partir del reporte del cliente),
+// pero SIN crear la OT sola — el Manager revisa/edita y le da "Crear".
+function aplicarPrellenadoOtLibre() {
+  const clientePrellenado = sessionStorage.getItem("lockbin_prellenar_ot_cliente");
+  const motivoPrellenado = sessionStorage.getItem("lockbin_prellenar_ot_motivo");
+  if (clientePrellenado === null && motivoPrellenado === null) return;
+  sessionStorage.removeItem("lockbin_prellenar_ot_cliente");
+  sessionStorage.removeItem("lockbin_prellenar_ot_motivo");
+  if (clientePrellenado) document.getElementById("nueva-ot-cliente").value = clientePrellenado;
+  if (motivoPrellenado) document.getElementById("nueva-ot-motivo").value = motivoPrellenado;
+  document.getElementById("nueva-ot-motivo")?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
 
 // --- Crear una OT libre, sin filtrar por alarmas ni ticket ---
 document.getElementById("crear-ot-libre-btn").addEventListener("click", async () => {

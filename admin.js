@@ -17,17 +17,20 @@ async function cargarDashboard() {
   const otsConPendientes = stats.ots_con_pendientes ?? 0;
   const equiposConAlarma = stats.equipos_con_alarma ?? 0;
   const componentesPendientes = stats.componentes_pendientes ?? 0;
+  const alertasClientesNuevas = stats.alertas_clientes_nuevas ?? 0;
 
   const tarjetas = document.querySelectorAll("#resumen-dashboard .tarjeta-resumen strong");
   if (tarjetas[0]) tarjetas[0].textContent = otsConPendientes;
   if (tarjetas[1]) tarjetas[1].textContent = equiposConAlarma;
   if (tarjetas[2]) tarjetas[2].textContent = componentesPendientes;
+  if (tarjetas[3]) tarjetas[3].textContent = alertasClientesNuevas;
 
   // Resalta en ámbar si hay algo pendiente
   const contenedores = document.querySelectorAll("#resumen-dashboard .tarjeta-resumen");
   if (otsConPendientes > 0) contenedores[0]?.classList.add("tarjeta-alerta");
   if (equiposConAlarma > 0) contenedores[1]?.classList.add("tarjeta-alerta");
   if (componentesPendientes > 0) contenedores[2]?.classList.add("tarjeta-alerta");
+  if (alertasClientesNuevas > 0) contenedores[3]?.classList.add("tarjeta-alerta");
 }
 
 cargarDashboard();
