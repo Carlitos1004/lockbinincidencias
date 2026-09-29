@@ -44,15 +44,22 @@
   </div>
 
   <h2 style="margin-top:28px;">🔴 Retiradas / Falladas</h2>
+  <p style="color:var(--gris-700); font-size:0.85rem; margin-top:-8px;">Política de garantía de baterías todavía sin definir del todo — por ahora se muestran los 2 plazos que se están evaluando (6 meses y 1 año) según los días en uso, calculados solos.</p>
   <table class="tabla-revision">
-    <thead><tr><th>Serial</th><th>Tipo</th><th>Cliente</th><th>MC</th><th>Categoría</th><th>Instalada</th><th>Retirada</th><th>Días en uso</th><th>Causa</th><th>OT</th></tr></thead>
-    <tbody id="tbody-retiradas"><tr><td colspan="10">Cargando...</td></tr></tbody>
+    <thead><tr><th>Serial</th><th>Tipo</th><th>Cliente</th><th>MC</th><th>Categoría</th><th>Instalada</th><th>Retirada</th><th>Días en uso</th><th>¿≤ 6 meses?</th><th>¿≤ 1 año?</th><th>Causa</th><th>OT</th></tr></thead>
+    <tbody id="tbody-retiradas"><tr><td colspan="12">Cargando...</td></tr></tbody>
+  </table>
+
+  <h2 style="margin-top:32px;">📈 Fallas de batería por mes</h2>
+  <table class="tabla-revision" style="max-width:420px;">
+    <thead><tr><th>Mes</th><th>Fallas</th></tr></thead>
+    <tbody id="tbody-tendencia-baterias"><tr><td colspan="2">Cargando...</td></tr></tbody>
   </table>
 
   <h2 style="margin-top:32px;">🟢 Activas (instaladas, sin fallar todavía)</h2>
   <table class="tabla-revision">
-    <thead><tr><th>Serial</th><th>Tipo</th><th>Cliente</th><th>MC</th><th>Categoría</th><th>Instalada</th><th>Días en uso hasta hoy</th><th>OT</th></tr></thead>
-    <tbody id="tbody-activas"><tr><td colspan="8">Cargando...</td></tr></tbody>
+    <thead><tr><th>Serial</th><th>Tipo</th><th>Cliente</th><th>MC</th><th>Categoría</th><th>Instalada</th><th>Días en uso hasta hoy</th><th>¿Dentro de 1 año?</th><th>OT</th></tr></thead>
+    <tbody id="tbody-activas"><tr><td colspan="9">Cargando...</td></tr></tbody>
   </table>
 </div>
 
