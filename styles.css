@@ -1840,6 +1840,21 @@ a.tarjeta-resumen:hover {
   background: var(--ambar-bg);
 }
 
+.garantia-si {
+  color: var(--verde-oscuro);
+  font-weight: 600;
+}
+
+.garantia-extendida {
+  color: #b8860b;
+  font-weight: 600;
+}
+
+.garantia-no {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .tarjeta-alerta strong {
   color: var(--ambar);
 }
@@ -1895,6 +1910,43 @@ a.tarjeta-resumen:hover {
   font-size: 0.8rem;
   color: var(--gris-700);
   line-height: 1.35;
+}
+
+/* --- Tarjetas grandes de categoría (panel principal) --- */
+
+.grid-tarjetas-grande {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.tarjeta-nav-grande {
+  padding: 32px 28px;
+  gap: 10px;
+  border-radius: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.tarjeta-nav-grande:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px -14px rgba(77, 122, 31, 0.32);
+}
+
+.tarjeta-nav-grande .tarjeta-nav-icono {
+  font-size: 2.4rem;
+  transition: transform 0.2s ease;
+}
+
+.tarjeta-nav-grande:hover .tarjeta-nav-icono {
+  transform: scale(1.1);
+}
+
+.tarjeta-nav-grande .tarjeta-nav-titulo {
+  font-size: 1.2rem;
+}
+
+.tarjeta-nav-grande .tarjeta-nav-desc {
+  font-size: 0.88rem;
 }
 
 /* --- Botón de volver --- */
