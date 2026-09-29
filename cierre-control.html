@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LockBin — Panel Manager</title>
+<title>LockBin — Cierre y Control</title>
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
@@ -17,35 +17,34 @@
 <div class="panel-header">
   <div class="panel-header-marca">
     <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
-    <h1>Manager</h1>
+    <h1>Cierre y Control</h1>
   </div>
   <button id="logout-btn">Cerrar sesión</button>
 </div>
 
 <div class="panel-body panel-body-ancho">
-  <h2>Hola, <span id="nombre-usuario">—</span></h2>
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
 
-  <div class="resumen-cliente" id="resumen-dashboard">
-    <div class="tarjeta-resumen"><strong>—</strong><span>OT con pendientes</span></div>
-    <div class="tarjeta-resumen"><strong>—</strong><span>Equipos con alarma activa</span></div>
-    <a class="tarjeta-resumen" href="revision.html?pendientes=1"><strong>—</strong><span>Componentes en Pendiente revisión</span></a>
-  </div>
-
-  <div class="grid-tarjetas">
-    <a class="tarjeta-nav" href="operacion-diaria.html">
-      <span class="tarjeta-nav-icono">🛠️</span>
-      <span class="tarjeta-nav-titulo">Operación Diaria</span>
-      <span class="tarjeta-nav-desc">OT, rutas, consulta de equipos y materiales</span>
+  <div class="grid-tarjetas" style="margin-top:20px;">
+    <a class="tarjeta-nav" href="revision.html">
+      <span class="tarjeta-nav-icono">🔍</span>
+      <span class="tarjeta-nav-titulo">Revisión de Taller</span>
+      <span class="tarjeta-nav-desc">Asignar Destino a componentes</span>
     </a>
-    <a class="tarjeta-nav" href="datos-inventario.html">
-      <span class="tarjeta-nav-icono">🗃️</span>
-      <span class="tarjeta-nav-titulo">Datos e Inventario</span>
-      <span class="tarjeta-nav-desc">Equipos, inventario, estadísticas y sensores</span>
+    <a class="tarjeta-nav" href="garantias.html">
+      <span class="tarjeta-nav-icono">🛡️</span>
+      <span class="tarjeta-nav-titulo">Garantías</span>
+      <span class="tarjeta-nav-desc">Consultar y editar</span>
     </a>
-    <a class="tarjeta-nav" href="cierre-control.html">
-      <span class="tarjeta-nav-icono">✅</span>
-      <span class="tarjeta-nav-titulo">Cierre y Control</span>
-      <span class="tarjeta-nav-desc">Revisión de taller, garantías, reposiciones y reportes</span>
+    <a class="tarjeta-nav" href="reposiciones.html">
+      <span class="tarjeta-nav-icono">📦</span>
+      <span class="tarjeta-nav-titulo">Reposiciones de Equipo</span>
+      <span class="tarjeta-nav-desc">Equipos bajo garantía pendientes de reponer</span>
+    </a>
+    <a class="tarjeta-nav" href="reporte-ot.html">
+      <span class="tarjeta-nav-icono">🧾</span>
+      <span class="tarjeta-nav-titulo">Reporte de Cierre de OT</span>
+      <span class="tarjeta-nav-desc">Descarga en PDF o Excel</span>
     </a>
   </div>
 </div>
@@ -54,7 +53,6 @@
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "manager";</script>
 <script src="sesion.js"></script>
-<script src="admin.js"></script>
 
 <footer class="footer-fv">
   <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="footer-fv-logo">

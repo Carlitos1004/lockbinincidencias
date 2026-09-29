@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Operación Diaria</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Operación Diaria</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <h3 class="seccion-dashboard" style="margin-top:20px;">Órdenes de trabajo</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="gestion-equipos.html">
+      <span class="tarjeta-nav-icono">⚙️</span>
+      <span class="tarjeta-nav-titulo">Gestión de Equipos</span>
+      <span class="tarjeta-nav-desc">Filtrar por cliente y crear una OT para la calle</span>
+    </a>
+    <a class="tarjeta-nav" href="ot-detalle.html">
+      <span class="tarjeta-nav-icono">📄</span>
+      <span class="tarjeta-nav-titulo">Detalle de una OT</span>
+      <span class="tarjeta-nav-desc">Ver, editar, y crear OT manuales (sin visita)</span>
+    </a>
+    <a class="tarjeta-nav" href="ordenes.html">
+      <span class="tarjeta-nav-icono">📋</span>
+      <span class="tarjeta-nav-titulo">Todas las OT</span>
+      <span class="tarjeta-nav-desc">Estado y avance de cada orden de trabajo</span>
+    </a>
+    <a class="tarjeta-nav" href="notas-equipo.html">
+      <span class="tarjeta-nav-icono">📝</span>
+      <span class="tarjeta-nav-titulo">Notas de Equipo</span>
+      <span class="tarjeta-nav-desc">Anotaciones que se avisan solas al crear una OT</span>
+    </a>
+  </div>
+
+  <h3 class="seccion-dashboard">Rutas o actuaciones de trabajo</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="ruta.html">
+      <span class="tarjeta-nav-icono">🗺️</span>
+      <span class="tarjeta-nav-titulo">Ruta</span>
+      <span class="tarjeta-nav-desc">Ver/editar como lo hace el operario</span>
+    </a>
+  </div>
+
+  <h3 class="seccion-dashboard">Consulta de equipos</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="buscar-serial.html">
+      <span class="tarjeta-nav-icono">🔎</span>
+      <span class="tarjeta-nav-titulo">Buscar por Serial</span>
+      <span class="tarjeta-nav-desc">Historial completo de un MC o componente</span>
+    </a>
+    <a class="tarjeta-nav" href="registro-maestro.html">
+      <span class="tarjeta-nav-icono">📋</span>
+      <span class="tarjeta-nav-titulo">Historial de Módulos de Control</span>
+      <span class="tarjeta-nav-desc">Instalado, reparado alguna vez, incidencias totales</span>
+    </a>
+    <a class="tarjeta-nav" href="registro-componentes.html">
+      <span class="tarjeta-nav-icono">🔩</span>
+      <span class="tarjeta-nav-titulo">Historial de Componentes</span>
+      <span class="tarjeta-nav-desc">Historia completa por serial: Lectores, Cierres, Baterías y Módulos</span>
+    </a>
+    <a class="tarjeta-nav" href="control-baterias.html">
+      <span class="tarjeta-nav-icono">🔋</span>
+      <span class="tarjeta-nav-titulo">Control de Baterías</span>
+      <span class="tarjeta-nav-desc">Activas y falladas, tiempo en uso, causa</span>
+    </a>
+    <a class="tarjeta-nav" href="vida-equipo.html">
+      <span class="tarjeta-nav-icono">🕘</span>
+      <span class="tarjeta-nav-titulo">Vida de los Equipos</span>
+      <span class="tarjeta-nav-desc">Línea de tiempo por IMEI: vinculación, AMMI, etc.</span>
+    </a>
+  </div>
+
+  <h3 class="seccion-dashboard">Materiales</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="materiales.html">
+      <span class="tarjeta-nav-icono">🔩</span>
+      <span class="tarjeta-nav-titulo">Gestión de Materiales</span>
+      <span class="tarjeta-nav-desc">Llevados / utilizados / vuelven por OT</span>
+    </a>
+    <a class="tarjeta-nav" href="materiales-serializados.html">
+      <span class="tarjeta-nav-icono">🔖</span>
+      <span class="tarjeta-nav-titulo">Serialización de Materiales</span>
+      <span class="tarjeta-nav-desc">Rastrea cada serial que sale del almacén</span>
+    </a>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+
+<footer class="footer-fv">
+  <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="footer-fv-logo">
+  <span>Un producto de Formato Verde</span>
+</footer>
+</body>
+</html>

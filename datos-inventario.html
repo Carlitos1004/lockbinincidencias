@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Datos e Inventario</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Datos e Inventario</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <h3 class="seccion-dashboard" style="margin-top:20px;">Equipos</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="equipos-cliente.html">
+      <span class="tarjeta-nav-icono">📋</span>
+      <span class="tarjeta-nav-titulo">Consulta de Equipos por Cliente</span>
+      <span class="tarjeta-nav-desc">Ver todos los equipos, sin filtrar por falla</span>
+    </a>
+    <a class="tarjeta-nav" href="equipos.html">
+      <span class="tarjeta-nav-icono">📦</span>
+      <span class="tarjeta-nav-titulo">Actualización de Equipos LB</span>
+      <span class="tarjeta-nav-desc">Subir/actualizar la lista completa</span>
+    </a>
+  </div>
+
+  <h3 class="seccion-dashboard">Inventario</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="inventario.html">
+      <span class="tarjeta-nav-icono">🗃️</span>
+      <span class="tarjeta-nav-titulo">Inventario por Destino</span>
+      <span class="tarjeta-nav-desc">Stock de componentes retirados</span>
+    </a>
+  </div>
+
+  <h3 class="seccion-dashboard">Estadísticas</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="estadisticas.html">
+      <span class="tarjeta-nav-icono">📊</span>
+      <span class="tarjeta-nav-titulo">Estadísticas de Fallas</span>
+      <span class="tarjeta-nav-desc">Fallas comunes, tasa por cliente, tendencia</span>
+    </a>
+    <a class="tarjeta-nav" href="estadisticas-generales.html">
+      <span class="tarjeta-nav-icono">📈</span>
+      <span class="tarjeta-nav-titulo">Estadísticas Generales</span>
+      <span class="tarjeta-nav-desc">Histórico completo: causas, condición física, por cliente</span>
+    </a>
+  </div>
+
+  <h3 class="seccion-dashboard">Sensores Superfy</h3>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="control-sensores.html">
+      <span class="tarjeta-nav-icono">📡</span>
+      <span class="tarjeta-nav-titulo">Sensores Superfy</span>
+      <span class="tarjeta-nav-desc">Estado de conectividad y vinculación, 800 sensores</span>
+    </a>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+
+<footer class="footer-fv">
+  <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="footer-fv-logo">
+  <span>Un producto de Formato Verde</span>
+</footer>
+</body>
+</html>
