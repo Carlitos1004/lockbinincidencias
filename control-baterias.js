@@ -90,17 +90,33 @@ async function cargarDatos() {
     if (!actual || new Date(c.fecha) > new Date(actual.fecha)) retirosPorSerial[c.serial_retirado] = c;
   });
 
+  // Fecha de instalación del equipo completo, por MC — se usa como
+  // aproximación de la fecha de instalación de la batería cuando no hay
+  // ningún registro de instalación de ese serial en particular (ej. si
+  // era la batería ORIGINAL del equipo, nunca sustituida antes de esta
+  // falla). Es una aproximación, no la fecha real de la batería — se
+  // marca como tal en la tabla.
+  const equiposPorMC = {};
+  equiposData.forEach(eq => { if (eq.m_control) equiposPorMC[eq.m_control] = eq; });
+
   retiradasData = Object.values(retirosPorSerial).map(retiro => {
     const instalacion = instalacionesPorSerial[retiro.serial_retirado];
+    const equipoAsociado = equiposPorMC[retiro.m_control];
+    const fechaInstalacionAprox = !instalacion && equipoAsociado?.fecha_instalacion
+      ? equipoAsociado.fecha_instalacion
+      : null;
+    const fechaInstalacionFinal = instalacion?.fecha || fechaInstalacionAprox;
+
     return {
       serial: retiro.serial_retirado,
       tipo: retiro.tipo_componente,
       cliente: retiro.cliente,
       mc: retiro.m_control,
       categoria: retiro.categoria,
-      fechaInstalacion: instalacion?.fecha || null,
+      fechaInstalacion: fechaInstalacionFinal || null,
+      fechaEsAproximada: !instalacion && !!fechaInstalacionAprox,
       fechaRetiro: retiro.fecha,
-      diasEnUso: instalacion ? diasEntre(instalacion.fecha, retiro.fecha) : null,
+      diasEnUso: fechaInstalacionFinal ? diasEntre(fechaInstalacionFinal, retiro.fecha) : null,
       causa: retiro.reparacion,
       idOt: retiro.id_ot
     };
@@ -177,8 +193,8 @@ function renderResumen() {
     <div class="tarjeta-resumen"><strong>${activasData.length}</strong><span>Activas hoy</span></div>
     <div class="tarjeta-resumen"><strong>${retiradasData.length}</strong><span>Retiradas / falladas</span></div>
     <div class="tarjeta-resumen"><strong>${promedio !== null ? promedio + " días" : "—"}</strong><span>Promedio de uso antes de fallar</span></div>
-    <div class="tarjeta-resumen"><strong>${pct1a !== null ? pct1a + "%" : "—"}</strong><span>Fallaron dentro de 1 año</span></div>
-    <div class="tarjeta-resumen"><strong>${pct6m !== null ? pct6m + "%" : "—"}</strong><span>Fallaron dentro de 6 meses</span></div>
+    <div class="tarjeta-resumen"><strong>${pct1a !== null ? pct1a + "%" : "—"}</strong><span>Fallaron dentro de 1 año${conGarantiaConocida.length > 0 ? ` (${dentro1a} de ${conGarantiaConocida.length})` : ""}</span></div>
+    <div class="tarjeta-resumen"><strong>${pct6m !== null ? pct6m + "%" : "—"}</strong><span>Fallaron dentro de 6 meses${conGarantiaConocida.length > 0 ? ` (${dentro6m} de ${conGarantiaConocida.length})` : ""}</span></div>
   `;
 }
 
@@ -206,7 +222,7 @@ function renderTablas() {
       <td>${r.cliente || "—"}</td>
       <td>${r.mc || "—"}</td>
       <td>${r.categoria || "—"}</td>
-      <td>${r.fechaInstalacion ? new Date(r.fechaInstalacion).toLocaleDateString("es-ES") : "—"}</td>
+      <td>${r.fechaInstalacion ? new Date(r.fechaInstalacion).toLocaleDateString("es-ES") + (r.fechaEsAproximada ? " (aprox.)" : "") : "—"}</td>
       <td>${new Date(r.fechaRetiro).toLocaleDateString("es-ES")}</td>
       <td>${r.diasEnUso !== null ? r.diasEnUso : "—"}</td>
       <td class="${r.garantia.dentro6m ? "garantia-si" : "garantia-no"}">${r.garantia.texto6m}</td>
