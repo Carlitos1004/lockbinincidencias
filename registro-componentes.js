@@ -18,6 +18,15 @@ const ICONOS_ESTADO_COMPONENTE = {
 let crudoComponentes = [];
 let gruposComponentes = [];
 
+// Clientes internos/de prueba que se excluyen de todos los conteos y
+// registros (mismo criterio que Estadísticas Generales y el Registro
+// Maestro de Equipos).
+const CLIENTES_EXCLUIDOS_EXACTOS = ["comercial", "frutos", "interno", "carmen", "municipalia"];
+function esClienteExcluido(cliente) {
+  const c = (cliente || "").toLowerCase();
+  return CLIENTES_EXCLUIDOS_EXACTOS.includes(c) || c.includes("villanueva");
+}
+
 cargarTodo();
 
 async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
@@ -50,6 +59,9 @@ async function cargarTodo() {
     document.getElementById("tbody-registro-comp").innerHTML = `<tr><td colspan="8">Error: ${err.message}</td></tr>`;
     return;
   }
+
+  crudoComponentes = crudoComponentes.filter(c => !esClienteExcluido(c.cliente));
+  equiposData = equiposData.filter(eq => !esClienteExcluido(eq.cliente));
 
   gruposComponentes = agrupar(crudoComponentes);
   agregarInstaladosSinIncidencias(equiposData);
