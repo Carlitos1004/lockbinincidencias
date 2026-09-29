@@ -57,11 +57,16 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
 
 async function cargarDatos() {
   let data;
+  let equiposData = [];
   try {
     data = await traerTodasLasFilas(
       "componentes_retirados",
       "cliente, m_control, id_ot, fecha, serial_nuevo, serial_retirado, tipo_componente, categoria, reparacion, estado",
       (q) => q.in("tipo_componente", ["Batería Recargable", "Batería No Recargable"])
+    );
+    equiposData = await traerTodasLasFilas(
+      "equipos",
+      "m_control, cliente, serie_bateria, modelo_bateria, fecha_instalacion"
     );
   } catch (err) {
     document.getElementById("tbody-retiradas").innerHTML = `<tr><td colspan="12">Error: ${err.message}</td></tr>`;
@@ -117,6 +122,40 @@ async function cargarDatos() {
       idOt: inst.id_ot
     }))
     .map(a => ({ ...a, garantia: calcularGarantia(a.diasEnUso) }));
+
+  // Baterías ORIGINALES que nunca se han cambiado (ninguna fila en
+  // componentes_retirados, ni como retiro ni como repuesto instalado) —
+  // sin esto no aparecían en Activas porque no había cómo saber cuándo
+  // se instalaron. Usamos la fecha de instalación del EQUIPO completo
+  // como referencia (fecha real de la batería si nunca se ha tocado).
+  const serialesConHistoria = new Set([
+    ...Object.keys(instalacionesPorSerial),
+    ...Object.keys(retirosPorSerial)
+  ].map(s => s.trim().toUpperCase()));
+
+  equiposData.forEach(eq => {
+    const serial = (eq.serie_bateria || "").trim();
+    if (!serial || serialesConHistoria.has(serial.toUpperCase())) return;
+    if (!eq.fecha_instalacion) return; // sin fecha de referencia, no se puede calcular
+
+    const modelo = (eq.modelo_bateria || "").toUpperCase();
+    const tipo = modelo.startsWith("BA02") ? "Batería Recargable"
+      : modelo.startsWith("BA01") ? "Batería No Recargable"
+      : "Batería";
+
+    const diasEnUso = diasEntre(eq.fecha_instalacion, new Date());
+    activasData.push({
+      serial,
+      tipo,
+      cliente: eq.cliente,
+      mc: eq.m_control,
+      categoria: null,
+      fechaInstalacion: eq.fecha_instalacion,
+      diasEnUso,
+      idOt: null,
+      garantia: calcularGarantia(diasEnUso)
+    });
+  });
 
   renderResumen();
   renderTablas();
@@ -221,3 +260,16 @@ function renderTendenciaFallas(retiradas) {
 ["filtro-tipo", "filtro-cliente", "filtro-categoria"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderTablas);
 });
+
+// --- Pestañas ---
+function cambiarPestanaBaterias(cual) {
+  document.getElementById("vista-retiradas-box").hidden = cual !== "retiradas";
+  document.getElementById("vista-tendencia-box").hidden = cual !== "tendencia";
+  document.getElementById("vista-activas-box").hidden = cual !== "activas";
+  document.getElementById("tab-retiradas-btn").classList.toggle("tab-vista-activa", cual === "retiradas");
+  document.getElementById("tab-tendencia-btn").classList.toggle("tab-vista-activa", cual === "tendencia");
+  document.getElementById("tab-activas-btn").classList.toggle("tab-vista-activa", cual === "activas");
+}
+document.getElementById("tab-retiradas-btn").addEventListener("click", () => cambiarPestanaBaterias("retiradas"));
+document.getElementById("tab-tendencia-btn").addEventListener("click", () => cambiarPestanaBaterias("tendencia"));
+document.getElementById("tab-activas-btn").addEventListener("click", () => cambiarPestanaBaterias("activas"));
