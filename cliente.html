@@ -27,72 +27,86 @@
 
   <div class="resumen-cliente" id="resumen-cliente"></div>
 
-  <!-- ================= 1. LISTA DE EQUIPOS ================= -->
-  <h2 style="margin-top:32px;">Tus equipos</h2>
-  <div class="materiales-controles">
-    <input type="text" id="filtro-equipos" placeholder="Buscar por módulo o fracción...">
+  <!-- Lista de MC del cliente, compartida por los 2 campos "buscables" -->
+  <datalist id="datalist-equipos-cliente"></datalist>
+
+  <div class="tabs-vista" style="margin-top:20px;">
+    <button id="tab-equipos-btn" class="tab-vista-btn tab-vista-activa">🗂️ Tus equipos</button>
+    <button id="tab-cambios-btn" class="tab-vista-btn">🔧 Cambio de equipos y componentes</button>
+    <button id="tab-fallas-btn" class="tab-vista-btn">🚨 Reporte de fallas</button>
+    <button id="tab-historial-btn" class="tab-vista-btn">📜 Historial</button>
   </div>
-  <table class="tabla-revision" id="tabla-equipos-cliente">
-    <thead><tr><th>Módulo</th><th>Fracción</th><th>Estado</th><th>Alarmas activas</th><th>Última comunicación</th></tr></thead>
-    <tbody id="equipos-cliente-tbody"><tr><td colspan="5">Cargando...</td></tr></tbody>
-  </table>
+
+  <!-- ================= 1. LISTA DE EQUIPOS ================= -->
+  <div id="vista-equipos-box">
+    <div class="materiales-controles" style="margin-top:16px;">
+      <input type="text" id="filtro-equipos" placeholder="Buscar por módulo o fracción...">
+    </div>
+    <table class="tabla-revision" id="tabla-equipos-cliente">
+      <thead><tr><th>Módulo</th><th>Fracción</th><th>Estado</th><th>Alarmas activas</th><th>Última comunicación</th></tr></thead>
+      <tbody id="equipos-cliente-tbody"><tr><td colspan="5">Cargando...</td></tr></tbody>
+    </table>
+  </div>
 
   <!-- ================= 2. CAMBIO DE EQUIPOS Y COMPONENTES ================= -->
-  <h2 style="margin-top:32px;">Cambio de equipos y componentes</h2>
-  <p>¿Ustedes mismos cambiaron una batería, un lector, un cierre o el módulo completo? Regístrenlo aquí para que quede constancia — nosotros lo revisamos y actualizamos el sistema.</p>
+  <div id="vista-cambios-box" hidden>
+    <p style="margin-top:16px;">¿Ustedes mismos cambiaron una batería, un lector, un cierre o el módulo completo? Regístrenlo aquí para que quede constancia — nosotros lo revisamos y actualizamos el sistema.</p>
 
-  <div class="agregar-equipo-box">
-    <label><strong>Reportar un cambio</strong></label>
-    <div class="materiales-controles">
-      <select id="cambio-mc"><option value="">Selecciona el módulo (MC)...</option></select>
-      <select id="cambio-tipo">
-        <option value="">Tipo de componente...</option>
-        <option value="Lector Electrónico">Lector Electrónico</option>
-        <option value="Cierre Electrónico">Cierre Electrónico</option>
-        <option value="Batería">Batería</option>
-        <option value="Módulo de Control">Módulo de Control (equipo completo)</option>
-        <option value="Otro">Otro</option>
-      </select>
+    <div class="agregar-equipo-box">
+      <label><strong>Reportar un cambio</strong></label>
+      <div class="materiales-controles">
+        <input type="text" id="cambio-mc" list="datalist-equipos-cliente" placeholder="Escribe o elige el módulo (MC)...">
+        <select id="cambio-tipo">
+          <option value="">Tipo de componente...</option>
+          <option value="Lector Electrónico">Lector Electrónico</option>
+          <option value="Cierre Electrónico">Cierre Electrónico</option>
+          <option value="Batería">Batería</option>
+          <option value="Módulo de Control">Módulo de Control (equipo completo)</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="materiales-controles">
+        <input type="text" id="cambio-serial-anterior" placeholder="Serial anterior (si lo conoces)">
+        <input type="text" id="cambio-serial-nuevo" placeholder="Serial nuevo (si lo conoces)">
+      </div>
+      <textarea id="cambio-descripcion" rows="2" placeholder="Cuéntanos qué cambiaron y cuándo (ej: 'Cambiamos la batería el 20/9, no tenemos el serial a mano')."></textarea>
+      <button id="cambio-btn" class="btn-primario" style="margin-top:8px;">Enviar reporte de cambio</button>
+      <p id="cambio-msg" class="resultado-msg" hidden></p>
     </div>
-    <div class="materiales-controles">
-      <input type="text" id="cambio-serial-anterior" placeholder="Serial anterior (si lo conoces)">
-      <input type="text" id="cambio-serial-nuevo" placeholder="Serial nuevo (si lo conoces)">
-    </div>
-    <textarea id="cambio-descripcion" rows="2" placeholder="Cuéntanos qué cambiaron y cuándo (ej: 'Cambiamos la batería el 20/9, no tenemos el serial a mano')."></textarea>
-    <button id="cambio-btn" class="btn-primario" style="margin-top:8px;">Enviar reporte de cambio</button>
-    <p id="cambio-msg" class="resultado-msg" hidden></p>
+
+    <table class="tabla-revision" id="tabla-cambios-cliente" style="margin-top:16px;">
+      <thead><tr><th>Fecha</th><th>Módulo</th><th>Componente</th><th>Serial anterior → nuevo</th><th>Descripción</th><th>Estado</th></tr></thead>
+      <tbody id="cambios-cliente-tbody"><tr><td colspan="6">Cargando...</td></tr></tbody>
+    </table>
   </div>
-
-  <table class="tabla-revision" id="tabla-cambios-cliente" style="margin-top:16px;">
-    <thead><tr><th>Fecha</th><th>Módulo</th><th>Componente</th><th>Serial anterior → nuevo</th><th>Descripción</th><th>Estado</th></tr></thead>
-    <tbody id="cambios-cliente-tbody"><tr><td colspan="6">Cargando...</td></tr></tbody>
-  </table>
 
   <!-- ================= 3. REPORTE / FORMULARIO DE FALLAS ================= -->
-  <h2 style="margin-top:32px;">Reporte de fallas</h2>
-  <p>¿Algo no funciona bien? Descríbelo aquí. Esto no genera automáticamente una visita — lo revisamos y, si hace falta, coordinamos una OT.</p>
+  <div id="vista-fallas-box" hidden>
+    <p style="margin-top:16px;">¿Algo no funciona bien? Descríbelo aquí. Esto no genera automáticamente una visita — lo revisamos y, si hace falta, coordinamos una OT.</p>
 
-  <div class="agregar-equipo-box">
-    <label><strong>Reportar una falla</strong></label>
-    <div class="materiales-controles">
-      <select id="falla-mc"><option value="">Selecciona el módulo (MC)...</option></select>
+    <div class="agregar-equipo-box">
+      <label><strong>Reportar una falla</strong></label>
+      <div class="materiales-controles">
+        <input type="text" id="falla-mc" list="datalist-equipos-cliente" placeholder="Escribe o elige el módulo (MC)...">
+      </div>
+      <textarea id="falla-mensaje" rows="3" placeholder="Describe la falla: qué pasa, desde cuándo, etc."></textarea>
+      <button id="falla-btn" class="btn-primario" style="margin-top:8px;">Enviar reporte de falla</button>
+      <p id="falla-msg" class="resultado-msg" hidden></p>
     </div>
-    <textarea id="falla-mensaje" rows="3" placeholder="Describe la falla: qué pasa, desde cuándo, etc."></textarea>
-    <button id="falla-btn" class="btn-primario" style="margin-top:8px;">Enviar reporte de falla</button>
-    <p id="falla-msg" class="resultado-msg" hidden></p>
+
+    <table class="tabla-revision" id="tabla-alertas-cliente" style="margin-top:16px;">
+      <thead><tr><th>Fecha</th><th>Módulo</th><th>Mensaje</th><th>Estado</th></tr></thead>
+      <tbody id="alertas-cliente-tbody"><tr><td colspan="4">Cargando...</td></tr></tbody>
+    </table>
   </div>
 
-  <table class="tabla-revision" id="tabla-alertas-cliente" style="margin-top:16px;">
-    <thead><tr><th>Fecha</th><th>Módulo</th><th>Mensaje</th><th>Estado</th></tr></thead>
-    <tbody id="alertas-cliente-tbody"><tr><td colspan="4">Cargando...</td></tr></tbody>
-  </table>
-
   <!-- ================= HISTORIAL OFICIAL ================= -->
-  <h2 style="margin-top:32px;">Historial de fallas y reparaciones</h2>
-  <table class="tabla-revision" id="tabla-historial-cliente">
-    <thead><tr><th>Fecha</th><th>Módulo</th><th>Falla</th><th>Estado</th><th>Acción / Comentarios</th></tr></thead>
-    <tbody id="historial-cliente-tbody"><tr><td colspan="5">Cargando...</td></tr></tbody>
-  </table>
+  <div id="vista-historial-box" hidden>
+    <table class="tabla-revision" id="tabla-historial-cliente" style="margin-top:16px;">
+      <thead><tr><th>Fecha</th><th>Módulo</th><th>Falla</th><th>Estado</th><th>Acción / Comentarios</th></tr></thead>
+      <tbody id="historial-cliente-tbody"><tr><td colspan="5">Cargando...</td></tr></tbody>
+    </table>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

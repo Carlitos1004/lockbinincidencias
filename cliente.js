@@ -140,18 +140,26 @@ function renderEquipos() {
 
 document.getElementById("filtro-equipos").addEventListener("input", renderEquipos);
 
-// Llena los 2 desplegables de "elige tu módulo" (cambios y fallas) con la
-// lista de equipos que ya tenemos cargada — evita que el cliente tenga que
-// escribir el MC a mano y se equivoque.
+// Llena el datalist compartido por los 2 campos "MC" (cambios y fallas) —
+// son inputs de texto normales, así que el cliente puede elegir de la
+// lista O escribir el serial directo si lo sabe de memoria.
 function llenarSelectsDeEquipos() {
-  const opciones = equiposCliente
-    .map(eq => `<option value="${eq.m_control}">${eq.m_control}${eq.fraccion ? " — " + eq.fraccion : ""}</option>`)
+  document.getElementById("datalist-equipos-cliente").innerHTML = equiposCliente
+    .map(eq => `<option value="${eq.m_control}">${eq.fraccion ? eq.m_control + " — " + eq.fraccion : ""}</option>`)
     .join("");
+}
 
-  const selectCambio = document.getElementById("cambio-mc");
-  const selectFalla = document.getElementById("falla-mc");
-  selectCambio.innerHTML = `<option value="">Selecciona el módulo (MC)...</option>` + opciones;
-  selectFalla.innerHTML = `<option value="">Selecciona el módulo (MC)...</option>` + opciones;
+// ================= PESTAÑAS =================
+const PESTANAS_CLIENTE = ["equipos", "cambios", "fallas", "historial"];
+PESTANAS_CLIENTE.forEach(nombre => {
+  document.getElementById(`tab-${nombre}-btn`).addEventListener("click", () => cambiarPestanaCliente(nombre));
+});
+
+function cambiarPestanaCliente(cual) {
+  PESTANAS_CLIENTE.forEach(nombre => {
+    document.getElementById(`vista-${nombre}-box`).hidden = nombre !== cual;
+    document.getElementById(`tab-${nombre}-btn`).classList.toggle("tab-vista-activa", nombre === cual);
+  });
 }
 
 function mostrarMensaje(el, texto, esError) {
@@ -191,7 +199,7 @@ async function cargarCambiosPropios() {
 }
 
 document.getElementById("cambio-btn").addEventListener("click", async () => {
-  const mc = document.getElementById("cambio-mc").value;
+  const mc = document.getElementById("cambio-mc").value.trim().toUpperCase();
   const tipo = document.getElementById("cambio-tipo").value;
   const serialAnterior = document.getElementById("cambio-serial-anterior").value.trim();
   const serialNuevo = document.getElementById("cambio-serial-nuevo").value.trim();
@@ -199,7 +207,11 @@ document.getElementById("cambio-btn").addEventListener("click", async () => {
   const msg = document.getElementById("cambio-msg");
 
   if (!mc || !tipo) {
-    mostrarMensaje(msg, "⚠️ Selecciona el módulo y el tipo de componente.", true);
+    mostrarMensaje(msg, "⚠️ Escribe o elige el módulo, y el tipo de componente.", true);
+    return;
+  }
+  if (!equiposCliente.some(eq => eq.m_control === mc)) {
+    mostrarMensaje(msg, "⚠️ Ese MC no aparece entre tus equipos. Revisa que esté bien escrito.", true);
     return;
   }
   if (!serialAnterior && !serialNuevo && !descripcion) {
@@ -266,12 +278,16 @@ async function cargarAlertasPropias() {
 }
 
 document.getElementById("falla-btn").addEventListener("click", async () => {
-  const mc = document.getElementById("falla-mc").value;
+  const mc = document.getElementById("falla-mc").value.trim().toUpperCase();
   const mensaje = document.getElementById("falla-mensaje").value.trim();
   const msg = document.getElementById("falla-msg");
 
   if (!mc || !mensaje) {
-    mostrarMensaje(msg, "⚠️ Selecciona el módulo y describe la falla.", true);
+    mostrarMensaje(msg, "⚠️ Escribe o elige el módulo y describe la falla.", true);
+    return;
+  }
+  if (!equiposCliente.some(eq => eq.m_control === mc)) {
+    mostrarMensaje(msg, "⚠️ Ese MC no aparece entre tus equipos. Revisa que esté bien escrito.", true);
     return;
   }
 
