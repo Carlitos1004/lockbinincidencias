@@ -88,6 +88,25 @@ function agrupar(filas) {
 function agregarInstaladosSinIncidencias(equiposData) {
   const yaExiste = new Set(gruposComponentes.map(g => g.tipo + "|" + g.serial.trim().toUpperCase()));
 
+  const agregarSiFalta = (tipo, serialCrudo, eq) => {
+    const serial = (serialCrudo || "").trim();
+    if (!serial) return;
+    const clave = tipo + "|" + serial.toUpperCase();
+    if (yaExiste.has(clave)) return; // ya tiene incidencias, no se duplica
+    yaExiste.add(clave);
+
+    gruposComponentes.push({
+      tipo,
+      serial,
+      clienteActual: eq.cliente,
+      mcActual: eq.m_control,
+      estadoActual: "Instalado — sin incidencias",
+      fechaUltima: eq.fecha_instalacion || eq.actualizado_en || null,
+      cantidad: 0,
+      eventos: []
+    });
+  };
+
   const TIPOS_EQUIPO = [
     { columna: "serie_lector", tipo: "Lector Electrónico" },
     { columna: "serie_cierre", tipo: "Cierre Electrónico" },
@@ -95,24 +114,10 @@ function agregarInstaladosSinIncidencias(equiposData) {
   ];
 
   equiposData.forEach(eq => {
-    TIPOS_EQUIPO.forEach(({ columna, tipo }) => {
-      const serial = (eq[columna] || "").trim();
-      if (!serial) return;
-      const clave = tipo + "|" + serial.toUpperCase();
-      if (yaExiste.has(clave)) return; // ya tiene incidencias, no se duplica
-      yaExiste.add(clave);
-
-      gruposComponentes.push({
-        tipo,
-        serial,
-        clienteActual: eq.cliente,
-        mcActual: eq.m_control,
-        estadoActual: "Instalado — sin incidencias",
-        fechaUltima: eq.fecha_instalacion || eq.actualizado_en || null,
-        cantidad: 0,
-        eventos: []
-      });
-    });
+    TIPOS_EQUIPO.forEach(({ columna, tipo }) => agregarSiFalta(tipo, eq[columna], eq));
+    // El Módulo de Control no tiene una columna de "serial" separada —
+    // su propio m_control ES el serial que lo identifica.
+    agregarSiFalta("Módulo de Control", eq.m_control, eq);
   });
 }
 
@@ -132,6 +137,7 @@ function renderResumen() {
     <div class="tarjeta-resumen"><strong>${porTipo["Lector Electrónico"] || 0}</strong><span>Lectores Electrónicos</span></div>
     <div class="tarjeta-resumen"><strong>${porTipo["Cierre Electrónico"] || 0}</strong><span>Cierres Electrónicos</span></div>
     <div class="tarjeta-resumen"><strong>${porTipo["Batería"] || 0}</strong><span>Baterías</span></div>
+    <div class="tarjeta-resumen"><strong>${porTipo["Módulo de Control"] || 0}</strong><span>Módulos de Control</span></div>
     <div class="tarjeta-resumen"><strong>${sinIncidencias}</strong><span>Instalados sin incidencias nunca</span></div>
   `;
 }
