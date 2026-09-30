@@ -4,6 +4,16 @@
 
 let registroData = [];
 
+// Clientes internos/de prueba que se excluyen de todos los conteos y
+// registros (mismo criterio que Estadísticas Generales y el Registro
+// Maestro de Componentes) — la tabla registro_maestro_equipos en la base
+// no filtra esto sola, así que se hace aquí al mostrarla.
+const CLIENTES_EXCLUIDOS_EXACTOS = ["comercial", "frutos", "interno", "carmen", "municipalia"];
+function esClienteExcluido(cliente) {
+  const c = (cliente || "").toLowerCase();
+  return CLIENTES_EXCLUIDOS_EXACTOS.includes(c) || c.includes("villanueva");
+}
+
 cargarRegistro();
 
 async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
@@ -29,6 +39,7 @@ async function cargarRegistro() {
     document.getElementById("tbody-registro").innerHTML = `<tr><td colspan="8">Error: ${err.message}</td></tr>`;
     return;
   }
+  registroData = registroData.filter(r => !esClienteExcluido(r.cliente_actual));
   renderResumen();
   llenarFiltroCliente();
   renderTabla();
