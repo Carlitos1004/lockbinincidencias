@@ -114,20 +114,35 @@ function renderTabla() {
       <td>${r.ha_sido_reparado ? "✅ Sí" : "— No"}</td>
       <td>${r.ultima_incidencia_fecha ? new Date(r.ultima_incidencia_fecha).toLocaleDateString("es-ES") : "—"}</td>
       <td>
-        ${r.mc_actual ? `<a href="buscar-serial.html" onclick="sessionStorage.setItem('lockbin_prellenar_busqueda', '${r.mc_actual}')">Ver incidencias →</a>` : "—"}
-        ${r.imei ? `<br><a href="vida-equipo.html" onclick="sessionStorage.setItem('lockbin_prellenar_busqueda', '${r.imei}')">Ver vida →</a>` : ""}
+        ${r.mc_actual ? `<a href="buscar-serial.html" class="link-ver-incidencias" data-mc="${r.mc_actual}">Ver incidencias →</a>` : "—"}
+        ${r.imei ? `<br><a href="vida-equipo.html" class="link-ver-vida" data-imei="${r.imei}">Ver vida →</a>` : ""}
       </td>
     </tr>
   `;
   }).join("");
 
-  tbody.querySelectorAll(".link-mc-historico").forEach(a => {
+  // Los 3 enlaces que salen de esta tabla (Ver incidencias / Ver vida / MC
+  // histórico) dejan dicho, además del MC o IMEI a buscar, que el botón de
+  // "←" de la página destino debe volver aquí — no al lugar de siempre.
+  tbody.querySelectorAll(".link-mc-historico, .link-ver-incidencias").forEach(a => {
     a.addEventListener("click", (e) => {
       e.preventDefault();
-      sessionStorage.setItem("lockbin_prellenar_busqueda", a.dataset.mc);
-      window.location.href = "buscar-serial.html";
+      irConVolverAlRegistro(a.dataset.mc, "buscar-serial.html");
     });
   });
+  tbody.querySelectorAll(".link-ver-vida").forEach(a => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      irConVolverAlRegistro(a.dataset.imei, "vida-equipo.html");
+    });
+  });
+}
+
+function irConVolverAlRegistro(valorBusqueda, url) {
+  sessionStorage.setItem("lockbin_prellenar_busqueda", valorBusqueda);
+  sessionStorage.setItem("lockbin_volver_url", "registro-maestro.html");
+  sessionStorage.setItem("lockbin_volver_texto", "Volver al Registro Maestro de Equipos");
+  window.location.href = url;
 }
 
 ["filtro-mc", "filtro-cliente", "filtro-instalado", "filtro-reparado", "filtro-mismo-imei", "orden-registro"].forEach(id => {

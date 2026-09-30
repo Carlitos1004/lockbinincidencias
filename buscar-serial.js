@@ -21,6 +21,22 @@ if (prellenado) {
   buscar();
 }
 
+// Si esa pantalla también dejó dicho a dónde debería volver el botón de
+// "←" (en vez del destino de siempre), lo aplicamos — si no dejó nada,
+// el botón se queda exactamente como está.
+aplicarVolverPersonalizado();
+function aplicarVolverPersonalizado() {
+  const url = sessionStorage.getItem("lockbin_volver_url");
+  const texto = sessionStorage.getItem("lockbin_volver_texto");
+  if (!url) return;
+  sessionStorage.removeItem("lockbin_volver_url");
+  sessionStorage.removeItem("lockbin_volver_texto");
+  const btnVolver = document.getElementById("btn-volver");
+  if (!btnVolver) return;
+  btnVolver.href = url;
+  btnVolver.innerHTML = `<span class="btn-volver-flecha">←</span> ${texto || "Volver"}`;
+}
+
 async function buscar() {
   const termino = busquedaInput.value.trim();
   buscarMsg.hidden = true;
