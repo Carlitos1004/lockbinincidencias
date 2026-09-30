@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Cambio de Equipos y Componentes</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Cambio de Equipos y Componentes</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="cliente.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">¿Ustedes mismos cambiaron una batería, un lector, un cierre o el módulo completo? Regístrenlo aquí para que quede constancia — nosotros lo revisamos y actualizamos el sistema.</p>
+
+  <div class="agregar-equipo-box">
+    <label><strong>Reportar un cambio</strong></label>
+    <div class="materiales-controles">
+      <input type="text" id="cambio-mc" list="datalist-equipos-cliente" placeholder="Escribe o elige el módulo (MC)...">
+      <datalist id="datalist-equipos-cliente"></datalist>
+      <select id="cambio-tipo">
+        <option value="">Tipo de componente...</option>
+        <option value="Lector Electrónico">Lector Electrónico</option>
+        <option value="Cierre Electrónico">Cierre Electrónico</option>
+        <option value="Batería">Batería</option>
+        <option value="Módulo de Control">Módulo de Control (equipo completo)</option>
+        <option value="Otro">Otro</option>
+      </select>
+    </div>
+    <div class="materiales-controles">
+      <input type="text" id="cambio-serial-anterior" placeholder="Serial anterior (si lo conoces)">
+      <input type="text" id="cambio-serial-nuevo" placeholder="Serial nuevo (si lo conoces)">
+    </div>
+    <textarea id="cambio-descripcion" rows="2" placeholder="Cuéntanos qué cambiaron y cuándo (ej: 'Cambiamos la batería el 20/9, no tenemos el serial a mano')."></textarea>
+    <button id="cambio-btn" class="btn-primario" style="margin-top:8px;">Enviar reporte de cambio</button>
+    <p id="cambio-msg" class="resultado-msg" hidden></p>
+  </div>
+
+  <table class="tabla-revision" id="tabla-cambios-cliente" style="margin-top:16px;">
+    <thead><tr><th>Fecha</th><th>Módulo</th><th>Componente</th><th>Serial anterior → nuevo</th><th>Descripción</th><th>Estado</th></tr></thead>
+    <tbody id="cambios-cliente-tbody"><tr><td colspan="6">Cargando...</td></tr></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "cliente";</script>
+<script src="sesion.js"></script>
+<script src="cliente-cambios.js"></script>
+
+<footer class="footer-fv">
+  <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="footer-fv-logo">
+  <span>Un producto de Formato Verde</span>
+</footer>
+</body>
+</html>
