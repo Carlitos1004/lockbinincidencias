@@ -19,6 +19,27 @@ function esClienteExcluido(cliente) {
 let enviosData = [];
 let editandoId = null;
 
+// Para el Módulo de Control se cuenta "veces enviado" por MC (el módulo es
+// el mismo aparato aunque cambie de sitio); para Lector/Cierre/Batería se
+// cuenta por el serial del componente en sí, porque el MC al que
+// pertenecían puede cambiar con el tiempo.
+//
+// Cuando falta el dato que identifica al componente (sin serial y sin MC —
+// típico de registros "sin ticket" agregados en lote, o históricos
+// agregados a mano sin ese dato), NO hay forma de saber si dos filas son el
+// mismo componente físico o dos distintos. Antes se agrupaban igual bajo
+// una clave compartida tipo "Lector Electrónico|null", lo que inflaba
+// muchísimo el "veces enviado" mezclando componentes que no tienen nada que
+// ver entre sí. Por eso, si no hay identificador, cada fila cuenta como un
+// componente aparte (usando su id único de fila).
+function claveDe(c) {
+  if (c.tipo_componente === "Módulo de Control") {
+    return c.m_control ? `MC|${c.m_control}` : `sin-id|${c.id}`;
+  }
+  const identificador = c.serial_retirado || c.m_control;
+  return identificador ? `${c.tipo_componente}|${identificador}` : `sin-id|${c.id}`;
+}
+
 cargarEnvios();
 
 async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
@@ -50,15 +71,13 @@ async function cargarEnvios() {
   enviosData = enviosData.filter(c => !esClienteExcluido(c.cliente));
 
   // Cuántas veces ha ido cada componente a AMMI (contando esta misma fila).
-  // Se cuenta por MC + tipo de componente: un mismo equipo puede mandar su
-  // Módulo de Control una vez y su Lector Electrónico otra, y son cosas
-  // distintas — no queremos que se mezclen en el mismo conteo.
-  const conteoPorMc = {};
-  enviosData.forEach(c => {
-    const clave = (c.m_control || "") + "||" + (c.tipo_componente || "");
-    conteoPorMc[clave] = (conteoPorMc[clave] || 0) + 1;
-  });
-  enviosData.forEach(c => { c.vecesEnviado = conteoPorMc[(c.m_control || "") + "||" + (c.tipo_componente || "")]; });
+  // Para el Módulo de Control se cuenta por MC (el módulo es el mismo
+  // aparato aunque cambie de sitio); para Lector/Cierre/Batería se cuenta
+  // por el serial del componente en sí, porque el MC al que pertenecían
+  // puede cambiar con el tiempo.
+  const conteoPorClave = {};
+  enviosData.forEach(c => { const k = claveDe(c); conteoPorClave[k] = (conteoPorClave[k] || 0) + 1; });
+  enviosData.forEach(c => { c.vecesEnviado = conteoPorClave[claveDe(c)]; });
 
   renderResumen();
   renderTabla();
@@ -69,7 +88,7 @@ function renderResumen() {
   const regresados = enviosData.filter(c => c.ammi_fecha_regreso).length;
   const primera = enviosData.filter(c => c.ammi_categoria_regreso === "1ra categoría").length;
   const segunda = enviosData.filter(c => c.ammi_categoria_regreso === "2da categoría").length;
-  const repetidos = new Set(enviosData.filter(c => c.vecesEnviado > 1).map(c => (c.m_control || "") + "||" + (c.tipo_componente || ""))).size;
+  const repetidos = new Set(enviosData.filter(c => c.vecesEnviado > 1).map(claveDe)).size;
 
   document.getElementById("resumen-ammi").innerHTML = `
     <div class="tarjeta-resumen"><strong>${enviosData.length}</strong><span>Total enviados</span></div>
@@ -83,14 +102,12 @@ function renderResumen() {
 
 function renderTabla() {
   const fMc = document.getElementById("filtro-mc-ammi").value.trim().toLowerCase();
-  const fTipo = document.getElementById("filtro-tipo-ammi").value;
   const fEstado = document.getElementById("filtro-estado-ammi").value;
   const fCategoria = document.getElementById("filtro-categoria-regreso").value;
   const fRepetidos = document.getElementById("filtro-repetidos-ammi").value;
 
   const filtrados = enviosData.filter(c =>
     (!fMc || (c.m_control || "").toLowerCase().includes(fMc) || (c.cliente || "").toLowerCase().includes(fMc) || (c.serial_retirado || "").toLowerCase().includes(fMc)) &&
-    (!fTipo || c.tipo_componente === fTipo) &&
     (!fEstado || (fEstado === "regresado") === !!c.ammi_fecha_regreso) &&
     (!fCategoria || c.ammi_categoria_regreso === fCategoria) &&
     (!fRepetidos || c.vecesEnviado > 1)
@@ -106,10 +123,10 @@ function renderTabla() {
     if (c.id === editandoId) {
       return `
         <tr>
-          <td>${c.m_control || "—"}</td>
+          <td>${c.m_control}</td>
           <td>${c.tipo_componente || "—"}</td>
+          <td>${c.serial_retirado || "—"}</td>
           <td>${c.cliente || "—"}</td>
-          <td class="celda-mono">${c.serial_retirado || "—"}</td>
           <td>${new Date(c.fecha).toLocaleDateString("es-ES")}</td>
           <td>${c.categoria_ammi || "—"}</td>
           <td>${c.garantia_cliente === "SI" ? "Sí cubre" : c.garantia_cliente === "NO" ? "No cubre" : "—"}</td>
@@ -132,10 +149,10 @@ function renderTabla() {
     }
     return `
     <tr class="${!c.ammi_fecha_regreso ? 'fila-alerta' : ''}">
-      <td>${c.m_control || "—"}</td>
+      <td>${c.m_control}</td>
       <td>${c.tipo_componente || "—"}</td>
+      <td>${c.serial_retirado || "—"}</td>
       <td>${c.cliente || "—"}</td>
-      <td class="celda-mono">${c.serial_retirado || "—"}</td>
       <td>${new Date(c.fecha).toLocaleDateString("es-ES")}</td>
       <td>${c.categoria_ammi || "—"}</td>
       <td>${c.garantia_cliente === "SI" ? "Sí cubre" : c.garantia_cliente === "NO" ? "No cubre" : "—"}</td>
@@ -182,73 +199,107 @@ function renderTabla() {
   });
 }
 
-["filtro-mc-ammi", "filtro-tipo-ammi", "filtro-estado-ammi", "filtro-categoria-regreso", "filtro-repetidos-ammi"].forEach(id => {
+["filtro-mc-ammi", "filtro-estado-ammi", "filtro-categoria-regreso", "filtro-repetidos-ammi"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderTabla);
 });
 
-// --- Agregar manualmente un envío (y opcionalmente su regreso) que no ---
-// --- quedó registrado en el sistema, o que viene de una hoja vieja.   ---
-document.getElementById("manual-agregar-btn").addEventListener("click", async () => {
-  const msg = document.getElementById("manual-msg");
-  const tipo = document.getElementById("manual-tipo").value;
-  const mc = document.getElementById("manual-mc").value.trim().toUpperCase();
-  const serial = document.getElementById("manual-serial").value.trim().toUpperCase() || null;
-  const cliente = document.getElementById("manual-cliente").value.trim();
-  const fechaEnvio = document.getElementById("manual-fecha-envio").value;
-  const categoriaEnvio = document.getElementById("manual-categoria-envio").value || null;
-  const garantia = document.getElementById("manual-garantia").value || null;
-  const fechaRegreso = document.getElementById("manual-fecha-regreso").value || null;
-  const categoriaRegreso = document.getElementById("manual-categoria-regreso").value || null;
-  const notas = document.getElementById("manual-notas").value.trim() || null;
+// =========================================================================
+// Agregar registro manual (equipos enviados a AMMI que nunca se
+// registraron en el sistema — encontrados en hojas viejas).
+// =========================================================================
 
-  if (!mc || !cliente || !fechaEnvio) {
-    mostrarMensajeManual(msg, "⚠️ Completa al menos MC, cliente y fecha de envío.", true);
-    return;
+cargarDatalistEquipos();
+
+async function cargarDatalistEquipos() {
+  try {
+    const equipos = await traerTodasLasFilas("equipos", "m_control, cliente");
+    const datalist = document.getElementById("datalist-equipos-manual-ammi");
+    datalist.innerHTML = equipos
+      .map(e => `<option value="${e.m_control}">${e.cliente ? " — " + e.cliente : ""}</option>`)
+      .join("");
+  } catch (err) {
+    // si falla, el input sigue funcionando como texto libre
   }
-  if (fechaRegreso && !categoriaRegreso) {
-    mostrarMensajeManual(msg, "⚠️ Si pones fecha de regreso, elige también la categoría de regreso.", true);
-    return;
-  }
+}
 
-  const btn = document.getElementById("manual-agregar-btn");
-  btn.disabled = true;
-  btn.textContent = "Agregando...";
+document.getElementById("btn-toggle-manual").addEventListener("click", () => {
+  const caja = document.getElementById("form-manual-ammi");
+  caja.hidden = !caja.hidden;
+});
 
-  const { error } = await supabaseClient.from("componentes_retirados").insert([{
-    tipo_componente: tipo,
-    m_control: mc,
-    serial_retirado: serial,
-    cliente: cliente,
-    fecha: fechaEnvio,
-    destino: DESTINO_AMMI,
-    estado: "Revisado",
-    categoria_ammi: categoriaEnvio,
-    garantia_cliente: garantia,
-    ammi_fecha_regreso: fechaRegreso,
-    ammi_categoria_regreso: categoriaRegreso,
-    ammi_notas_regreso: notas
-  }]);
+document.getElementById("btn-cancelar-manual-ammi").addEventListener("click", () => {
+  limpiarFormularioManual();
+  document.getElementById("form-manual-ammi").hidden = true;
+});
 
-  btn.disabled = false;
-  btn.textContent = "Agregar registro";
-
-  if (error) {
-    mostrarMensajeManual(msg, "❌ " + error.message, true);
-    return;
-  }
-
-  mostrarMensajeManual(msg, "✅ Registro agregado.", false);
-  ["manual-mc", "manual-serial", "manual-cliente", "manual-fecha-envio", "manual-fecha-regreso", "manual-notas"].forEach(id => {
+function limpiarFormularioManual() {
+  ["manual-mc", "manual-serial", "manual-fecha-envio", "manual-fecha-regreso", "manual-notas"].forEach(id => {
     document.getElementById(id).value = "";
   });
   ["manual-categoria-envio", "manual-garantia", "manual-categoria-regreso"].forEach(id => {
     document.getElementById(id).value = "";
   });
+  document.getElementById("manual-tipo-componente").value = "Módulo de Control";
+  document.getElementById("mensaje-manual-ammi").textContent = "";
+}
+
+document.getElementById("btn-guardar-manual-ammi").addEventListener("click", async () => {
+  const mensaje = document.getElementById("mensaje-manual-ammi");
+  mensaje.textContent = "";
+
+  const mc = document.getElementById("manual-mc").value.trim();
+  const tipoComponente = document.getElementById("manual-tipo-componente").value;
+  const serial = document.getElementById("manual-serial").value.trim();
+  const fechaEnvio = document.getElementById("manual-fecha-envio").value;
+  const categoriaEnvio = document.getElementById("manual-categoria-envio").value;
+  const garantia = document.getElementById("manual-garantia").value;
+  const fechaRegreso = document.getElementById("manual-fecha-regreso").value;
+  const categoriaRegreso = document.getElementById("manual-categoria-regreso").value;
+  const notas = document.getElementById("manual-notas").value.trim();
+
+  if (!mc) {
+    mensaje.textContent = "❌ Falta el Módulo de Control (MC).";
+    mensaje.style.color = "var(--rojo-600, #c0392b)";
+    return;
+  }
+
+  const { data: equipo, error: errEquipo } = await supabaseClient
+    .from("equipos")
+    .select("m_control, cliente")
+    .eq("m_control", mc)
+    .maybeSingle();
+
+  if (errEquipo || !equipo) {
+    mensaje.textContent = "❌ Ese MC no existe en Equipos. Verifica el serial.";
+    mensaje.style.color = "var(--rojo-600, #c0392b)";
+    return;
+  }
+
+  const nuevoRegistro = {
+    fecha: fechaEnvio || new Date().toISOString(),
+    cliente: equipo.cliente || null,
+    m_control: mc,
+    tipo_componente: tipoComponente,
+    serial_retirado: serial || null,
+    estado: "Revisado",
+    reparacion: "Registro histórico agregado manualmente (hoja vieja de AMMI).",
+    destino: DESTINO_AMMI,
+    categoria_ammi: categoriaEnvio || null,
+    garantia_cliente: garantia || null,
+    ammi_fecha_regreso: fechaRegreso || null,
+    ammi_categoria_regreso: categoriaRegreso || null,
+    ammi_notas_regreso: notas || null
+  };
+
+  const { error } = await supabaseClient.from("componentes_retirados").insert(nuevoRegistro);
+
+  if (error) {
+    mensaje.textContent = "❌ " + error.message;
+    mensaje.style.color = "var(--rojo-600, #c0392b)";
+    return;
+  }
+
+  limpiarFormularioManual();
+  document.getElementById("form-manual-ammi").hidden = true;
   cargarEnvios();
 });
-
-function mostrarMensajeManual(el, texto, esError) {
-  el.textContent = texto;
-  el.className = esError ? "resultado-msg resultado-error" : "resultado-msg resultado-ok";
-  el.hidden = false;
-}
