@@ -11,9 +11,14 @@ const LAT_OFICINA = 42.2985;
 const LNG_OFICINA = -7.8180;
 const MAX_PARADAS_POR_LINK = 7; // límite práctico de Google Maps por link
 
+// Mismo valor usado en revision.js / ammi.js para marcar un componente como
+// enviado a AMMI — se repite aquí porque esta página no carga esos scripts.
+const DESTINO_AMMI = "❌ Equipo dañado - Enviar a AMMI";
+
 let otActualCargada = null;
 let ticketsCargados = [];
 let conteoFotosPorRegistro = {};
+let componentesPorRegistro = {};
 
 const otInput = document.getElementById("ot-input");
 const buscarBtn = document.getElementById("buscar-btn");
@@ -113,6 +118,21 @@ async function buscarOT() {
     });
   }
 
+  // Componentes retirados asociados a cada ticket — para mostrar, en OTs
+  // viejas migradas ("Hist...") y en las nuevas, cuáles componentes se le
+  // sacaron al equipo y por qué (tipo, serial, causa/hallazgo).
+  componentesPorRegistro = {};
+  if (idsRegistro.length > 0) {
+    const { data: comps } = await supabaseClient
+      .from("componentes_retirados")
+      .select("id_registro, tipo_componente, serial_retirado, causa_falla, condicion_fisica, reparacion, destino")
+      .in("id_registro", idsRegistro);
+    (comps || []).forEach(c => {
+      if (!componentesPorRegistro[c.id_registro]) componentesPorRegistro[c.id_registro] = [];
+      componentesPorRegistro[c.id_registro].push(c);
+    });
+  }
+
   const fallasUnicas = [...new Set(ticketsCargados.map(t => t.falla).filter(Boolean))].sort();
   document.getElementById("filtro-falla-select").innerHTML =
     `<option value="">Todas las fallas</option>` +
@@ -176,12 +196,23 @@ function renderTabla() {
       ? `<button class="btn-eliminar-ticket" data-id="${t.id_registro}" title="Quitar este equipo de la OT">🗑️</button>`
       : "";
 
+    const compsDelTicket = componentesPorRegistro[t.id_registro] || [];
+    const celdaComponentes = compsDelTicket.length > 0
+      ? compsDelTicket.map(c => {
+          const etiquetaTipo = c.serial_retirado ? `${c.tipo_componente} (${c.serial_retirado})` : c.tipo_componente;
+          const detalle = [c.causa_falla, c.condicion_fisica, c.reparacion].filter(Boolean).join(" — ");
+          const aAmmi = c.destino === DESTINO_AMMI ? " · → AMMI" : "";
+          return `<div class="componente-retirado-linea"><strong>${etiquetaTipo}</strong>${aAmmi}${detalle ? "<br><span class='componente-retirado-detalle'>" + detalle + "</span>" : ""}</div>`;
+        }).join("")
+      : "—";
+
     return `
       <tr>
         <td>${t.m_control}${etiquetaVinculo}</td>
         <td>${t.equipos?.fraccion || "—"}</td>
         <td>${t.falla}</td>
         <td>${t.estado}${t.estado_equipo ? " — " + t.estado_equipo : ""}</td>
+        <td>${celdaComponentes}</td>
         <td>${t.nuevo_serial || "—"}</td>
         <td>${celdaFoto}</td>
         <td>${celdaAccionComentarios}</td>
@@ -322,15 +353,24 @@ verRutaBtn.addEventListener("click", () => {
 descargarBtn.addEventListener("click", () => {
   if (!otActualCargada) return;
 
-  const filas = ticketsCargados.map(t => ({
-    "Módulo de Control": t.m_control,
-    "Fracción": t.equipos?.fraccion || "",
-    "Falla": t.falla,
-    "Estado": t.estado,
-    "Estado Equipo": t.estado_equipo || "",
-    "Acción en calle": t.accion_calle || "",
-    "Comentarios": t.comentarios || ""
-  }));
+  const filas = ticketsCargados.map(t => {
+    const compsDelTicket = componentesPorRegistro[t.id_registro] || [];
+    const componentesTexto = compsDelTicket.map(c => {
+      const etiquetaTipo = c.serial_retirado ? `${c.tipo_componente} (${c.serial_retirado})` : c.tipo_componente;
+      const detalle = [c.causa_falla, c.condicion_fisica, c.reparacion].filter(Boolean).join(" — ");
+      return detalle ? `${etiquetaTipo}: ${detalle}` : etiquetaTipo;
+    }).join(" | ");
+    return {
+      "Módulo de Control": t.m_control,
+      "Fracción": t.equipos?.fraccion || "",
+      "Falla": t.falla,
+      "Estado": t.estado,
+      "Estado Equipo": t.estado_equipo || "",
+      "Componentes retirados / Motivo": componentesTexto,
+      "Acción en calle": t.accion_calle || "",
+      "Comentarios": t.comentarios || ""
+    };
+  });
 
   const hoja = XLSX.utils.json_to_sheet(filas);
   const libro = XLSX.utils.book_new();

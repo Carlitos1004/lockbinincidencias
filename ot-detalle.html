@@ -11,6 +11,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<style>
+  .componente-retirado-linea { margin-bottom: 6px; }
+  .componente-retirado-linea:last-child { margin-bottom: 0; }
+  .componente-retirado-detalle { color: var(--gris-700); font-size: 0.82rem; }
+</style>
 </head>
 <body>
 
@@ -139,7 +144,7 @@
 
     <table class="tabla-revision" id="tabla-ot">
       <thead>
-        <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Serial Nuevo</th><th>Foto</th><th>Acción / Comentarios</th><th></th></tr>
+        <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Componentes retirados / Motivo</th><th>Serial Nuevo</th><th>Foto</th><th>Acción / Comentarios</th><th></th></tr>
         <tr class="fila-filtros">
           <th><input type="text" id="filtro-modulo" placeholder="Filtrar..."></th>
           <th></th>
@@ -151,7 +156,7 @@
               <option value="✅ CERRADO">Cerrado</option>
             </select>
           </th>
-          <th></th><th></th><th></th><th></th>
+          <th></th><th></th><th></th><th></th><th></th>
         </tr>
       </thead>
       <tbody id="ot-tbody"></tbody>
