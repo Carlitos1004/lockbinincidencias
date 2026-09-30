@@ -25,62 +25,12 @@
 <div class="panel-body panel-body-ancho">
   <a href="cierre-control.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Cierre y Control</a>
 
-  <p style="margin-top:20px;">Todo lo que le hemos enviado a AMMI y todo lo que nos ha devuelto reparado — Módulos de Control, Lectores Electrónicos, Cierres Electrónicos y Baterías. Los envíos se registran solos desde Revisión de Taller — el regreso lo registras aquí tú mismo cuando AMMI te lo entrega y lo clasificas para Operaciones.</p>
+  <p style="margin-top:20px;">Todo lo que le hemos enviado a AMMI y todo lo que nos ha devuelto reparado. Los envíos se registran solos desde Revisión de Taller — el regreso lo registras aquí tú mismo cuando AMMI te lo entrega y lo clasificas para Operaciones.</p>
 
   <div id="resumen-ammi" class="resumen-cliente"></div>
 
-  <div class="agregar-equipo-box">
-    <label><strong>➕ Agregar envío/regreso manual</strong> — para equipos que fueron a AMMI pero no quedaron registrados en el sistema, o que aparecen en hojas viejas y no los encontramos acá.</label>
-    <div class="materiales-controles">
-      <select id="manual-tipo">
-        <option value="Módulo de Control">Módulo de Control</option>
-        <option value="Lector Electrónico">Lector Electrónico</option>
-        <option value="Cierre Electrónico">Cierre Electrónico</option>
-        <option value="Batería Recargable">Batería Recargable</option>
-        <option value="Batería No Recargable">Batería No Recargable</option>
-      </select>
-      <input type="text" id="manual-mc" placeholder="MC (ej. MC2600123)">
-      <input type="text" id="manual-serial" placeholder="Serial del componente (opcional)">
-      <input type="text" id="manual-cliente" placeholder="Cliente">
-    </div>
-    <div class="materiales-controles">
-      <label style="align-self:center;">Envío:</label>
-      <input type="date" id="manual-fecha-envio">
-      <select id="manual-categoria-envio">
-        <option value="">Categoría al enviar...</option>
-        <option value="1ra categoría">1ra categoría</option>
-        <option value="2da categoría">2da categoría</option>
-      </select>
-      <select id="manual-garantia">
-        <option value="">¿Garantía cliente?</option>
-        <option value="SI">Sí cubre</option>
-        <option value="NO">No cubre</option>
-      </select>
-    </div>
-    <div class="materiales-controles">
-      <label style="align-self:center;">Regreso (opcional — déjalo vacío si aún está pendiente):</label>
-      <input type="date" id="manual-fecha-regreso">
-      <select id="manual-categoria-regreso">
-        <option value="">Categoría al regresar...</option>
-        <option value="1ra categoría">1ra categoría</option>
-        <option value="2da categoría">2da categoría</option>
-      </select>
-    </div>
-    <textarea id="manual-notas" rows="2" placeholder="Notas (opcional)"></textarea>
-    <button id="manual-agregar-btn" class="btn-primario" style="margin-top:8px;">Agregar registro</button>
-    <p id="manual-msg" class="resultado-msg" hidden></p>
-  </div>
-
   <div class="materiales-controles">
-    <input type="text" id="filtro-mc-ammi" placeholder="Filtrar por MC, serial o cliente...">
-    <select id="filtro-tipo-ammi">
-      <option value="">Todos los tipos</option>
-      <option value="Módulo de Control">Módulo de Control</option>
-      <option value="Lector Electrónico">Lector Electrónico</option>
-      <option value="Cierre Electrónico">Cierre Electrónico</option>
-      <option value="Batería Recargable">Batería Recargable</option>
-      <option value="Batería No Recargable">Batería No Recargable</option>
-    </select>
+    <input type="text" id="filtro-mc-ammi" placeholder="Filtrar por MC o cliente...">
     <select id="filtro-estado-ammi">
       <option value="">Todos (pendientes y regresados)</option>
       <option value="pendiente">🕓 Pendientes de regreso</option>
@@ -102,19 +52,66 @@
       <tr>
         <th>MC</th>
         <th>Tipo</th>
-        <th>Cliente</th>
         <th>Serial</th>
+        <th>Cliente</th>
         <th>Fecha de envío</th>
         <th>Categoría al enviar</th>
         <th>¿Garantía cliente?</th>
         <th>Nº veces a AMMI</th>
+        <th>OT</th>
         <th>Estado</th>
         <th>Regreso</th>
         <th></th>
       </tr>
     </thead>
-    <tbody id="tbody-ammi"><tr><td colspan="11">Cargando...</td></tr></tbody>
+    <tbody id="tbody-ammi"><tr><td colspan="12">Cargando...</td></tr></tbody>
   </table>
+
+  <div class="caja-formulario" style="margin-top:28px;">
+    <button id="btn-toggle-manual" class="btn-secundario btn-compacto" type="button">➕ Agregar registro que no está en el sistema (hojas viejas)</button>
+    <div id="form-manual-ammi" hidden style="margin-top:14px;">
+      <p style="font-size:0.9rem; color:var(--gris-500);">Para equipos que fueron enviados a AMMI en el pasado (y puede que ya hayan regresado) pero que nunca se registraron aquí. Si el regreso también es conocido, complétalo de una vez.</p>
+      <div class="materiales-controles">
+        <input type="text" id="manual-mc" list="datalist-equipos-manual-ammi" placeholder="Módulo de Control (MC) *">
+        <datalist id="datalist-equipos-manual-ammi"></datalist>
+        <select id="manual-tipo-componente">
+          <option value="Módulo de Control">Módulo de Control</option>
+          <option value="Lector Electrónico">Lector Electrónico</option>
+          <option value="Cierre Electrónico">Cierre Electrónico</option>
+          <option value="Batería">Batería</option>
+        </select>
+        <input type="text" id="manual-serial" placeholder="Serial del componente (opcional)">
+      </div>
+      <div class="materiales-controles" style="margin-top:8px;">
+        <input type="date" id="manual-fecha-envio" placeholder="Fecha de envío a AMMI">
+        <select id="manual-categoria-envio">
+          <option value="">Categoría al enviar (opcional)</option>
+          <option value="1ra categoría">1ra categoría</option>
+          <option value="2da categoría">2da categoría</option>
+        </select>
+        <select id="manual-garantia">
+          <option value="">¿Garantía cliente? (opcional)</option>
+          <option value="SI">Sí cubre</option>
+          <option value="NO">No cubre</option>
+        </select>
+      </div>
+      <p style="margin-top:14px; font-weight:600;">Si ya regresó de AMMI:</p>
+      <div class="materiales-controles">
+        <input type="date" id="manual-fecha-regreso" placeholder="Fecha de regreso (opcional)">
+        <select id="manual-categoria-regreso">
+          <option value="">Categoría al regresar (opcional)</option>
+          <option value="1ra categoría">1ra categoría</option>
+          <option value="2da categoría">2da categoría</option>
+        </select>
+      </div>
+      <textarea id="manual-notas" rows="2" placeholder="Notas (opcional)" style="margin-top:8px; width:100%;"></textarea>
+      <div style="margin-top:12px;">
+        <button id="btn-guardar-manual-ammi" class="btn-primario btn-compacto" type="button">Guardar registro</button>
+        <button id="btn-cancelar-manual-ammi" class="btn-secundario btn-compacto" type="button">Cancelar</button>
+      </div>
+      <p id="mensaje-manual-ammi" style="margin-top:8px;"></p>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

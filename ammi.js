@@ -115,7 +115,7 @@ function renderTabla() {
 
   const tbody = document.getElementById("tbody-ammi");
   if (filtrados.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11">Ningún envío coincide.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12">Ningún envío coincide.</td></tr>`;
     return;
   }
 
@@ -131,6 +131,7 @@ function renderTabla() {
           <td>${c.categoria_ammi || "—"}</td>
           <td>${c.garantia_cliente === "SI" ? "Sí cubre" : c.garantia_cliente === "NO" ? "No cubre" : "—"}</td>
           <td>${c.vecesEnviado}</td>
+          <td>${c.id_ot ? `<a href="ot-detalle.html?ot=${encodeURIComponent(c.id_ot)}" target="_blank" rel="noopener">${c.id_ot}</a>` : "—"}</td>
           <td colspan="3">
             <div class="materiales-controles">
               <input type="date" class="input-fecha-regreso" value="${new Date().toISOString().slice(0, 10)}">
@@ -157,6 +158,7 @@ function renderTabla() {
       <td>${c.categoria_ammi || "—"}</td>
       <td>${c.garantia_cliente === "SI" ? "Sí cubre" : c.garantia_cliente === "NO" ? "No cubre" : "—"}</td>
       <td>${c.vecesEnviado}</td>
+      <td>${c.id_ot ? `<a href="ot-detalle.html?ot=${encodeURIComponent(c.id_ot)}" target="_blank" rel="noopener">${c.id_ot}</a>` : "—"}</td>
       <td>${c.ammi_fecha_regreso ? "✅ Regresado" : "🕓 Pendiente"}</td>
       <td>${c.ammi_fecha_regreso
         ? `${new Date(c.ammi_fecha_regreso).toLocaleDateString("es-ES")}${c.ammi_categoria_regreso ? " — " + c.ammi_categoria_regreso : ""}${c.ammi_notas_regreso ? `<br><span style="font-size:0.85rem; color:var(--gris-500);">${c.ammi_notas_regreso}</span>` : ""}`
