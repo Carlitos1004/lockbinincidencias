@@ -29,45 +29,7 @@
 
   <div id="resumen-ammi" class="resumen-cliente"></div>
 
-  <div class="materiales-controles">
-    <input type="text" id="filtro-mc-ammi" placeholder="Filtrar por MC o cliente...">
-    <select id="filtro-estado-ammi">
-      <option value="">Todos (pendientes y regresados)</option>
-      <option value="pendiente">🕓 Pendientes de regreso</option>
-      <option value="regresado">✅ Ya regresados</option>
-    </select>
-    <select id="filtro-categoria-regreso">
-      <option value="">Toda categoría de regreso</option>
-      <option value="1ra categoría">1ra categoría</option>
-      <option value="2da categoría">2da categoría</option>
-    </select>
-    <select id="filtro-repetidos-ammi">
-      <option value="">Todos (una vez o más)</option>
-      <option value="si">Solo enviados más de una vez</option>
-    </select>
-  </div>
-
-  <table class="tabla-revision">
-    <thead>
-      <tr>
-        <th>MC</th>
-        <th>Tipo</th>
-        <th>Serial</th>
-        <th>Cliente</th>
-        <th>Fecha de envío</th>
-        <th>Categoría al enviar</th>
-        <th>¿Garantía cliente?</th>
-        <th>Nº veces a AMMI</th>
-        <th>OT</th>
-        <th>Estado</th>
-        <th>Regreso</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody id="tbody-ammi"><tr><td colspan="12">Cargando...</td></tr></tbody>
-  </table>
-
-  <div class="caja-formulario" style="margin-top:28px;">
+  <div class="caja-formulario">
     <button id="btn-toggle-manual" class="btn-secundario btn-compacto" type="button">➕ Agregar registro que no está en el sistema (hojas viejas)</button>
     <div id="form-manual-ammi" hidden style="margin-top:14px;">
       <p style="font-size:0.9rem; color:var(--gris-500);">Para equipos que fueron enviados a AMMI en el pasado (y puede que ya hayan regresado) pero que nunca se registraron aquí. Si el regreso también es conocido, complétalo de una vez.</p>
@@ -112,6 +74,44 @@
       <p id="mensaje-manual-ammi" style="margin-top:8px;"></p>
     </div>
   </div>
+
+  <div class="materiales-controles" style="margin-top:20px;">
+    <input type="text" id="filtro-mc-ammi" placeholder="Filtrar por MC o cliente...">
+    <select id="filtro-estado-ammi">
+      <option value="">Todos (pendientes y regresados)</option>
+      <option value="pendiente">🕓 Pendientes de regreso</option>
+      <option value="regresado">✅ Ya regresados</option>
+    </select>
+    <select id="filtro-categoria-regreso">
+      <option value="">Toda categoría de regreso</option>
+      <option value="1ra categoría">1ra categoría</option>
+      <option value="2da categoría">2da categoría</option>
+    </select>
+    <select id="filtro-repetidos-ammi">
+      <option value="">Todos (una vez o más)</option>
+      <option value="si">Solo enviados más de una vez</option>
+    </select>
+  </div>
+
+  <table class="tabla-revision">
+    <thead>
+      <tr>
+        <th>MC</th>
+        <th>Tipo</th>
+        <th>Serial</th>
+        <th>Cliente</th>
+        <th>Fecha de envío</th>
+        <th>Categoría al enviar</th>
+        <th>¿Garantía cliente?</th>
+        <th>Nº veces a AMMI</th>
+        <th>OT</th>
+        <th>Estado</th>
+        <th>Regreso</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tbody-ammi"><tr><td colspan="12">Cargando...</td></tr></tbody>
+  </table>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
