@@ -25,12 +25,62 @@
 <div class="panel-body panel-body-ancho">
   <a href="cierre-control.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Cierre y Control</a>
 
-  <p style="margin-top:20px;">Todo lo que le hemos enviado a AMMI y todo lo que nos ha devuelto reparado. Los envíos se registran solos desde Revisión de Taller — el regreso lo registras aquí tú mismo cuando AMMI te lo entrega y lo clasificas para Operaciones.</p>
+  <p style="margin-top:20px;">Todo lo que le hemos enviado a AMMI y todo lo que nos ha devuelto reparado — Módulos de Control, Lectores Electrónicos, Cierres Electrónicos y Baterías. Los envíos se registran solos desde Revisión de Taller — el regreso lo registras aquí tú mismo cuando AMMI te lo entrega y lo clasificas para Operaciones.</p>
 
   <div id="resumen-ammi" class="resumen-cliente"></div>
 
+  <div class="agregar-equipo-box">
+    <label><strong>➕ Agregar envío/regreso manual</strong> — para equipos que fueron a AMMI pero no quedaron registrados en el sistema, o que aparecen en hojas viejas y no los encontramos acá.</label>
+    <div class="materiales-controles">
+      <select id="manual-tipo">
+        <option value="Módulo de Control">Módulo de Control</option>
+        <option value="Lector Electrónico">Lector Electrónico</option>
+        <option value="Cierre Electrónico">Cierre Electrónico</option>
+        <option value="Batería Recargable">Batería Recargable</option>
+        <option value="Batería No Recargable">Batería No Recargable</option>
+      </select>
+      <input type="text" id="manual-mc" placeholder="MC (ej. MC2600123)">
+      <input type="text" id="manual-serial" placeholder="Serial del componente (opcional)">
+      <input type="text" id="manual-cliente" placeholder="Cliente">
+    </div>
+    <div class="materiales-controles">
+      <label style="align-self:center;">Envío:</label>
+      <input type="date" id="manual-fecha-envio">
+      <select id="manual-categoria-envio">
+        <option value="">Categoría al enviar...</option>
+        <option value="1ra categoría">1ra categoría</option>
+        <option value="2da categoría">2da categoría</option>
+      </select>
+      <select id="manual-garantia">
+        <option value="">¿Garantía cliente?</option>
+        <option value="SI">Sí cubre</option>
+        <option value="NO">No cubre</option>
+      </select>
+    </div>
+    <div class="materiales-controles">
+      <label style="align-self:center;">Regreso (opcional — déjalo vacío si aún está pendiente):</label>
+      <input type="date" id="manual-fecha-regreso">
+      <select id="manual-categoria-regreso">
+        <option value="">Categoría al regresar...</option>
+        <option value="1ra categoría">1ra categoría</option>
+        <option value="2da categoría">2da categoría</option>
+      </select>
+    </div>
+    <textarea id="manual-notas" rows="2" placeholder="Notas (opcional)"></textarea>
+    <button id="manual-agregar-btn" class="btn-primario" style="margin-top:8px;">Agregar registro</button>
+    <p id="manual-msg" class="resultado-msg" hidden></p>
+  </div>
+
   <div class="materiales-controles">
-    <input type="text" id="filtro-mc-ammi" placeholder="Filtrar por MC o cliente...">
+    <input type="text" id="filtro-mc-ammi" placeholder="Filtrar por MC, serial o cliente...">
+    <select id="filtro-tipo-ammi">
+      <option value="">Todos los tipos</option>
+      <option value="Módulo de Control">Módulo de Control</option>
+      <option value="Lector Electrónico">Lector Electrónico</option>
+      <option value="Cierre Electrónico">Cierre Electrónico</option>
+      <option value="Batería Recargable">Batería Recargable</option>
+      <option value="Batería No Recargable">Batería No Recargable</option>
+    </select>
     <select id="filtro-estado-ammi">
       <option value="">Todos (pendientes y regresados)</option>
       <option value="pendiente">🕓 Pendientes de regreso</option>
@@ -51,7 +101,9 @@
     <thead>
       <tr>
         <th>MC</th>
+        <th>Tipo</th>
         <th>Cliente</th>
+        <th>Serial</th>
         <th>Fecha de envío</th>
         <th>Categoría al enviar</th>
         <th>¿Garantía cliente?</th>
@@ -61,7 +113,7 @@
         <th></th>
       </tr>
     </thead>
-    <tbody id="tbody-ammi"><tr><td colspan="9">Cargando...</td></tr></tbody>
+    <tbody id="tbody-ammi"><tr><td colspan="11">Cargando...</td></tr></tbody>
   </table>
 </div>
 

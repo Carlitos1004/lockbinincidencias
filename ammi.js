@@ -40,20 +40,25 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
 async function cargarEnvios() {
   try {
     enviosData = await traerTodasLasFilas("componentes_retirados", "*", (q) =>
-      q.eq("destino", DESTINO_AMMI).eq("tipo_componente", "Módulo de Control").order("fecha", { ascending: false })
+      q.eq("destino", DESTINO_AMMI).order("fecha", { ascending: false })
     );
   } catch (err) {
-    document.getElementById("tbody-ammi").innerHTML = `<tr><td colspan="9">Error: ${err.message}</td></tr>`;
+    document.getElementById("tbody-ammi").innerHTML = `<tr><td colspan="11">Error: ${err.message}</td></tr>`;
     return;
   }
 
   enviosData = enviosData.filter(c => !esClienteExcluido(c.cliente));
 
-  // Cuántas veces ha ido cada MC a AMMI (contando esta misma fila) — un
-  // mismo módulo puede fallar, volver, y volver a fallar más adelante.
+  // Cuántas veces ha ido cada componente a AMMI (contando esta misma fila).
+  // Se cuenta por MC + tipo de componente: un mismo equipo puede mandar su
+  // Módulo de Control una vez y su Lector Electrónico otra, y son cosas
+  // distintas — no queremos que se mezclen en el mismo conteo.
   const conteoPorMc = {};
-  enviosData.forEach(c => { conteoPorMc[c.m_control] = (conteoPorMc[c.m_control] || 0) + 1; });
-  enviosData.forEach(c => { c.vecesEnviado = conteoPorMc[c.m_control]; });
+  enviosData.forEach(c => {
+    const clave = (c.m_control || "") + "||" + (c.tipo_componente || "");
+    conteoPorMc[clave] = (conteoPorMc[clave] || 0) + 1;
+  });
+  enviosData.forEach(c => { c.vecesEnviado = conteoPorMc[(c.m_control || "") + "||" + (c.tipo_componente || "")]; });
 
   renderResumen();
   renderTabla();
@@ -64,7 +69,7 @@ function renderResumen() {
   const regresados = enviosData.filter(c => c.ammi_fecha_regreso).length;
   const primera = enviosData.filter(c => c.ammi_categoria_regreso === "1ra categoría").length;
   const segunda = enviosData.filter(c => c.ammi_categoria_regreso === "2da categoría").length;
-  const repetidos = new Set(enviosData.filter(c => c.vecesEnviado > 1).map(c => c.m_control)).size;
+  const repetidos = new Set(enviosData.filter(c => c.vecesEnviado > 1).map(c => (c.m_control || "") + "||" + (c.tipo_componente || ""))).size;
 
   document.getElementById("resumen-ammi").innerHTML = `
     <div class="tarjeta-resumen"><strong>${enviosData.length}</strong><span>Total enviados</span></div>
@@ -78,12 +83,14 @@ function renderResumen() {
 
 function renderTabla() {
   const fMc = document.getElementById("filtro-mc-ammi").value.trim().toLowerCase();
+  const fTipo = document.getElementById("filtro-tipo-ammi").value;
   const fEstado = document.getElementById("filtro-estado-ammi").value;
   const fCategoria = document.getElementById("filtro-categoria-regreso").value;
   const fRepetidos = document.getElementById("filtro-repetidos-ammi").value;
 
   const filtrados = enviosData.filter(c =>
-    (!fMc || (c.m_control || "").toLowerCase().includes(fMc) || (c.cliente || "").toLowerCase().includes(fMc)) &&
+    (!fMc || (c.m_control || "").toLowerCase().includes(fMc) || (c.cliente || "").toLowerCase().includes(fMc) || (c.serial_retirado || "").toLowerCase().includes(fMc)) &&
+    (!fTipo || c.tipo_componente === fTipo) &&
     (!fEstado || (fEstado === "regresado") === !!c.ammi_fecha_regreso) &&
     (!fCategoria || c.ammi_categoria_regreso === fCategoria) &&
     (!fRepetidos || c.vecesEnviado > 1)
@@ -91,7 +98,7 @@ function renderTabla() {
 
   const tbody = document.getElementById("tbody-ammi");
   if (filtrados.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9">Ningún envío coincide.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11">Ningún envío coincide.</td></tr>`;
     return;
   }
 
@@ -99,8 +106,10 @@ function renderTabla() {
     if (c.id === editandoId) {
       return `
         <tr>
-          <td>${c.m_control}</td>
+          <td>${c.m_control || "—"}</td>
+          <td>${c.tipo_componente || "—"}</td>
           <td>${c.cliente || "—"}</td>
+          <td class="celda-mono">${c.serial_retirado || "—"}</td>
           <td>${new Date(c.fecha).toLocaleDateString("es-ES")}</td>
           <td>${c.categoria_ammi || "—"}</td>
           <td>${c.garantia_cliente === "SI" ? "Sí cubre" : c.garantia_cliente === "NO" ? "No cubre" : "—"}</td>
@@ -123,8 +132,10 @@ function renderTabla() {
     }
     return `
     <tr class="${!c.ammi_fecha_regreso ? 'fila-alerta' : ''}">
-      <td>${c.m_control}</td>
+      <td>${c.m_control || "—"}</td>
+      <td>${c.tipo_componente || "—"}</td>
       <td>${c.cliente || "—"}</td>
+      <td class="celda-mono">${c.serial_retirado || "—"}</td>
       <td>${new Date(c.fecha).toLocaleDateString("es-ES")}</td>
       <td>${c.categoria_ammi || "—"}</td>
       <td>${c.garantia_cliente === "SI" ? "Sí cubre" : c.garantia_cliente === "NO" ? "No cubre" : "—"}</td>
@@ -171,6 +182,73 @@ function renderTabla() {
   });
 }
 
-["filtro-mc-ammi", "filtro-estado-ammi", "filtro-categoria-regreso", "filtro-repetidos-ammi"].forEach(id => {
+["filtro-mc-ammi", "filtro-tipo-ammi", "filtro-estado-ammi", "filtro-categoria-regreso", "filtro-repetidos-ammi"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderTabla);
 });
+
+// --- Agregar manualmente un envío (y opcionalmente su regreso) que no ---
+// --- quedó registrado en el sistema, o que viene de una hoja vieja.   ---
+document.getElementById("manual-agregar-btn").addEventListener("click", async () => {
+  const msg = document.getElementById("manual-msg");
+  const tipo = document.getElementById("manual-tipo").value;
+  const mc = document.getElementById("manual-mc").value.trim().toUpperCase();
+  const serial = document.getElementById("manual-serial").value.trim().toUpperCase() || null;
+  const cliente = document.getElementById("manual-cliente").value.trim();
+  const fechaEnvio = document.getElementById("manual-fecha-envio").value;
+  const categoriaEnvio = document.getElementById("manual-categoria-envio").value || null;
+  const garantia = document.getElementById("manual-garantia").value || null;
+  const fechaRegreso = document.getElementById("manual-fecha-regreso").value || null;
+  const categoriaRegreso = document.getElementById("manual-categoria-regreso").value || null;
+  const notas = document.getElementById("manual-notas").value.trim() || null;
+
+  if (!mc || !cliente || !fechaEnvio) {
+    mostrarMensajeManual(msg, "⚠️ Completa al menos MC, cliente y fecha de envío.", true);
+    return;
+  }
+  if (fechaRegreso && !categoriaRegreso) {
+    mostrarMensajeManual(msg, "⚠️ Si pones fecha de regreso, elige también la categoría de regreso.", true);
+    return;
+  }
+
+  const btn = document.getElementById("manual-agregar-btn");
+  btn.disabled = true;
+  btn.textContent = "Agregando...";
+
+  const { error } = await supabaseClient.from("componentes_retirados").insert([{
+    tipo_componente: tipo,
+    m_control: mc,
+    serial_retirado: serial,
+    cliente: cliente,
+    fecha: fechaEnvio,
+    destino: DESTINO_AMMI,
+    estado: "Revisado",
+    categoria_ammi: categoriaEnvio,
+    garantia_cliente: garantia,
+    ammi_fecha_regreso: fechaRegreso,
+    ammi_categoria_regreso: categoriaRegreso,
+    ammi_notas_regreso: notas
+  }]);
+
+  btn.disabled = false;
+  btn.textContent = "Agregar registro";
+
+  if (error) {
+    mostrarMensajeManual(msg, "❌ " + error.message, true);
+    return;
+  }
+
+  mostrarMensajeManual(msg, "✅ Registro agregado.", false);
+  ["manual-mc", "manual-serial", "manual-cliente", "manual-fecha-envio", "manual-fecha-regreso", "manual-notas"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+  ["manual-categoria-envio", "manual-garantia", "manual-categoria-regreso"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+  cargarEnvios();
+});
+
+function mostrarMensajeManual(el, texto, esError) {
+  el.textContent = texto;
+  el.className = esError ? "resultado-msg resultado-error" : "resultado-msg resultado-ok";
+  el.hidden = false;
+}
