@@ -50,6 +50,7 @@
 
     <div class="materiales-controles">
       <input type="text" id="filtro-mc" placeholder="Filtrar por MC...">
+      <input type="text" id="filtro-serial" placeholder="Filtrar por serial del sensor...">
       <select id="filtro-conectividad">
         <option value="">Toda conectividad</option>
         <option value="ONLINE">Online</option>
@@ -59,6 +60,17 @@
         <option value="">Toda vinculación</option>
         <option value="VINCULADO">Vinculado</option>
         <option value="DESVINCULADO">Desvinculado</option>
+      </select>
+      <select id="filtro-bateria">
+        <option value="">Toda batería</option>
+        <option value="20">≤ 20%</option>
+        <option value="30">≤ 30%</option>
+        <option value="50">≤ 50%</option>
+        <option value="sin_lectura">Sin lectura de batería</option>
+      </select>
+      <select id="orden-sensores">
+        <option value="">Orden normal</option>
+        <option value="bateria_asc">Batería: de más baja a más alta</option>
       </select>
     </div>
 

@@ -93,25 +93,49 @@ function renderResumen() {
   const online = sensoresData.filter(s => s.estado_conectividad === "ONLINE").length;
   const offline = sensoresData.filter(s => s.estado_conectividad === "OFFLINE").length;
   const desvinculados = sensoresData.filter(s => s.estado_vinculacion === "DESVINCULADO").length;
+  const bateriaBaja = sensoresData.filter(s => s.nivel_bateria !== null && s.nivel_bateria !== undefined && s.nivel_bateria < 20).length;
 
   document.getElementById("resumen-sensores").innerHTML = `
     <div class="tarjeta-resumen"><strong>${sensoresData.length}</strong><span>Total sensores</span></div>
     <div class="tarjeta-resumen"><strong>${online}</strong><span>Online</span></div>
     <div class="tarjeta-resumen"><strong>${offline}</strong><span>Offline</span></div>
     <div class="tarjeta-resumen"><strong>${desvinculados}</strong><span>Desvinculados</span></div>
+    <div class="tarjeta-resumen ${bateriaBaja > 0 ? 'tarjeta-alerta' : ''}"><strong>${bateriaBaja}</strong><span>Batería &lt; 20%</span></div>
   `;
 }
 
 function renderTablaSensores() {
   const fMc = document.getElementById("filtro-mc").value.trim().toLowerCase();
+  const fSerial = document.getElementById("filtro-serial").value.trim().toLowerCase();
   const fConectividad = document.getElementById("filtro-conectividad").value;
   const fVinculacion = document.getElementById("filtro-vinculacion").value;
+  const fBateria = document.getElementById("filtro-bateria").value;
+  const orden = document.getElementById("orden-sensores").value;
 
-  const filtrados = sensoresData.filter(s =>
-    (!fMc || (s.mc || "").toLowerCase().includes(fMc)) &&
-    (!fConectividad || s.estado_conectividad === fConectividad) &&
-    (!fVinculacion || s.estado_vinculacion === fVinculacion)
-  );
+  let filtrados = sensoresData.filter(s => {
+    const tieneLectura = s.nivel_bateria !== null && s.nivel_bateria !== undefined;
+    let pasaBateria = true;
+    if (fBateria === "sin_lectura") pasaBateria = !tieneLectura;
+    else if (fBateria) pasaBateria = tieneLectura && s.nivel_bateria <= Number(fBateria);
+
+    return (!fMc || (s.mc || "").toLowerCase().includes(fMc)) &&
+      (!fSerial || (s.serial || "").toLowerCase().includes(fSerial)) &&
+      (!fConectividad || s.estado_conectividad === fConectividad) &&
+      (!fVinculacion || s.estado_vinculacion === fVinculacion) &&
+      pasaBateria;
+  });
+
+  if (orden === "bateria_asc") {
+    // Sin lectura va al final — no es "0%", es que no sabemos.
+    filtrados = filtrados.sort((a, b) => {
+      const tieneA = a.nivel_bateria !== null && a.nivel_bateria !== undefined;
+      const tieneB = b.nivel_bateria !== null && b.nivel_bateria !== undefined;
+      if (!tieneA && !tieneB) return 0;
+      if (!tieneA) return 1;
+      if (!tieneB) return -1;
+      return a.nivel_bateria - b.nivel_bateria;
+    });
+  }
 
   const tbody = document.getElementById("tbody-sensores");
   if (filtrados.length === 0) {
@@ -133,7 +157,7 @@ function renderTablaSensores() {
   `).join("");
 }
 
-["filtro-mc", "filtro-conectividad", "filtro-vinculacion"].forEach(id => {
+["filtro-mc", "filtro-serial", "filtro-conectividad", "filtro-vinculacion", "filtro-bateria", "orden-sensores"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderTablaSensores);
 });
 
