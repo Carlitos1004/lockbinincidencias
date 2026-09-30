@@ -42,6 +42,11 @@
       <option value="si">Con reparación alguna vez</option>
       <option value="no">Nunca reparado</option>
     </select>
+    <select id="filtro-mismo-imei">
+      <option value="">¿Mismo IMEI con varios MC? (todos)</option>
+      <option value="si">Solo con más de un MC</option>
+      <option value="no">Solo con un único MC</option>
+    </select>
     <select id="orden-registro">
       <option value="cliente">Ordenar por Cliente (A-Z)</option>
       <option value="mc">Ordenar por MC</option>
@@ -51,8 +56,8 @@
   </div>
 
   <table class="tabla-revision">
-    <thead><tr><th>MC Actual</th><th>IMEI</th><th>Cliente</th><th>Instalado</th><th>Incidencias</th><th>¿Reparado alguna vez?</th><th>Última incidencia</th><th></th></tr></thead>
-    <tbody id="tbody-registro"><tr><td colspan="8">Cargando...</td></tr></tbody>
+    <thead><tr><th>MC Actual</th><th>IMEI</th><th>Cliente</th><th>Instalado</th><th>MC históricos (mismo IMEI)</th><th>Incidencias</th><th>¿Reparado alguna vez?</th><th>Última incidencia</th><th></th></tr></thead>
+    <tbody id="tbody-registro"><tr><td colspan="9">Cargando...</td></tr></tbody>
   </table>
 </div>
 
