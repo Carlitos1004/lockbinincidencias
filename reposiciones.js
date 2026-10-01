@@ -5,8 +5,20 @@
 let reposicionesData = [];
 let componentesPorReposicion = {};
 let expandidoId = null;
+let esManager = false;
 
-cargarReposiciones();
+(async () => {
+  // Agregar/quitar componentes de una reposición queda solo para Manager
+  // (ya restringido también del lado de la base de datos, esto es solo
+  // para no mostrarle al Operario botones que de todas formas no le van
+  // a funcionar).
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) {
+    const { data: perfil } = await supabaseClient.from("perfiles").select("rol").eq("id", session.user.id).single();
+    esManager = perfil?.rol === "manager";
+  }
+  cargarReposiciones();
+})();
 
 async function cargarReposiciones() {
   const [{ data: reposiciones, error: errorRep }, { data: componentes, error: errorComp }] = await Promise.all([
@@ -78,9 +90,10 @@ function renderTabla() {
                       <td>${c.categoria}</td>
                       <td><input type="text" class="input-serial-comp" data-id="${c.id}" value="${c.serial_nuevo || ""}" placeholder="Aún sin definir"></td>
                       <td><button class="btn-guardar-serial-comp btn-secundario" data-id="${c.id}">Guardar</button></td>
-                      <td><button class="btn-quitar-componente btn-secundario" data-id="${c.id}" title="Quitar componente">🗑️</button></td>
+                      <td>${esManager ? `<button class="btn-quitar-componente btn-secundario" data-id="${c.id}" title="Quitar componente">🗑️</button>` : ""}</td>
                     </tr>
                   `).join("")}
+                  ${esManager ? `
                   <tr>
                     <td>
                       <select class="input-nuevo-tipo-comp">
@@ -100,6 +113,7 @@ function renderTabla() {
                       <button class="btn-agregar-componente-reposicion btn-secundario" data-id="${r.id}">+ Agregar componente</button>
                     </td>
                   </tr>
+                  ` : ""}
                 </tbody>
               </table>
               ${r.tipo_registro === "REPONER" ? `
