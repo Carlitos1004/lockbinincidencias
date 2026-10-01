@@ -12,8 +12,12 @@ const DESTINO_AMMI = "❌ Equipo dañado - Enviar a AMMI";
 // Cuando AMMI descarta el componente que enviamos y, en vez de repararlo,
 // nos manda uno de reposición (equipo/pieza nueva), SIEMPRE es 1ra
 // categoría — así que no es un valor aparte de categoría, es un checkbox
-// que fija la categoría en 1ra y guarda el serial del componente nuevo en
-// "serial_nuevo". No se maneja el stock desde aquí, solo queda anotado.
+// que fija la categoría en 1ra. La bandera real de "esto fue reposición"
+// es "ammi_es_reposicion" (columna propia) — "serial_nuevo" NO sirve como
+// bandera porque ya la usan otras pantallas (cambios de cliente, control
+// de baterías) para guardar el serial que reemplazó a otro por motivos que
+// no tienen nada que ver con AMMI. Solo se escribe serial_nuevo aquí
+// cuando ammi_es_reposicion es true, y nunca se pisa con null si no lo es.
 const CATEGORIA_1RA = "1ra categoría";
 
 // Mismo criterio de exclusión que el resto de registros y estadísticas.
@@ -95,7 +99,7 @@ function renderResumen() {
   const regresados = enviosData.filter(c => c.ammi_fecha_regreso).length;
   const primera = enviosData.filter(c => c.ammi_categoria_regreso === CATEGORIA_1RA).length;
   const segunda = enviosData.filter(c => c.ammi_categoria_regreso === "2da categoría").length;
-  const reposiciones = enviosData.filter(c => !!c.serial_nuevo).length;
+  const reposiciones = enviosData.filter(c => !!c.ammi_es_reposicion).length;
   const repetidos = new Set(enviosData.filter(c => c.vecesEnviado > 1).map(claveDe)).size;
 
   document.getElementById("resumen-ammi").innerHTML = `
@@ -121,7 +125,7 @@ function renderTabla() {
     (!fEstado || (fEstado === "regresado") === !!c.ammi_fecha_regreso) &&
     (!fCategoria || c.ammi_categoria_regreso === fCategoria) &&
     (!fRepetidos || c.vecesEnviado > 1) &&
-    (!fReposicion || !!c.serial_nuevo)
+    (!fReposicion || !!c.ammi_es_reposicion)
   );
 
   const tbody = document.getElementById("tbody-ammi");
@@ -153,11 +157,11 @@ function renderTabla() {
               </select>
             </div>
             <label class="opcion-check" style="margin-top:8px; display:block;">
-              <input type="checkbox" class="input-es-reposicion" ${c.serial_nuevo ? "checked" : ""}>
+              <input type="checkbox" class="input-es-reposicion" ${c.ammi_es_reposicion ? "checked" : ""}>
               🔁 Es reposición — AMMI no lo reparó, nos mandó un componente nuevo (fija la categoría en 1ra automáticamente)
             </label>
-            <div class="input-serial-reposicion-caja materiales-controles" ${c.serial_nuevo ? "" : "hidden"} style="margin-top:6px;">
-              <input type="text" class="input-serial-reposicion" placeholder="Serial del componente nuevo que llegó de reposición" value="${c.serial_nuevo || ""}">
+            <div class="input-serial-reposicion-caja materiales-controles" ${c.ammi_es_reposicion ? "" : "hidden"} style="margin-top:6px;">
+              <input type="text" class="input-serial-reposicion" placeholder="Serial del componente nuevo que llegó de reposición" value="${c.ammi_es_reposicion ? (c.serial_nuevo || "") : ""}">
             </div>
             <textarea class="input-notas-regreso" rows="2" placeholder="Notas de AMMI (opcional)">${c.ammi_notas_regreso || ""}</textarea>
             <button class="btn-guardar-regreso btn-primario btn-compacto" data-id="${c.id}" style="margin-top:6px;">Guardar regreso</button>
@@ -179,7 +183,7 @@ function renderTabla() {
       <td>${c.id_ot ? `<a href="ot-detalle.html?ot=${encodeURIComponent(c.id_ot)}" target="_blank" rel="noopener">${c.id_ot}</a>` : "—"}</td>
       <td>${c.ammi_fecha_regreso ? "✅ Regresado" : "🕓 Pendiente"}</td>
       <td>${c.ammi_fecha_regreso
-        ? `${new Date(c.ammi_fecha_regreso).toLocaleDateString("es-ES")}${c.ammi_categoria_regreso ? " — " + c.ammi_categoria_regreso : ""}${c.serial_nuevo ? `<br><span style="font-size:0.85rem;">🔁 Reposición — nuevo serial: <strong>${c.serial_nuevo}</strong></span>` : ""}${c.ammi_notas_regreso ? `<br><span style="font-size:0.85rem; color:var(--gris-500);">${c.ammi_notas_regreso}</span>` : ""}`
+        ? `${new Date(c.ammi_fecha_regreso).toLocaleDateString("es-ES")}${c.ammi_categoria_regreso ? " — " + c.ammi_categoria_regreso : ""}${c.ammi_es_reposicion ? `<br><span style="font-size:0.85rem;">🔁 Reposición${c.serial_nuevo ? " — nuevo serial: <strong>" + c.serial_nuevo + "</strong>" : ""}</span>` : ""}${c.ammi_notas_regreso ? `<br><span style="font-size:0.85rem; color:var(--gris-500);">${c.ammi_notas_regreso}</span>` : ""}`
         : "—"
       }</td>
       <td>
@@ -235,12 +239,19 @@ function renderTabla() {
         return;
       }
 
-      await supabaseClient.from("componentes_retirados").update({
+      const datosActualizacion = {
         ammi_fecha_regreso: fecha,
         ammi_categoria_regreso: categoria,
         ammi_notas_regreso: notas || null,
-        serial_nuevo: esReposicion ? (serialReposicion || null) : null
-      }).eq("id", btn.dataset.id);
+        ammi_es_reposicion: esReposicion
+      };
+      // Solo tocamos "serial_nuevo" cuando SÍ es reposición — ese campo lo
+      // usan también otras pantallas (cambios de cliente, control de
+      // baterías) para otros motivos, así que si no es reposición no lo
+      // pisamos con null por si ya tenía un valor de otro origen.
+      if (esReposicion) datosActualizacion.serial_nuevo = serialReposicion || null;
+
+      await supabaseClient.from("componentes_retirados").update(datosActualizacion).eq("id", btn.dataset.id);
 
       editandoId = null;
       cargarEnvios();
