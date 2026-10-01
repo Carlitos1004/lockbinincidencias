@@ -10,10 +10,11 @@
 const DESTINO_AMMI = "❌ Equipo dañado - Enviar a AMMI";
 
 // Cuando AMMI descarta el componente que enviamos y, en vez de repararlo,
-// nos manda uno de reposición (equipo/pieza nueva) — no es ni 1ra ni 2da
-// categoría, es un resultado aparte. El serial del componente de reposición
-// se guarda en "serial_nuevo".
-const CATEGORIA_REPOSICION = "Reposición (no repararon — enviaron nuevo)";
+// nos manda uno de reposición (equipo/pieza nueva), SIEMPRE es 1ra
+// categoría — así que no es un valor aparte de categoría, es un checkbox
+// que fija la categoría en 1ra y guarda el serial del componente nuevo en
+// "serial_nuevo". No se maneja el stock desde aquí, solo queda anotado.
+const CATEGORIA_1RA = "1ra categoría";
 
 // Mismo criterio de exclusión que el resto de registros y estadísticas.
 const CLIENTES_EXCLUIDOS_EXACTOS = ["comercial", "frutos", "interno", "carmen", "municipalia"];
@@ -92,9 +93,9 @@ async function cargarEnvios() {
 function renderResumen() {
   const pendientes = enviosData.filter(c => !c.ammi_fecha_regreso).length;
   const regresados = enviosData.filter(c => c.ammi_fecha_regreso).length;
-  const primera = enviosData.filter(c => c.ammi_categoria_regreso === "1ra categoría").length;
+  const primera = enviosData.filter(c => c.ammi_categoria_regreso === CATEGORIA_1RA).length;
   const segunda = enviosData.filter(c => c.ammi_categoria_regreso === "2da categoría").length;
-  const reposiciones = enviosData.filter(c => c.ammi_categoria_regreso === CATEGORIA_REPOSICION).length;
+  const reposiciones = enviosData.filter(c => !!c.serial_nuevo).length;
   const repetidos = new Set(enviosData.filter(c => c.vecesEnviado > 1).map(claveDe)).size;
 
   document.getElementById("resumen-ammi").innerHTML = `
@@ -113,12 +114,14 @@ function renderTabla() {
   const fEstado = document.getElementById("filtro-estado-ammi").value;
   const fCategoria = document.getElementById("filtro-categoria-regreso").value;
   const fRepetidos = document.getElementById("filtro-repetidos-ammi").value;
+  const fReposicion = document.getElementById("filtro-reposicion-ammi").value;
 
   const filtrados = enviosData.filter(c =>
     (!fMc || (c.m_control || "").toLowerCase().includes(fMc) || (c.cliente || "").toLowerCase().includes(fMc) || (c.serial_retirado || "").toLowerCase().includes(fMc)) &&
     (!fEstado || (fEstado === "regresado") === !!c.ammi_fecha_regreso) &&
     (!fCategoria || c.ammi_categoria_regreso === fCategoria) &&
-    (!fRepetidos || c.vecesEnviado > 1)
+    (!fRepetidos || c.vecesEnviado > 1) &&
+    (!fReposicion || !!c.serial_nuevo)
   );
 
   const tbody = document.getElementById("tbody-ammi");
@@ -145,12 +148,15 @@ function renderTabla() {
               <input type="date" class="input-fecha-regreso" value="${new Date().toISOString().slice(0, 10)}">
               <select class="input-categoria-regreso">
                 <option value="">Categoría...</option>
-                <option value="1ra categoría">1ra categoría</option>
+                <option value="${CATEGORIA_1RA}">1ra categoría</option>
                 <option value="2da categoría">2da categoría</option>
-                <option value="${CATEGORIA_REPOSICION}">🔁 Reposición (no lo reparan, mandan uno nuevo)</option>
               </select>
             </div>
-            <div class="input-serial-reposicion-caja materiales-controles" hidden style="margin-top:6px;">
+            <label class="opcion-check" style="margin-top:8px; display:block;">
+              <input type="checkbox" class="input-es-reposicion" ${c.serial_nuevo ? "checked" : ""}>
+              🔁 Es reposición — AMMI no lo reparó, nos mandó un componente nuevo (fija la categoría en 1ra automáticamente)
+            </label>
+            <div class="input-serial-reposicion-caja materiales-controles" ${c.serial_nuevo ? "" : "hidden"} style="margin-top:6px;">
               <input type="text" class="input-serial-reposicion" placeholder="Serial del componente nuevo que llegó de reposición" value="${c.serial_nuevo || ""}">
             </div>
             <textarea class="input-notas-regreso" rows="2" placeholder="Notas de AMMI (opcional)">${c.ammi_notas_regreso || ""}</textarea>
@@ -173,7 +179,7 @@ function renderTabla() {
       <td>${c.id_ot ? `<a href="ot-detalle.html?ot=${encodeURIComponent(c.id_ot)}" target="_blank" rel="noopener">${c.id_ot}</a>` : "—"}</td>
       <td>${c.ammi_fecha_regreso ? "✅ Regresado" : "🕓 Pendiente"}</td>
       <td>${c.ammi_fecha_regreso
-        ? `${new Date(c.ammi_fecha_regreso).toLocaleDateString("es-ES")}${c.ammi_categoria_regreso ? " — " + c.ammi_categoria_regreso : ""}${c.ammi_categoria_regreso === CATEGORIA_REPOSICION && c.serial_nuevo ? `<br><span style="font-size:0.85rem;">🔁 Nuevo serial: <strong>${c.serial_nuevo}</strong></span>` : ""}${c.ammi_notas_regreso ? `<br><span style="font-size:0.85rem; color:var(--gris-500);">${c.ammi_notas_regreso}</span>` : ""}`
+        ? `${new Date(c.ammi_fecha_regreso).toLocaleDateString("es-ES")}${c.ammi_categoria_regreso ? " — " + c.ammi_categoria_regreso : ""}${c.serial_nuevo ? `<br><span style="font-size:0.85rem;">🔁 Reposición — nuevo serial: <strong>${c.serial_nuevo}</strong></span>` : ""}${c.ammi_notas_regreso ? `<br><span style="font-size:0.85rem; color:var(--gris-500);">${c.ammi_notas_regreso}</span>` : ""}`
         : "—"
       }</td>
       <td>
@@ -190,31 +196,34 @@ function renderTabla() {
     btn.addEventListener("click", () => { editandoId = null; renderTabla(); });
   });
 
-  // Fila en edición: mostrar/ocultar el campo de "serial de reposición"
-  // según la categoría elegida, y dejarlo visible de entrada si ya hay un
-  // serial de reposición guardado (o la categoría guardada ya era
-  // "Reposición").
+  // Fila en edición: precargar la categoría guardada, y el checkbox de
+  // reposición controla si se ve el campo del serial nuevo — al marcarlo,
+  // fuerza la categoría a 1ra (ya que una reposición siempre lo es) y
+  // bloquea el desplegable para que no se pueda dejar en 2da por error.
   tbody.querySelectorAll(".input-categoria-regreso").forEach(select => {
-    const fila = select.closest("tr");
-    const cajaSerial = fila.querySelector(".input-serial-reposicion-caja");
-    const actualizarVisibilidad = () => { cajaSerial.hidden = select.value !== CATEGORIA_REPOSICION; };
     const componenteEnEdicion = enviosData.find(c => c.id === editandoId);
-    if (componenteEnEdicion && (componenteEnEdicion.ammi_categoria_regreso === CATEGORIA_REPOSICION || componenteEnEdicion.serial_nuevo)) {
-      select.value = CATEGORIA_REPOSICION;
-    } else if (componenteEnEdicion && componenteEnEdicion.ammi_categoria_regreso) {
-      select.value = componenteEnEdicion.ammi_categoria_regreso;
-    }
-    actualizarVisibilidad();
-    select.addEventListener("change", actualizarVisibilidad);
+    if (componenteEnEdicion?.ammi_categoria_regreso) select.value = componenteEnEdicion.ammi_categoria_regreso;
+  });
+  tbody.querySelectorAll(".input-es-reposicion").forEach(checkbox => {
+    const fila = checkbox.closest("tr");
+    const select = fila.querySelector(".input-categoria-regreso");
+    const cajaSerial = fila.querySelector(".input-serial-reposicion-caja");
+    const aplicar = () => {
+      cajaSerial.hidden = !checkbox.checked;
+      select.disabled = checkbox.checked;
+      if (checkbox.checked) select.value = CATEGORIA_1RA;
+    };
+    aplicar();
+    checkbox.addEventListener("change", aplicar);
   });
 
   tbody.querySelectorAll(".btn-guardar-regreso").forEach(btn => {
     btn.addEventListener("click", async () => {
       const fila = btn.closest("tr");
       const fecha = fila.querySelector(".input-fecha-regreso").value;
-      const categoria = fila.querySelector(".input-categoria-regreso").value;
+      const esReposicion = fila.querySelector(".input-es-reposicion").checked;
+      const categoria = esReposicion ? CATEGORIA_1RA : fila.querySelector(".input-categoria-regreso").value;
       const notas = fila.querySelector(".input-notas-regreso").value.trim();
-      const esReposicion = categoria === CATEGORIA_REPOSICION;
       const serialReposicion = fila.querySelector(".input-serial-reposicion").value.trim().toUpperCase();
 
       if (!fecha || !categoria) {
@@ -239,7 +248,7 @@ function renderTabla() {
   });
 }
 
-["filtro-mc-ammi", "filtro-estado-ammi", "filtro-categoria-regreso", "filtro-repetidos-ammi"].forEach(id => {
+["filtro-mc-ammi", "filtro-estado-ammi", "filtro-categoria-regreso", "filtro-repetidos-ammi", "filtro-reposicion-ammi"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderTabla);
 });
 
