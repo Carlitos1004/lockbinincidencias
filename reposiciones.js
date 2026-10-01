@@ -204,17 +204,42 @@ function renderTabla() {
 // una nueva vinculación del equipo con ese cliente para Vida del Equipo —
 // igual que cuando se instala un equipo completo en Ruta. No duplica si
 // se vuelve a guardar la misma reposición (se busca por id_reposicion).
+//
+// Si lo que se repuso fue el Módulo de Control completo, el MC viejo deja
+// de funcionar con ese cliente por ahora (hasta que se repare o se
+// deseche) — se desvincula. El MC nuevo arranca su propia vinculación con
+// ese cliente, con el mismo LE/CE/BA que tenía el equipo viejo, salvo los
+// que esta misma reposición también esté cambiando (esos usan su serial
+// nuevo en vez del que tenía antes).
 async function registrarVinculacionEnVidaDelEquipo(reposicion, fecha) {
   const comps = componentesPorReposicion[reposicion.id] || [];
   const porTipo = {};
   comps.forEach(c => { porTipo[c.tipo_componente] = c.serial_nuevo || null; });
 
-  // Si entre los componentes a reponer está el Módulo de Control, el MC
-  // en sí cambió — no fue solo una pieza. Usamos el serial nuevo anotado
-  // como el MC del evento (y guardamos el viejo en mc_anterior); si no
-  // hay Módulo de Control en la lista, el MC del equipo sigue siendo el
-  // mismo de siempre. Solo registramos lo que pasó, sin más lógica.
   const mcNuevo = porTipo["Módulo de Control"] || null;
+
+  let serieLector = porTipo["Lector Electrónico"] || null;
+  let serieCierre = porTipo["Cierre Electrónico"] || null;
+  let serieBateria = porTipo["Batería"] || null;
+
+  if (mcNuevo) {
+    await registrarDesvinculacionPorReposicion(reposicion, fecha);
+
+    // Lo que el equipo viejo tenía instalado, para que el MC nuevo se
+    // vincule con lo mismo — salvo lo que ya se está reponiendo también.
+    const { data: equipoViejo } = await supabaseClient
+      .from("equipos")
+      .select("serie_lector, serie_cierre, serie_bateria")
+      .eq("m_control", reposicion.mc)
+      .maybeSingle();
+
+    if (equipoViejo) {
+      serieLector = serieLector || equipoViejo.serie_lector || null;
+      serieCierre = serieCierre || equipoViejo.serie_cierre || null;
+      serieBateria = serieBateria || equipoViejo.serie_bateria || null;
+    }
+  }
+
   const mcEvento = mcNuevo || reposicion.mc;
 
   const { data: equipoInfo } = await supabaseClient
@@ -228,26 +253,49 @@ async function registrarVinculacionEnVidaDelEquipo(reposicion, fecha) {
     mc: mcEvento,
     tipo_evento: "Vinculación",
     cliente: reposicion.cliente || null,
-    serie_lector: porTipo["Lector Electrónico"] || null,
-    serie_cierre: porTipo["Cierre Electrónico"] || null,
-    serie_bateria: porTipo["Batería"] || null,
+    serie_lector: serieLector,
+    serie_cierre: serieCierre,
+    serie_bateria: serieBateria,
     mc_anterior: mcNuevo ? reposicion.mc : null,
     id_reposicion: reposicion.id,
     fecha: fecha,
     notas: `Reposición de equipo bajo garantía${reposicion.motivo ? " — " + reposicion.motivo : ""}`
   };
 
+  await upsertHistorialEquipo(datosVinculacion, reposicion.id, "Vinculación");
+}
+
+async function registrarDesvinculacionPorReposicion(reposicion, fecha) {
+  const { data: equipoInfo } = await supabaseClient
+    .from("equipos")
+    .select("imei")
+    .eq("m_control", reposicion.mc)
+    .maybeSingle();
+
+  const datosDesvinculacion = {
+    imei: equipoInfo?.imei || null,
+    mc: reposicion.mc,
+    tipo_evento: "Desvinculación",
+    id_reposicion: reposicion.id,
+    fecha: fecha,
+    notas: `Módulo de Control dado de baja — repuesto por garantía${reposicion.motivo ? " — " + reposicion.motivo : ""}`
+  };
+
+  await upsertHistorialEquipo(datosDesvinculacion, reposicion.id, "Desvinculación");
+}
+
+async function upsertHistorialEquipo(datos, idReposicion, tipoEvento) {
   const { data: existente } = await supabaseClient
     .from("historial_equipo")
     .select("id")
-    .eq("id_reposicion", reposicion.id)
-    .eq("tipo_evento", "Vinculación")
+    .eq("id_reposicion", idReposicion)
+    .eq("tipo_evento", tipoEvento)
     .maybeSingle();
 
   if (existente) {
-    await supabaseClient.from("historial_equipo").update(datosVinculacion).eq("id", existente.id);
+    await supabaseClient.from("historial_equipo").update(datos).eq("id", existente.id);
   } else {
-    await supabaseClient.from("historial_equipo").insert(datosVinculacion);
+    await supabaseClient.from("historial_equipo").insert(datos);
   }
 }
 
