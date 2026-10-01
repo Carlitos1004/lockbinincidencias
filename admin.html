@@ -23,13 +23,28 @@
 </div>
 
 <div class="panel-body panel-body-ancho">
-  <h2>Hola, <span id="nombre-usuario">—</span></h2>
+  <div class="dashboard-saludo">
+    <h2>Hola, <span id="nombre-usuario">—</span></h2>
+    <span class="dashboard-fecha" id="dashboard-fecha"></span>
+  </div>
 
-  <div class="resumen-cliente" id="resumen-dashboard">
-    <div class="tarjeta-resumen"><strong>—</strong><span>OT con pendientes</span></div>
-    <div class="tarjeta-resumen"><strong>—</strong><span>Equipos con alarma activa</span></div>
-    <a class="tarjeta-resumen" href="revision.html?pendientes=1"><strong>—</strong><span>Componentes en Pendiente revisión</span></a>
-    <a class="tarjeta-resumen" href="alertas-clientes.html"><strong>—</strong><span>Alertas de clientes nuevas</span></a>
+  <div class="resumen-cliente resumen-dashboard-grande" id="resumen-dashboard">
+    <div class="tarjeta-resumen">
+      <span class="tarjeta-resumen-icono">📋</span>
+      <strong>—</strong><span>OT con pendientes</span>
+    </div>
+    <div class="tarjeta-resumen">
+      <span class="tarjeta-resumen-icono">🚨</span>
+      <strong>—</strong><span>Equipos con alarma activa</span>
+    </div>
+    <a class="tarjeta-resumen" href="revision.html?pendientes=1">
+      <span class="tarjeta-resumen-icono">🔍</span>
+      <strong>—</strong><span>Componentes en Pendiente revisión</span>
+    </a>
+    <a class="tarjeta-resumen" href="alertas-clientes.html">
+      <span class="tarjeta-resumen-icono">🔔</span>
+      <strong>—</strong><span>Alertas de clientes nuevas</span>
+    </a>
   </div>
 
   <div class="grid-tarjetas-grande">
@@ -47,6 +62,30 @@
       <span class="tarjeta-nav-icono">✅</span>
       <span class="tarjeta-nav-titulo">Cierre y Control</span>
       <span class="tarjeta-nav-desc">Revisión de taller, garantías, reposiciones y reportes</span>
+    </a>
+  </div>
+
+  <div class="seccion-dashboard">Accesos directos</div>
+  <div class="grid-tarjetas">
+    <a class="tarjeta-nav" href="ammi.html">
+      <span class="tarjeta-nav-icono">♻️</span>
+      <span class="tarjeta-nav-titulo">AMMI</span>
+      <span class="tarjeta-nav-desc">Equipos enviados y regresos de AMMI</span>
+    </a>
+    <a class="tarjeta-nav" href="control-baterias.html">
+      <span class="tarjeta-nav-icono">🔋</span>
+      <span class="tarjeta-nav-titulo">Control de Baterías</span>
+      <span class="tarjeta-nav-desc">Estado e instalación de baterías</span>
+    </a>
+    <a class="tarjeta-nav" href="revision.html">
+      <span class="tarjeta-nav-icono">🧰</span>
+      <span class="tarjeta-nav-titulo">Revisión de Taller</span>
+      <span class="tarjeta-nav-desc">Componentes retirados en revisión</span>
+    </a>
+    <a class="tarjeta-nav" href="alertas-clientes.html">
+      <span class="tarjeta-nav-icono">📣</span>
+      <span class="tarjeta-nav-titulo">Alertas de Clientes</span>
+      <span class="tarjeta-nav-desc">Cambios y novedades reportadas por clientes</span>
     </a>
   </div>
 </div>

@@ -34,3 +34,14 @@ async function cargarDashboard() {
 }
 
 cargarDashboard();
+
+// Fecha de hoy junto al saludo, p.ej. "jueves, 1 de octubre de 2026"
+const elFecha = document.getElementById("dashboard-fecha");
+if (elFecha) {
+  elFecha.textContent = new Date().toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+}

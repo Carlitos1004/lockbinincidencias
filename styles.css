@@ -1802,6 +1802,7 @@ input[type="file"]::file-selector-button:hover {
   display: flex;
   gap: 16px;
   margin: 16px 0;
+  flex-wrap: wrap;
 }
 
 .tarjeta-resumen {
@@ -1813,6 +1814,39 @@ input[type="file"]::file-selector-button:hover {
   min-width: 140px;
   text-decoration: none;
   color: inherit;
+}
+
+/* Dashboard del Manager: saludo + fecha, y tarjetas de resumen más grandes */
+
+.dashboard-saludo {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-fecha {
+  font-size: 0.85rem;
+  color: var(--gris-700);
+  text-transform: capitalize;
+}
+
+.resumen-dashboard-grande {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 20px 0 36px;
+}
+
+.resumen-dashboard-grande .tarjeta-resumen {
+  min-width: 0;
+  padding: 20px 22px;
+  border-radius: 14px;
+}
+
+.tarjeta-resumen-icono {
+  font-size: 1.4rem;
+  margin-bottom: 6px;
 }
 
 a.tarjeta-resumen {
