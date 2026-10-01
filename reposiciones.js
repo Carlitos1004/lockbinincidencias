@@ -132,10 +132,54 @@ function renderTabla() {
       const fecha = document.getElementById(`fecha-reposicion-${btn.dataset.id}`).value;
       if (!fecha) { alert("Elige la fecha de reposición."); return; }
       btn.disabled = true;
+      const reposicion = reposicionesData.find(r => r.id === btn.dataset.id);
       await supabaseClient.from("equipos_reposicion").update({ estado: "Repuesto", fecha_reposicion: fecha }).eq("id", btn.dataset.id);
+      if (reposicion) await registrarVinculacionEnVidaDelEquipo(reposicion, fecha);
       await cargarReposiciones();
     });
   });
+}
+
+// Cuando un equipo se repone de verdad (REPONER → Repuesto), cuenta como
+// una nueva vinculación del equipo con ese cliente para Vida del Equipo —
+// igual que cuando se instala un equipo completo en Ruta. No duplica si
+// se vuelve a guardar la misma reposición (se busca por id_reposicion).
+async function registrarVinculacionEnVidaDelEquipo(reposicion, fecha) {
+  const comps = componentesPorReposicion[reposicion.id] || [];
+  const porTipo = {};
+  comps.forEach(c => { porTipo[c.tipo_componente] = c.serial_nuevo || null; });
+
+  const { data: equipoInfo } = await supabaseClient
+    .from("equipos")
+    .select("imei")
+    .eq("m_control", reposicion.mc)
+    .maybeSingle();
+
+  const datosVinculacion = {
+    imei: equipoInfo?.imei || null,
+    mc: reposicion.mc,
+    tipo_evento: "Vinculación",
+    cliente: reposicion.cliente || null,
+    serie_lector: porTipo["Lector Electrónico"] || null,
+    serie_cierre: porTipo["Cierre Electrónico"] || null,
+    serie_bateria: porTipo["Batería"] || null,
+    id_reposicion: reposicion.id,
+    fecha: fecha,
+    notas: `Reposición de equipo bajo garantía${reposicion.motivo ? " — " + reposicion.motivo : ""}`
+  };
+
+  const { data: existente } = await supabaseClient
+    .from("historial_equipo")
+    .select("id")
+    .eq("id_reposicion", reposicion.id)
+    .eq("tipo_evento", "Vinculación")
+    .maybeSingle();
+
+  if (existente) {
+    await supabaseClient.from("historial_equipo").update(datosVinculacion).eq("id", existente.id);
+  } else {
+    await supabaseClient.from("historial_equipo").insert(datosVinculacion);
+  }
 }
 
 ["filtro-mc", "filtro-tipo", "filtro-estado"].forEach(id => {
