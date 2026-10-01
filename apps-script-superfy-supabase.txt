@@ -1,0 +1,132 @@
+INSTRUCCIONES
+=============
+1. Abre tu Google Sheet de Superfy → Extensiones → Apps Script.
+2. Pega TODO el contenido de este archivo al FINAL de tu script existente
+   (el mismo donde ya tienes sincronizarDirectoDesdeApi).
+3. Dentro de sincronizarDirectoDesdeApi(), busca esta línea (ya la tienes,
+   es donde escribe en tu hoja):
+
+     hojaEstatus.getRange(i + 1, 13).setValue(stringVinculacion).setBackground(colorVinculacion); // Columna M -> Estado Vinculación
+
+   Justo DESPUÉS de esa línea, agrega esta llamada:
+
+     registrarEnSupabase(serialExcel, mc, sensorVivo, i + 1, hojaEstatus);
+
+   (mc lo sacas de: var mc = datos[i][0] ? datos[i][0].toString().trim() : "";
+    agrega esa línea junto a donde ya lees "serialExcel", si no la tienes ya)
+
+4. Al final de sincronizarDirectoDesdeApi(), justo antes del ui.alert final,
+   agrega esta línea para mandar todo de una vez:
+
+     enviarLoteASupabase();
+
+5. La primera vez que corras el botón después de este cambio, te va a pedir
+   la URL y el service_role key de Supabase (una sola vez, igual que te
+   pidió el token de Superfy) — los sacas de tu proyecto Supabase en
+   Project Settings → API → "service_role" (el secreto, NO el "anon
+   public"). Guárdalo con cuidado, ese key tiene acceso total a tu base.
+=============
+
+// --- Empuje a Supabase: se acumula en memoria y se manda de una vez al
+// final, para no hacer 800 llamadas HTTP sueltas ---
+var loteSensoresSupabase = [];
+var loteEventosSupabase = [];
+
+function obtenerCredencialesSupabase() {
+  var propiedades = PropertiesService.getScriptProperties();
+  var url = propiedades.getProperty('SUPABASE_URL');
+  var key = propiedades.getProperty('SUPABASE_SERVICE_KEY');
+
+  if (!url || !key) {
+    var ui = SpreadsheetApp.getUi();
+    var respUrl = ui.prompt('🔑 Configuración de Supabase (una sola vez)', 'Pega la URL de tu proyecto (ej. https://xxxxx.supabase.co):', ui.ButtonSet.OK_CANCEL);
+    if (respUrl.getSelectedButton() != ui.Button.OK) return null;
+    url = respUrl.getResponseText().trim().replace(/\/$/, "");
+
+    var respKey = ui.prompt('🔑 Service Role Key', 'Pega el "service_role" key (Project Settings → API en Supabase):', ui.ButtonSet.OK_CANCEL);
+    if (respKey.getSelectedButton() != ui.Button.OK) return null;
+    key = respKey.getResponseText().trim();
+
+    propiedades.setProperty('SUPABASE_URL', url);
+    propiedades.setProperty('SUPABASE_SERVICE_KEY', key);
+  }
+  return { url: url, key: key };
+}
+
+// Llamar justo después de escribir cada fila en la hoja, dentro del loop
+// principal de sincronizarDirectoDesdeApi()
+function registrarEnSupabase(serial, mc, sensorVivo, filaExcel, hojaEstatus) {
+  if (!sensorVivo) return; // "NO ENCONTRADO" — no hay nada nuevo que comparar
+
+  var conEst = sensorVivo.estadoConexion.toUpperCase();
+  var nuevaConectividad = (conEst === "OFFLINE" || conEst === "DISCONNECTED") ? "OFFLINE" : "ONLINE";
+  var vincEst = sensorVivo.estadoVinculacion.toUpperCase();
+  var nuevaVinculacion = (vincEst === "ATTACHED" || vincEst === "VINCULADO") ? "VINCULADO" : "DESVINCULADO";
+
+  // El valor que había ANTES en la celda, antes de que este mismo ciclo
+  // lo sobreescribiera arriba — así detectamos si cambió de verdad
+  var celdaConectividadVieja = hojaEstatus.getRange(filaExcel, 12).getValue().toString();
+  var celdaVinculacionVieja = hojaEstatus.getRange(filaExcel, 13).getValue().toString();
+  var conectividadVieja = celdaConectividadVieja.indexOf("ONLINE") >= 0 ? "ONLINE" : (celdaConectividadVieja.indexOf("OFFLINE") >= 0 ? "OFFLINE" : null);
+  var vinculacionVieja = celdaVinculacionVieja.indexOf("VINCULADO") >= 0 && celdaVinculacionVieja.indexOf("DES") < 0 ? "VINCULADO" : (celdaVinculacionVieja.indexOf("DESVINCULADO") >= 0 ? "DESVINCULADO" : null);
+
+  loteSensoresSupabase.push({
+    serial: serial,
+    mc: mc || null,
+    superfy_id: sensorVivo.idSuperfy,
+    estado_conectividad: nuevaConectividad,
+    estado_vinculacion: nuevaVinculacion,
+    ultima_lectura: sensorVivo.fecha !== "Sin lecturas" ? sensorVivo.fecha : null,
+    fecha_actualizacion: new Date().toISOString()
+  });
+
+  if (conectividadVieja && conectividadVieja !== nuevaConectividad) {
+    loteEventosSupabase.push({
+      serial: serial, mc: mc || null,
+      tipo_evento: nuevaConectividad === "OFFLINE" ? "Offline detectado" : "Online recuperado",
+      notas: "Detectado en sincronización automática"
+    });
+  }
+  if (vinculacionVieja && vinculacionVieja !== nuevaVinculacion) {
+    loteEventosSupabase.push({
+      serial: serial, mc: mc || null,
+      tipo_evento: nuevaVinculacion === "DESVINCULADO" ? "Desvinculado" : "Vinculado",
+      notas: "Detectado en sincronización automática"
+    });
+  }
+}
+
+// Llamar UNA vez, al final de sincronizarDirectoDesdeApi()
+function enviarLoteASupabase() {
+  var credenciales = obtenerCredencialesSupabase();
+  if (!credenciales) return;
+  if (loteSensoresSupabase.length === 0) return;
+
+  var opcionesBase = {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      "apikey": credenciales.key,
+      "Authorization": "Bearer " + credenciales.key
+    },
+    muteHttpExceptions: true
+  };
+
+  // Upsert de sensores (actualiza si ya existe el serial, lo crea si no)
+  UrlFetchApp.fetch(credenciales.url + "/rest/v1/sensores?on_conflict=serial", Object.assign({}, opcionesBase, {
+    headers: Object.assign({}, opcionesBase.headers, { "Prefer": "resolution=merge-duplicates,return=minimal" }),
+    payload: JSON.stringify(loteSensoresSupabase)
+  }));
+
+  // Inserta los eventos de falla/recuperación detectados en esta corrida
+  if (loteEventosSupabase.length > 0) {
+    UrlFetchApp.fetch(credenciales.url + "/rest/v1/historial_sensores", Object.assign({}, opcionesBase, {
+      headers: Object.assign({}, opcionesBase.headers, { "Prefer": "return=minimal" }),
+      payload: JSON.stringify(loteEventosSupabase)
+    }));
+  }
+
+  // Reiniciamos para la próxima corrida
+  loteSensoresSupabase = [];
+  loteEventosSupabase = [];
+}

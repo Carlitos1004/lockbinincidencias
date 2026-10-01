@@ -1,0 +1,116 @@
+CÓMO APLICAR ESTE CAMBIO
+========================
+Son 5 ediciones puntuales sobre el script que ya tienes (el optimizado en
+bloque). Busca cada línea/bloque de abajo y reemplázalo tal cual — no hace
+falta reescribir el archivo completo esta vez.
+
+--------------------------------------------------------------------------
+CAMBIO 1 — guardar el nivel de batería al leer la API
+
+Busca:
+
+        mapaHardware[serialSensor] = {
+          "idSuperfy": idContenedorCorto,
+          "estadoConexion": item.connectivity_status || "UNKNOWN",
+          "fecha": fechaLimpia,
+          "estadoVinculacion": item.life_cycle_status || "UNKNOWN"
+        };
+
+Reemplázalo por:
+
+        mapaHardware[serialSensor] = {
+          "idSuperfy": idContenedorCorto,
+          "estadoConexion": item.connectivity_status || "UNKNOWN",
+          "fecha": fechaLimpia,
+          "estadoVinculacion": item.life_cycle_status || "UNKNOWN",
+          "nivelBateria": (item.battery_level !== undefined && item.battery_level !== null) ? item.battery_level : null
+        };
+
+--------------------------------------------------------------------------
+CAMBIO 2 — leer también la columna N al armar los arreglos en memoria
+
+Busca:
+
+    var valoresE = [];
+    var valoresKLM = [];
+    for (var f = 1; f < datos.length; f++) {
+      valoresE.push([datos[f][4]]);                              // Columna E
+      valoresKLM.push([datos[f][10], datos[f][11], datos[f][12]]); // Columnas K, L, M
+    }
+
+Reemplázalo por:
+
+    var valoresE = [];
+    var valoresKLM = [];
+    for (var f = 1; f < datos.length; f++) {
+      valoresE.push([datos[f][4]]);                                            // Columna E
+      valoresKLM.push([datos[f][10], datos[f][11], datos[f][12], datos[f][13]]); // Columnas K, L, M, N
+    }
+
+--------------------------------------------------------------------------
+CAMBIO 3 — escribir el nivel de batería en la columna N cuando se encuentra
+
+Busca:
+
+          valoresE[filaArr][0] = sensorVivo.idSuperfy;
+          valoresKLM[filaArr] = [sensorVivo.fecha, stringSalud, stringVinculacion];
+          coloresLM[filaArr] = [colorConexion, colorVinculacion];
+
+Reemplázalo por:
+
+          valoresE[filaArr][0] = sensorVivo.idSuperfy;
+          valoresKLM[filaArr] = [sensorVivo.fecha, stringSalud, stringVinculacion, sensorVivo.nivelBateria];
+          coloresLM[filaArr] = [colorConexion, colorVinculacion];
+
+--------------------------------------------------------------------------
+CAMBIO 4 — escribir 4 columnas en vez de 3 al final
+
+Busca:
+
+    if (totalFilas > 0) {
+      hojaEstatus.getRange(2, 5, valoresE.length, 1).setValues(valoresE);
+      hojaEstatus.getRange(2, 11, valoresKLM.length, 3).setValues(valoresKLM);
+      hojaEstatus.getRange(2, 12, coloresLM.length, 2).setBackgrounds(coloresLM);
+    }
+
+Reemplázalo por:
+
+    if (totalFilas > 0) {
+      hojaEstatus.getRange(2, 5, valoresE.length, 1).setValues(valoresE);
+      hojaEstatus.getRange(2, 11, valoresKLM.length, 4).setValues(valoresKLM);
+      hojaEstatus.getRange(2, 12, coloresLM.length, 2).setBackgrounds(coloresLM);
+    }
+
+--------------------------------------------------------------------------
+CAMBIO 5 — mandar el nivel de batería a Supabase también
+
+Busca, dentro de registrarEnSupabase():
+
+  loteSensoresSupabase.push({
+    serial: serial,
+    mc: mc || null,
+    superfy_id: sensorVivo.idSuperfy,
+    estado_conectividad: nuevaConectividad,
+    estado_vinculacion: nuevaVinculacion,
+    ultima_lectura: sensorVivo.fecha !== "Sin lecturas" ? sensorVivo.fecha : null,
+    fecha_actualizacion: new Date().toISOString()
+  });
+
+Reemplázalo por:
+
+  loteSensoresSupabase.push({
+    serial: serial,
+    mc: mc || null,
+    superfy_id: sensorVivo.idSuperfy,
+    estado_conectividad: nuevaConectividad,
+    estado_vinculacion: nuevaVinculacion,
+    ultima_lectura: sensorVivo.fecha !== "Sin lecturas" ? sensorVivo.fecha : null,
+    nivel_bateria: sensorVivo.nivelBateria,
+    fecha_actualizacion: new Date().toISOString()
+  });
+
+--------------------------------------------------------------------------
+Guarda con Ctrl+S y corre el botón de siempre. La columna N de tu hoja
+"Estatus de equipos" debe estar vacía o con un encabezado tipo "Nivel
+Batería" antes de correr esto — si ya tienes algo ahí, avísame para
+ajustar el número de columna.
