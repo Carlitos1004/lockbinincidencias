@@ -52,7 +52,12 @@
     <tbody id="tbody-registro-comp"><tr><td colspan="8">Cargando...</td></tr></tbody>
   </table>
 
-  <div id="historial-componente"></div>
+  <div class="modal-fondo" id="modal-historial-comp" hidden>
+    <div class="modal-caja modal-caja-ancha">
+      <button class="modal-cerrar" id="cerrar-modal-historial-comp">✕</button>
+      <div id="historial-componente"></div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

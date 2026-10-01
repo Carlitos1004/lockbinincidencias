@@ -207,6 +207,14 @@ function renderTabla() {
   });
 }
 
+const modalHistorialComp = document.getElementById("modal-historial-comp");
+document.getElementById("cerrar-modal-historial-comp").addEventListener("click", () => {
+  modalHistorialComp.hidden = true;
+});
+modalHistorialComp.addEventListener("click", (e) => {
+  if (e.target === modalHistorialComp) modalHistorialComp.hidden = true;
+});
+
 function mostrarHistorial(tipo, serial) {
   const grupo = gruposComponentes.find(g => g.tipo === tipo && g.serial === serial);
   const contenedor = document.getElementById("historial-componente");
@@ -214,15 +222,15 @@ function mostrarHistorial(tipo, serial) {
 
   if (grupo.eventos.length === 0) {
     contenedor.innerHTML = `
-      <h2 style="margin-top:24px;">${tipo} · Serial ${serial}</h2>
+      <h2 style="margin-top:0;">${tipo} · Serial ${serial}</h2>
       <p class="resultado-msg resultado-ok">🟢 Instalado en ${grupo.mcActual || "—"}${grupo.clienteActual ? " (" + grupo.clienteActual + ")" : ""} — nunca ha pasado por Revisión de Taller, no tiene incidencias registradas.</p>
     `;
-    contenedor.scrollIntoView({ behavior: "smooth", block: "start" });
+    modalHistorialComp.hidden = false;
     return;
   }
 
   contenedor.innerHTML = `
-    <h2 style="margin-top:24px;">${grupo.eventos.length} incidencia(s) — ${tipo} · Serial ${serial}</h2>
+    <h2 style="margin-top:0;">${grupo.eventos.length} incidencia(s) — ${tipo} · Serial ${serial}</h2>
     <div class="linea-tiempo-lista">
       ${grupo.eventos.map(ev => `
         <div class="evento-vida">
@@ -243,7 +251,7 @@ function mostrarHistorial(tipo, serial) {
       `).join("")}
     </div>
   `;
-  contenedor.scrollIntoView({ behavior: "smooth", block: "start" });
+  modalHistorialComp.hidden = false;
 }
 
 ["filtro-serial", "filtro-tipo", "filtro-cliente-comp", "orden-registro-comp"].forEach(id => {
