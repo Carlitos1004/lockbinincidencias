@@ -20,12 +20,10 @@ const DESTINO_AMMI = "❌ Equipo dañado - Enviar a AMMI";
 // el mismo componente).
 const CATEGORIA_1RA = "1ra categoría";
 
-// Mismo criterio de exclusión que el resto de registros y estadísticas.
-const CLIENTES_EXCLUIDOS_EXACTOS = ["comercial", "frutos", "interno", "carmen", "municipalia"];
-function esClienteExcluido(cliente) {
-  const c = (cliente || "").toLowerCase();
-  return CLIENTES_EXCLUIDOS_EXACTOS.includes(c) || c.includes("villanueva");
-}
+// A diferencia de otros reportes/estadísticas, AMMI NO excluye clientes
+// internos/de prueba (INTERNO, COMERCIAL, etc.) — un componente enviado a
+// AMMI hay que poder rastrearlo y recibirlo de vuelta sin importar de qué
+// cliente venía, así que aquí entran todos.
 
 let enviosData = [];
 let editandoId = null;
@@ -75,11 +73,9 @@ async function cargarEnvios() {
       q.eq("destino", DESTINO_AMMI).order("fecha", { ascending: false })
     );
   } catch (err) {
-    document.getElementById("tbody-ammi").innerHTML = `<tr><td colspan="11">Error: ${err.message}</td></tr>`;
+    document.getElementById("tbody-ammi").innerHTML = `<tr><td colspan="12">Error: ${err.message}</td></tr>`;
     return;
   }
-
-  enviosData = enviosData.filter(c => !esClienteExcluido(c.cliente));
 
   // Cuántas veces ha ido cada componente a AMMI (contando esta misma fila).
   // Para el Módulo de Control se cuenta por MC (el módulo es el mismo
