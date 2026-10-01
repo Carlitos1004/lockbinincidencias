@@ -70,7 +70,7 @@ function renderTabla() {
             <div class="agregar-equipo-box">
               <strong>${r.mc}${r.motivo ? ` — ${r.motivo}` : ""}</strong>
               <table class="tabla-revision" style="margin-top:10px;">
-                <thead><tr><th>Componente</th><th>Categoría</th><th>Serial real</th><th></th></tr></thead>
+                <thead><tr><th>Componente</th><th>Categoría</th><th>Serial real</th><th></th><th></th></tr></thead>
                 <tbody>
                   ${comps.map(c => `
                     <tr>
@@ -78,8 +78,28 @@ function renderTabla() {
                       <td>${c.categoria}</td>
                       <td><input type="text" class="input-serial-comp" data-id="${c.id}" value="${c.serial_nuevo || ""}" placeholder="Aún sin definir"></td>
                       <td><button class="btn-guardar-serial-comp btn-secundario" data-id="${c.id}">Guardar</button></td>
+                      <td><button class="btn-quitar-componente btn-secundario" data-id="${c.id}" title="Quitar componente">🗑️</button></td>
                     </tr>
                   `).join("")}
+                  <tr>
+                    <td>
+                      <select class="input-nuevo-tipo-comp">
+                        <option value="Módulo de Control">Módulo de Control</option>
+                        <option value="Lector Electrónico">Lector Electrónico</option>
+                        <option value="Cierre Electrónico">Cierre Electrónico</option>
+                        <option value="Batería">Batería</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select class="input-nuevo-categoria-comp">
+                        <option value="1ra categoría">1ra categoría</option>
+                        <option value="2da categoría">2da categoría</option>
+                      </select>
+                    </td>
+                    <td colspan="3">
+                      <button class="btn-agregar-componente-reposicion btn-secundario" data-id="${r.id}">+ Agregar componente</button>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
               ${r.tipo_registro === "REPONER" ? `
@@ -127,6 +147,29 @@ function renderTabla() {
       await cargarReposiciones();
     });
   });
+  tbody.querySelectorAll(".btn-quitar-componente").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("¿Quitar este componente de la reposición?")) return;
+      btn.disabled = true;
+      await supabaseClient.from("reposicion_componentes").delete().eq("id", btn.dataset.id);
+      await cargarReposiciones();
+    });
+  });
+  tbody.querySelectorAll(".btn-agregar-componente-reposicion").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const fila = btn.closest("tr");
+      const tipo = fila.querySelector(".input-nuevo-tipo-comp").value;
+      const categoria = fila.querySelector(".input-nuevo-categoria-comp").value;
+      btn.disabled = true;
+      btn.textContent = "Agregando...";
+      await supabaseClient.from("reposicion_componentes").insert({
+        reposicion_id: btn.dataset.id,
+        tipo_componente: tipo,
+        categoria: categoria
+      });
+      await cargarReposiciones();
+    });
+  });
   tbody.querySelectorAll(".btn-marcar-repuesto").forEach(btn => {
     btn.addEventListener("click", async () => {
       const fecha = document.getElementById(`fecha-reposicion-${btn.dataset.id}`).value;
@@ -149,20 +192,29 @@ async function registrarVinculacionEnVidaDelEquipo(reposicion, fecha) {
   const porTipo = {};
   comps.forEach(c => { porTipo[c.tipo_componente] = c.serial_nuevo || null; });
 
+  // Si entre los componentes a reponer está el Módulo de Control, el MC
+  // en sí cambió — no fue solo una pieza. Usamos el serial nuevo anotado
+  // como el MC del evento (y guardamos el viejo en mc_anterior); si no
+  // hay Módulo de Control en la lista, el MC del equipo sigue siendo el
+  // mismo de siempre. Solo registramos lo que pasó, sin más lógica.
+  const mcNuevo = porTipo["Módulo de Control"] || null;
+  const mcEvento = mcNuevo || reposicion.mc;
+
   const { data: equipoInfo } = await supabaseClient
     .from("equipos")
     .select("imei")
-    .eq("m_control", reposicion.mc)
+    .eq("m_control", mcEvento)
     .maybeSingle();
 
   const datosVinculacion = {
     imei: equipoInfo?.imei || null,
-    mc: reposicion.mc,
+    mc: mcEvento,
     tipo_evento: "Vinculación",
     cliente: reposicion.cliente || null,
     serie_lector: porTipo["Lector Electrónico"] || null,
     serie_cierre: porTipo["Cierre Electrónico"] || null,
     serie_bateria: porTipo["Batería"] || null,
+    mc_anterior: mcNuevo ? reposicion.mc : null,
     id_reposicion: reposicion.id,
     fecha: fecha,
     notas: `Reposición de equipo bajo garantía${reposicion.motivo ? " — " + reposicion.motivo : ""}`
