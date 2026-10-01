@@ -192,8 +192,17 @@ function renderTabla() {
       const reposicion = reposicionesData.find(r => r.id === btn.dataset.id);
       await supabaseClient.from("equipos_reposicion").update({ estado: "Repuesto", fecha_reposicion: fecha }).eq("id", btn.dataset.id);
       if (reposicion) {
-        await registrarVinculacionEnVidaDelEquipo(reposicion, fecha);
-        await registrarEnRegistroComponentes(reposicion, fecha);
+        const errores = [
+          ...(await registrarVinculacionEnVidaDelEquipo(reposicion, fecha)),
+          ...(await registrarEnRegistroComponentes(reposicion, fecha))
+        ];
+        if (errores.length > 0) {
+          alert(
+            "El equipo quedó marcado como Repuesto, pero algo falló al registrar " +
+            "Vida del Equipo / Registro de Componentes:\n\n" + errores.join("\n") +
+            "\n\nProbablemente falte correr algún script SQL — avisa para revisarlo."
+          );
+        }
       }
       await cargarReposiciones();
     });
@@ -212,6 +221,7 @@ function renderTabla() {
 // que esta misma reposición también esté cambiando (esos usan su serial
 // nuevo en vez del que tenía antes).
 async function registrarVinculacionEnVidaDelEquipo(reposicion, fecha) {
+  const errores = [];
   const comps = componentesPorReposicion[reposicion.id] || [];
   const porTipo = {};
   comps.forEach(c => { porTipo[c.tipo_componente] = c.serial_nuevo || null; });
@@ -223,7 +233,7 @@ async function registrarVinculacionEnVidaDelEquipo(reposicion, fecha) {
   let serieBateria = porTipo["Batería"] || null;
 
   if (mcNuevo) {
-    await registrarDesvinculacionPorReposicion(reposicion, fecha);
+    errores.push(...await registrarDesvinculacionPorReposicion(reposicion, fecha));
 
     // Lo que el equipo viejo tenía instalado, para que el MC nuevo se
     // vincule con lo mismo — salvo lo que ya se está reponiendo también.
@@ -262,7 +272,9 @@ async function registrarVinculacionEnVidaDelEquipo(reposicion, fecha) {
     notas: `Reposición de equipo bajo garantía${reposicion.motivo ? " — " + reposicion.motivo : ""}`
   };
 
-  await upsertHistorialEquipo(datosVinculacion, reposicion.id, "Vinculación");
+  const error = await upsertHistorialEquipo(datosVinculacion, reposicion.id, "Vinculación");
+  if (error) errores.push("Vida del Equipo (Vinculación): " + error);
+  return errores;
 }
 
 async function registrarDesvinculacionPorReposicion(reposicion, fecha) {
@@ -281,21 +293,29 @@ async function registrarDesvinculacionPorReposicion(reposicion, fecha) {
     notas: `Módulo de Control dado de baja — repuesto por garantía${reposicion.motivo ? " — " + reposicion.motivo : ""}`
   };
 
-  await upsertHistorialEquipo(datosDesvinculacion, reposicion.id, "Desvinculación");
+  const error = await upsertHistorialEquipo(datosDesvinculacion, reposicion.id, "Desvinculación");
+  return error ? ["Vida del Equipo (Desvinculación): " + error] : [];
 }
 
+// Devuelve el mensaje de error de Supabase si algo falla, o null si salió
+// bien — así quien llama puede juntar y mostrar los errores en vez de que
+// se pierdan en silencio (ej. si falta correr algún script SQL).
 async function upsertHistorialEquipo(datos, idReposicion, tipoEvento) {
-  const { data: existente } = await supabaseClient
+  const { data: existente, error: errorBusqueda } = await supabaseClient
     .from("historial_equipo")
     .select("id")
     .eq("id_reposicion", idReposicion)
     .eq("tipo_evento", tipoEvento)
     .maybeSingle();
 
+  if (errorBusqueda) return errorBusqueda.message;
+
   if (existente) {
-    await supabaseClient.from("historial_equipo").update(datos).eq("id", existente.id);
+    const { error } = await supabaseClient.from("historial_equipo").update(datos).eq("id", existente.id);
+    return error ? error.message : null;
   } else {
-    await supabaseClient.from("historial_equipo").insert(datos);
+    const { error } = await supabaseClient.from("historial_equipo").insert(datos);
+    return error ? error.message : null;
   }
 }
 
@@ -308,38 +328,70 @@ async function upsertHistorialEquipo(datos, idReposicion, tipoEvento) {
 // duplica si se vuelve a guardar la misma reposición (se busca por
 // id_reposicion).
 async function registrarEnRegistroComponentes(reposicion, fecha) {
+  const errores = [];
   const comps = componentesPorReposicion[reposicion.id] || [];
   const fechaTexto = new Date(fecha + "T00:00:00").toLocaleDateString("es-ES");
 
+  const porTipo = {};
+  comps.forEach(c => { porTipo[c.tipo_componente] = c.serial_nuevo || null; });
+  const mcNuevo = porTipo["Módulo de Control"] || null;
+
+  // Si se repuso el Módulo de Control completo, los DEMÁS componentes (LE/
+  // CE/BA) ahora están instalados en el MC nuevo, no en el viejo — salvo
+  // que el MC nuevo todavía no esté dado de alta en Equipos, en cuyo caso
+  // los dejamos en el MC viejo para no romper la referencia (y lo decimos
+  // en la nota) hasta que se registre el equipo nuevo.
+  let mcParaOtrosComponentes = reposicion.mc;
+  if (mcNuevo) {
+    const { data: mcNuevoExiste } = await supabaseClient
+      .from("equipos")
+      .select("m_control")
+      .eq("m_control", mcNuevo)
+      .maybeSingle();
+    if (mcNuevoExiste) mcParaOtrosComponentes = mcNuevo;
+  }
+
   for (const c of comps) {
-    const { data: existente } = await supabaseClient
+    const esModuloControl = c.tipo_componente === "Módulo de Control";
+    // El propio Módulo de Control siempre queda anotado bajo el MC viejo
+    // (es su propio identificador — esa fila describe que ESE módulo se
+    // dio de baja). Los demás componentes van al MC donde están ahora.
+    const mcDelEvento = esModuloControl ? reposicion.mc : mcParaOtrosComponentes;
+    const avisoMcPendiente = !esModuloControl && mcNuevo && mcParaOtrosComponentes !== mcNuevo
+      ? ` (instalado en MC nuevo ${mcNuevo}, aún sin dar de alta en Equipos)`
+      : "";
+
+    const { data: existente, error: errorBusqueda } = await supabaseClient
       .from("componentes_retirados")
       .select("id")
       .eq("id_reposicion", reposicion.id)
       .eq("tipo_componente", c.tipo_componente)
       .maybeSingle();
 
+    if (errorBusqueda) { errores.push(`Registro de Componentes (${c.tipo_componente}): ` + errorBusqueda.message); continue; }
+
     const datosEvento = {
       fecha: fecha,
       cliente: reposicion.cliente || null,
-      m_control: reposicion.mc,
+      m_control: mcDelEvento,
       tipo_componente: c.tipo_componente,
       estado: "Repuesto por garantía",
       destino: "✅ Repuesto por garantía",
-      reparacion: `${c.tipo_componente} ${c.categoria} repuesta el día ${fechaTexto}${c.serial_nuevo ? " con serial " + c.serial_nuevo : ""}${reposicion.motivo ? " — " + reposicion.motivo : ""}`,
+      reparacion: `${c.tipo_componente} ${c.categoria} repuesta el día ${fechaTexto}${c.serial_nuevo ? " con serial " + c.serial_nuevo : ""}${avisoMcPendiente}${reposicion.motivo ? " — " + reposicion.motivo : ""}`,
       excluir_materiales: true,
       id_reposicion: reposicion.id
     };
 
     if (existente) {
-      await supabaseClient.from("componentes_retirados").update(datosEvento).eq("id", existente.id);
+      const { error } = await supabaseClient.from("componentes_retirados").update(datosEvento).eq("id", existente.id);
+      if (error) errores.push(`Registro de Componentes (${c.tipo_componente}): ` + error.message);
       continue;
     }
 
     // Buscamos la incidencia más reciente de este mismo tipo de componente
-    // en este MC para agrupar la reposición en el mismo serial — así
-    // Registro Maestro de Componentes la muestra como una acción más
-    // dentro de esa misma historia.
+    // en el MC VIEJO (de ahí viene la reposición) para agrupar el evento
+    // en el mismo serial — así Registro Maestro de Componentes la muestra
+    // como una acción más dentro de esa misma historia.
     const { data: incidenciaPrevia } = await supabaseClient
       .from("componentes_retirados")
       .select("serial_retirado")
@@ -353,8 +405,11 @@ async function registrarEnRegistroComponentes(reposicion, fecha) {
 
     datosEvento.serial_retirado = incidenciaPrevia?.serial_retirado || c.serial_nuevo || reposicion.mc;
 
-    await supabaseClient.from("componentes_retirados").insert(datosEvento);
+    const { error } = await supabaseClient.from("componentes_retirados").insert(datosEvento);
+    if (error) errores.push(`Registro de Componentes (${c.tipo_componente}): ` + error.message);
   }
+
+  return errores;
 }
 
 ["filtro-mc", "filtro-tipo", "filtro-estado"].forEach(id => {
