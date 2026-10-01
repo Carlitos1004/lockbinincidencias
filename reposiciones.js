@@ -191,7 +191,10 @@ function renderTabla() {
       btn.disabled = true;
       const reposicion = reposicionesData.find(r => r.id === btn.dataset.id);
       await supabaseClient.from("equipos_reposicion").update({ estado: "Repuesto", fecha_reposicion: fecha }).eq("id", btn.dataset.id);
-      if (reposicion) await registrarVinculacionEnVidaDelEquipo(reposicion, fecha);
+      if (reposicion) {
+        await registrarVinculacionEnVidaDelEquipo(reposicion, fecha);
+        await registrarEnRegistroComponentes(reposicion, fecha);
+      }
       await cargarReposiciones();
     });
   });
@@ -245,6 +248,64 @@ async function registrarVinculacionEnVidaDelEquipo(reposicion, fecha) {
     await supabaseClient.from("historial_equipo").update(datosVinculacion).eq("id", existente.id);
   } else {
     await supabaseClient.from("historial_equipo").insert(datosVinculacion);
+  }
+}
+
+// Cuando se repone de verdad, también lo anotamos como una acción más en
+// el historial de ese componente (Registro Maestro de Componentes), en el
+// mismo serial donde ya estaba la incidencia que originó la reposición —
+// así se ve como continuación de esa misma historia, no como algo aparte.
+// Si no se encuentra una incidencia previa para ese MC/tipo, se agrupa por
+// el serial nuevo (si ya se anotó) o por el MC, para no perderlo. No
+// duplica si se vuelve a guardar la misma reposición (se busca por
+// id_reposicion).
+async function registrarEnRegistroComponentes(reposicion, fecha) {
+  const comps = componentesPorReposicion[reposicion.id] || [];
+  const fechaTexto = new Date(fecha + "T00:00:00").toLocaleDateString("es-ES");
+
+  for (const c of comps) {
+    const { data: existente } = await supabaseClient
+      .from("componentes_retirados")
+      .select("id")
+      .eq("id_reposicion", reposicion.id)
+      .eq("tipo_componente", c.tipo_componente)
+      .maybeSingle();
+
+    const datosEvento = {
+      fecha: fecha,
+      cliente: reposicion.cliente || null,
+      m_control: reposicion.mc,
+      tipo_componente: c.tipo_componente,
+      estado: "Repuesto por garantía",
+      destino: "✅ Repuesto por garantía",
+      reparacion: `${c.tipo_componente} ${c.categoria} repuesta el día ${fechaTexto}${c.serial_nuevo ? " con serial " + c.serial_nuevo : ""}${reposicion.motivo ? " — " + reposicion.motivo : ""}`,
+      excluir_materiales: true,
+      id_reposicion: reposicion.id
+    };
+
+    if (existente) {
+      await supabaseClient.from("componentes_retirados").update(datosEvento).eq("id", existente.id);
+      continue;
+    }
+
+    // Buscamos la incidencia más reciente de este mismo tipo de componente
+    // en este MC para agrupar la reposición en el mismo serial — así
+    // Registro Maestro de Componentes la muestra como una acción más
+    // dentro de esa misma historia.
+    const { data: incidenciaPrevia } = await supabaseClient
+      .from("componentes_retirados")
+      .select("serial_retirado")
+      .eq("m_control", reposicion.mc)
+      .eq("tipo_componente", c.tipo_componente)
+      .not("serial_retirado", "is", null)
+      .neq("serial_retirado", "")
+      .order("fecha", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    datosEvento.serial_retirado = incidenciaPrevia?.serial_retirado || c.serial_nuevo || reposicion.mc;
+
+    await supabaseClient.from("componentes_retirados").insert(datosEvento);
   }
 }
 

@@ -12,7 +12,8 @@ const ICONOS_ESTADO_COMPONENTE = {
   "Descartado": "🗑️",
   "Cambiado por el cliente": "🙋",
   "Faltante/Perdido": "⚠️",
-  "Instalado — sin incidencias": "🟢"
+  "Instalado — sin incidencias": "🟢",
+  "Repuesto por garantía": "🛡️"
 };
 
 let crudoComponentes = [];
