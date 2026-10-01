@@ -9,6 +9,12 @@
 
 const DESTINO_AMMI = "❌ Equipo dañado - Enviar a AMMI";
 
+// Cuando AMMI descarta el componente que enviamos y, en vez de repararlo,
+// nos manda uno de reposición (equipo/pieza nueva) — no es ni 1ra ni 2da
+// categoría, es un resultado aparte. El serial del componente de reposición
+// se guarda en "serial_nuevo".
+const CATEGORIA_REPOSICION = "Reposición (no repararon — enviaron nuevo)";
+
 // Mismo criterio de exclusión que el resto de registros y estadísticas.
 const CLIENTES_EXCLUIDOS_EXACTOS = ["comercial", "frutos", "interno", "carmen", "municipalia"];
 function esClienteExcluido(cliente) {
@@ -88,6 +94,7 @@ function renderResumen() {
   const regresados = enviosData.filter(c => c.ammi_fecha_regreso).length;
   const primera = enviosData.filter(c => c.ammi_categoria_regreso === "1ra categoría").length;
   const segunda = enviosData.filter(c => c.ammi_categoria_regreso === "2da categoría").length;
+  const reposiciones = enviosData.filter(c => c.ammi_categoria_regreso === CATEGORIA_REPOSICION).length;
   const repetidos = new Set(enviosData.filter(c => c.vecesEnviado > 1).map(claveDe)).size;
 
   document.getElementById("resumen-ammi").innerHTML = `
@@ -96,6 +103,7 @@ function renderResumen() {
     <div class="tarjeta-resumen"><strong>${regresados}</strong><span>Regresados</span></div>
     <div class="tarjeta-resumen"><strong>${primera}</strong><span>1ra categoría</span></div>
     <div class="tarjeta-resumen"><strong>${segunda}</strong><span>2da categoría</span></div>
+    <div class="tarjeta-resumen"><strong>${reposiciones}</strong><span>Reposiciones (no repararon, enviaron nuevo)</span></div>
     <div class="tarjeta-resumen"><strong>${repetidos}</strong><span>Equipos enviados más de una vez</span></div>
   `;
 }
@@ -139,9 +147,13 @@ function renderTabla() {
                 <option value="">Categoría...</option>
                 <option value="1ra categoría">1ra categoría</option>
                 <option value="2da categoría">2da categoría</option>
+                <option value="${CATEGORIA_REPOSICION}">🔁 Reposición (no lo reparan, mandan uno nuevo)</option>
               </select>
             </div>
-            <textarea class="input-notas-regreso" rows="2" placeholder="Notas de AMMI (opcional)"></textarea>
+            <div class="input-serial-reposicion-caja materiales-controles" hidden style="margin-top:6px;">
+              <input type="text" class="input-serial-reposicion" placeholder="Serial del componente nuevo que llegó de reposición" value="${c.serial_nuevo || ""}">
+            </div>
+            <textarea class="input-notas-regreso" rows="2" placeholder="Notas de AMMI (opcional)">${c.ammi_notas_regreso || ""}</textarea>
             <button class="btn-guardar-regreso btn-primario btn-compacto" data-id="${c.id}" style="margin-top:6px;">Guardar regreso</button>
             <button class="btn-cancelar-regreso btn-secundario btn-compacto" data-id="${c.id}">Cancelar</button>
           </td>
@@ -161,7 +173,7 @@ function renderTabla() {
       <td>${c.id_ot ? `<a href="ot-detalle.html?ot=${encodeURIComponent(c.id_ot)}" target="_blank" rel="noopener">${c.id_ot}</a>` : "—"}</td>
       <td>${c.ammi_fecha_regreso ? "✅ Regresado" : "🕓 Pendiente"}</td>
       <td>${c.ammi_fecha_regreso
-        ? `${new Date(c.ammi_fecha_regreso).toLocaleDateString("es-ES")}${c.ammi_categoria_regreso ? " — " + c.ammi_categoria_regreso : ""}${c.ammi_notas_regreso ? `<br><span style="font-size:0.85rem; color:var(--gris-500);">${c.ammi_notas_regreso}</span>` : ""}`
+        ? `${new Date(c.ammi_fecha_regreso).toLocaleDateString("es-ES")}${c.ammi_categoria_regreso ? " — " + c.ammi_categoria_regreso : ""}${c.ammi_categoria_regreso === CATEGORIA_REPOSICION && c.serial_nuevo ? `<br><span style="font-size:0.85rem;">🔁 Nuevo serial: <strong>${c.serial_nuevo}</strong></span>` : ""}${c.ammi_notas_regreso ? `<br><span style="font-size:0.85rem; color:var(--gris-500);">${c.ammi_notas_regreso}</span>` : ""}`
         : "—"
       }</td>
       <td>
@@ -177,22 +189,48 @@ function renderTabla() {
   tbody.querySelectorAll(".btn-cancelar-regreso").forEach(btn => {
     btn.addEventListener("click", () => { editandoId = null; renderTabla(); });
   });
+
+  // Fila en edición: mostrar/ocultar el campo de "serial de reposición"
+  // según la categoría elegida, y dejarlo visible de entrada si ya hay un
+  // serial de reposición guardado (o la categoría guardada ya era
+  // "Reposición").
+  tbody.querySelectorAll(".input-categoria-regreso").forEach(select => {
+    const fila = select.closest("tr");
+    const cajaSerial = fila.querySelector(".input-serial-reposicion-caja");
+    const actualizarVisibilidad = () => { cajaSerial.hidden = select.value !== CATEGORIA_REPOSICION; };
+    const componenteEnEdicion = enviosData.find(c => c.id === editandoId);
+    if (componenteEnEdicion && (componenteEnEdicion.ammi_categoria_regreso === CATEGORIA_REPOSICION || componenteEnEdicion.serial_nuevo)) {
+      select.value = CATEGORIA_REPOSICION;
+    } else if (componenteEnEdicion && componenteEnEdicion.ammi_categoria_regreso) {
+      select.value = componenteEnEdicion.ammi_categoria_regreso;
+    }
+    actualizarVisibilidad();
+    select.addEventListener("change", actualizarVisibilidad);
+  });
+
   tbody.querySelectorAll(".btn-guardar-regreso").forEach(btn => {
     btn.addEventListener("click", async () => {
       const fila = btn.closest("tr");
       const fecha = fila.querySelector(".input-fecha-regreso").value;
       const categoria = fila.querySelector(".input-categoria-regreso").value;
       const notas = fila.querySelector(".input-notas-regreso").value.trim();
+      const esReposicion = categoria === CATEGORIA_REPOSICION;
+      const serialReposicion = fila.querySelector(".input-serial-reposicion").value.trim().toUpperCase();
 
       if (!fecha || !categoria) {
         alert("Elige la fecha de regreso y la categoría.");
+        return;
+      }
+      if (esReposicion && !serialReposicion) {
+        alert("Escribe el serial del componente nuevo que llegó de reposición (si todavía no lo sabes, puedes dejarlo pendiente y volver a editar este regreso después).");
         return;
       }
 
       await supabaseClient.from("componentes_retirados").update({
         ammi_fecha_regreso: fecha,
         ammi_categoria_regreso: categoria,
-        ammi_notas_regreso: notas || null
+        ammi_notas_regreso: notas || null,
+        serial_nuevo: esReposicion ? (serialReposicion || null) : null
       }).eq("id", btn.dataset.id);
 
       editandoId = null;
