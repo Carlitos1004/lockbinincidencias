@@ -162,7 +162,7 @@ function renderTabla() {
   const orden = document.getElementById("orden-registro-comp").value;
 
   let filtrados = gruposComponentes.filter(g =>
-    (!fSerial || g.serial.toLowerCase().includes(fSerial)) &&
+    (!fSerial || g.serial.toLowerCase().includes(fSerial) || (g.mcActual || "").toLowerCase().includes(fSerial)) &&
     (!fTipo || g.tipo === fTipo) &&
     (!fCliente || g.clienteActual === fCliente)
   );
