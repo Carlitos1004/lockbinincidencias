@@ -66,6 +66,13 @@
           <option value="2da categoría">2da categoría</option>
         </select>
       </div>
+      <div id="manual-carcasa-caja" style="margin-top:10px;">
+        <label class="opcion-check" style="display:block;">
+          <input type="checkbox" id="manual-cambio-carcasa">
+          🔧 Reparación con cambio de carcasa — el MC volvió con serial nuevo pero el mismo IMEI (requiere fecha de regreso)
+        </label>
+        <input type="text" id="manual-mc-nuevo" placeholder="Serial NUEVO del MC (carcasa nueva)" hidden style="margin-top:6px;">
+      </div>
       <textarea id="manual-notas" rows="2" placeholder="Notas (opcional)" style="margin-top:8px; width:100%;"></textarea>
       <div style="margin-top:12px;">
         <button id="btn-guardar-manual-ammi" class="btn-primario btn-compacto" type="button">Guardar registro</button>

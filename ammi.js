@@ -161,7 +161,7 @@ function renderTabla() {
             <div class="input-serial-reposicion-caja materiales-controles" ${c.ammi_es_reposicion ? "" : "hidden"} style="margin-top:6px;">
               <input type="text" class="input-serial-reposicion" placeholder="Serial del componente nuevo que llegó de reposición" value="${c.ammi_es_reposicion ? (c.ammi_serial_reposicion || "") : ""}">
             </div>
-            ${c.tipo_componente === "Módulo de Control" ? `
+            ${(c.tipo_componente === "Módulo de Control" || !c.tipo_componente) ? `
             <label class="opcion-check" style="margin-top:8px; display:block;">
               <input type="checkbox" class="input-cambio-carcasa" ${c.ammi_cambio_carcasa ? "checked" : ""}>
               🔧 Reparación con cambio de carcasa — el MC volvió con serial nuevo pero el mismo IMEI
@@ -379,8 +379,19 @@ function limpiarFormularioManual() {
     document.getElementById(id).value = "";
   });
   document.getElementById("manual-tipo-componente").value = "Módulo de Control";
+  document.getElementById("manual-cambio-carcasa").checked = false;
+  document.getElementById("manual-mc-nuevo").value = "";
+  actualizarCajaCarcasaManual();
   document.getElementById("mensaje-manual-ammi").textContent = "";
 }
+
+function actualizarCajaCarcasaManual() {
+  const esMc = document.getElementById("manual-tipo-componente").value === "Módulo de Control";
+  document.getElementById("manual-carcasa-caja").hidden = !esMc;
+  document.getElementById("manual-mc-nuevo").hidden = !(esMc && document.getElementById("manual-cambio-carcasa").checked);
+}
+document.getElementById("manual-tipo-componente").addEventListener("change", actualizarCajaCarcasaManual);
+document.getElementById("manual-cambio-carcasa").addEventListener("change", actualizarCajaCarcasaManual);
 
 document.getElementById("btn-guardar-manual-ammi").addEventListener("click", async () => {
   const mensaje = document.getElementById("mensaje-manual-ammi");
@@ -395,6 +406,19 @@ document.getElementById("btn-guardar-manual-ammi").addEventListener("click", asy
   const fechaRegreso = document.getElementById("manual-fecha-regreso").value;
   const categoriaRegreso = document.getElementById("manual-categoria-regreso").value;
   const notas = document.getElementById("manual-notas").value.trim();
+  const esCarcasa = tipoComponente === "Módulo de Control" && document.getElementById("manual-cambio-carcasa").checked;
+  const mcNuevo = document.getElementById("manual-mc-nuevo").value.trim().toUpperCase();
+
+  if (esCarcasa && (!mcNuevo || !fechaRegreso)) {
+    mensaje.textContent = "❌ Para un cambio de carcasa indica el serial nuevo del MC y la fecha de regreso.";
+    mensaje.style.color = "var(--rojo-600, #c0392b)";
+    return;
+  }
+  if (esCarcasa && mcNuevo === mc) {
+    mensaje.textContent = "❌ El serial nuevo es igual al anterior.";
+    mensaje.style.color = "var(--rojo-600, #c0392b)";
+    return;
+  }
 
   if (!mc) {
     mensaje.textContent = "❌ Falta el Módulo de Control (MC).";
@@ -427,7 +451,9 @@ document.getElementById("btn-guardar-manual-ammi").addEventListener("click", asy
     garantia_cliente: garantia || null,
     ammi_fecha_regreso: fechaRegreso || null,
     ammi_categoria_regreso: categoriaRegreso || null,
-    ammi_notas_regreso: notas || null
+    ammi_notas_regreso: notas || null,
+    ammi_cambio_carcasa: esCarcasa,
+    ammi_mc_nuevo: esCarcasa ? mcNuevo : null
   };
 
   const { error } = await supabaseClient.from("componentes_retirados").insert(nuevoRegistro);
@@ -436,6 +462,11 @@ document.getElementById("btn-guardar-manual-ammi").addEventListener("click", asy
     mensaje.textContent = "❌ " + error.message;
     mensaje.style.color = "var(--rojo-600, #c0392b)";
     return;
+  }
+
+  if (esCarcasa) {
+    const aviso = await registrarCambioCarcasaEnVidaDelEquipo({ m_control: mc, id_ot: null }, mcNuevo, fechaRegreso, notas);
+    if (aviso) alert(aviso);
   }
 
   limpiarFormularioManual();
