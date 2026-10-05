@@ -96,6 +96,7 @@ function renderResumen() {
   const primera = enviosData.filter(c => c.ammi_categoria_regreso === CATEGORIA_1RA).length;
   const segunda = enviosData.filter(c => c.ammi_categoria_regreso === "2da categoría").length;
   const reposiciones = enviosData.filter(c => !!c.ammi_es_reposicion).length;
+  const carcasas = enviosData.filter(c => !!c.ammi_cambio_carcasa).length;
   const repetidos = new Set(enviosData.filter(c => c.vecesEnviado > 1).map(claveDe)).size;
 
   document.getElementById("resumen-ammi").innerHTML = `
@@ -105,6 +106,7 @@ function renderResumen() {
     <div class="tarjeta-resumen"><strong>${primera}</strong><span>1ra categoría</span></div>
     <div class="tarjeta-resumen"><strong>${segunda}</strong><span>2da categoría</span></div>
     <div class="tarjeta-resumen"><strong>${reposiciones}</strong><span>Reposiciones (no repararon, enviaron nuevo)</span></div>
+    <div class="tarjeta-resumen"><strong>${carcasas}</strong><span>MC reparados con cambio de carcasa</span></div>
     <div class="tarjeta-resumen"><strong>${repetidos}</strong><span>Equipos enviados más de una vez</span></div>
   `;
 }
@@ -117,11 +119,11 @@ function renderTabla() {
   const fReposicion = document.getElementById("filtro-reposicion-ammi").value;
 
   const filtrados = enviosData.filter(c =>
-    (!fMc || (c.m_control || "").toLowerCase().includes(fMc) || (c.cliente || "").toLowerCase().includes(fMc) || (c.serial_retirado || "").toLowerCase().includes(fMc)) &&
+    (!fMc || (c.m_control || "").toLowerCase().includes(fMc) || (c.cliente || "").toLowerCase().includes(fMc) || (c.serial_retirado || "").toLowerCase().includes(fMc) || (c.ammi_mc_nuevo || "").toLowerCase().includes(fMc)) &&
     (!fEstado || (fEstado === "regresado") === !!c.ammi_fecha_regreso) &&
     (!fCategoria || c.ammi_categoria_regreso === fCategoria) &&
     (!fRepetidos || c.vecesEnviado > 1) &&
-    (!fReposicion || !!c.ammi_es_reposicion)
+    (!fReposicion || (fReposicion === "carcasa" ? !!c.ammi_cambio_carcasa : !!c.ammi_es_reposicion))
   );
 
   const tbody = document.getElementById("tbody-ammi");
@@ -159,6 +161,14 @@ function renderTabla() {
             <div class="input-serial-reposicion-caja materiales-controles" ${c.ammi_es_reposicion ? "" : "hidden"} style="margin-top:6px;">
               <input type="text" class="input-serial-reposicion" placeholder="Serial del componente nuevo que llegó de reposición" value="${c.ammi_es_reposicion ? (c.ammi_serial_reposicion || "") : ""}">
             </div>
+            ${c.tipo_componente === "Módulo de Control" ? `
+            <label class="opcion-check" style="margin-top:8px; display:block;">
+              <input type="checkbox" class="input-cambio-carcasa" ${c.ammi_cambio_carcasa ? "checked" : ""}>
+              🔧 Reparación con cambio de carcasa — el MC volvió con serial nuevo pero el mismo IMEI
+            </label>
+            <div class="input-mc-nuevo-caja materiales-controles" ${c.ammi_cambio_carcasa ? "" : "hidden"} style="margin-top:6px;">
+              <input type="text" class="input-mc-nuevo" placeholder="Serial NUEVO del MC (carcasa nueva)" value="${c.ammi_cambio_carcasa ? (c.ammi_mc_nuevo || "") : ""}">
+            </div>` : ""}
             <textarea class="input-notas-regreso" rows="2" placeholder="Notas de AMMI (opcional)">${c.ammi_notas_regreso || ""}</textarea>
             <button class="btn-guardar-regreso btn-primario btn-compacto" data-id="${c.id}" style="margin-top:6px;">Guardar regreso</button>
             <button class="btn-cancelar-regreso btn-secundario btn-compacto" data-id="${c.id}">Cancelar</button>
@@ -179,7 +189,7 @@ function renderTabla() {
       <td>${c.id_ot ? `<a href="ot-detalle.html?ot=${encodeURIComponent(c.id_ot)}" target="_blank" rel="noopener">${c.id_ot}</a>` : "—"}</td>
       <td>${c.ammi_fecha_regreso ? "✅ Regresado" : "🕓 Pendiente"}</td>
       <td>${c.ammi_fecha_regreso
-        ? `${new Date(c.ammi_fecha_regreso).toLocaleDateString("es-ES")}${c.ammi_categoria_regreso ? " — " + c.ammi_categoria_regreso : ""}${c.ammi_es_reposicion ? `<br><span style="font-size:0.85rem;">🔁 Reposición${c.ammi_serial_reposicion ? " — nuevo serial: <strong>" + c.ammi_serial_reposicion + "</strong>" : ""}</span>` : ""}${c.ammi_notas_regreso ? `<br><span style="font-size:0.85rem; color:var(--gris-500);">${c.ammi_notas_regreso}</span>` : ""}`
+        ? `${new Date(c.ammi_fecha_regreso).toLocaleDateString("es-ES")}${c.ammi_categoria_regreso ? " — " + c.ammi_categoria_regreso : ""}${c.ammi_es_reposicion ? `<br><span style="font-size:0.85rem;">🔁 Reposición${c.ammi_serial_reposicion ? " — nuevo serial: <strong>" + c.ammi_serial_reposicion + "</strong>" : ""}</span>` : ""}${c.ammi_cambio_carcasa ? `<br><span style="font-size:0.85rem;">🔧 Cambio de carcasa${c.ammi_mc_nuevo ? " — nuevo MC: <strong>" + c.ammi_mc_nuevo + "</strong> (mismo IMEI)" : ""}</span>` : ""}${c.ammi_notas_regreso ? `<br><span style="font-size:0.85rem; color:var(--gris-500);">${c.ammi_notas_regreso}</span>` : ""}`
         : "—"
       }</td>
       <td>
@@ -217,6 +227,19 @@ function renderTabla() {
     checkbox.addEventListener("change", aplicar);
   });
 
+  tbody.querySelectorAll(".input-cambio-carcasa").forEach(checkbox => {
+    const fila = checkbox.closest("tr");
+    const cajaMc = fila.querySelector(".input-mc-nuevo-caja");
+    const checkRepo = fila.querySelector(".input-es-reposicion");
+    checkbox.addEventListener("change", () => {
+      cajaMc.hidden = !checkbox.checked;
+      if (checkbox.checked && checkRepo.checked) { checkRepo.checked = false; checkRepo.dispatchEvent(new Event("change")); }
+    });
+    checkRepo.addEventListener("change", () => {
+      if (checkRepo.checked && checkbox.checked) { checkbox.checked = false; cajaMc.hidden = true; }
+    });
+  });
+
   tbody.querySelectorAll(".btn-guardar-regreso").forEach(btn => {
     btn.addEventListener("click", async () => {
       const fila = btn.closest("tr");
@@ -225,6 +248,8 @@ function renderTabla() {
       const categoria = esReposicion ? CATEGORIA_1RA : fila.querySelector(".input-categoria-regreso").value;
       const notas = fila.querySelector(".input-notas-regreso").value.trim();
       const serialReposicion = fila.querySelector(".input-serial-reposicion").value.trim().toUpperCase();
+      const esCarcasa = !!fila.querySelector(".input-cambio-carcasa")?.checked;
+      const mcNuevo = (fila.querySelector(".input-mc-nuevo")?.value || "").trim().toUpperCase();
 
       if (!fecha || !categoria) {
         alert("Elige la fecha de regreso y la categoría.");
@@ -235,6 +260,16 @@ function renderTabla() {
         return;
       }
 
+      if (esCarcasa && !mcNuevo) {
+        alert("Escribe el serial NUEVO del MC (el de la carcasa nueva).");
+        return;
+      }
+      const componente = enviosData.find(c => c.id === btn.dataset.id);
+      if (esCarcasa && mcNuevo === componente.m_control) {
+        alert("El serial nuevo es igual al anterior. Si no cambió el serial, no marques cambio de carcasa.");
+        return;
+      }
+
       // "serial_nuevo" NUNCA se toca desde aquí — es de Ruta, no de AMMI.
       // El serial de reposición de AMMI va solo en "ammi_serial_reposicion".
       const datosActualizacion = {
@@ -242,15 +277,65 @@ function renderTabla() {
         ammi_categoria_regreso: categoria,
         ammi_notas_regreso: notas || null,
         ammi_es_reposicion: esReposicion,
-        ammi_serial_reposicion: esReposicion ? (serialReposicion || null) : null
+        ammi_serial_reposicion: esReposicion ? (serialReposicion || null) : null,
+        ammi_cambio_carcasa: esCarcasa,
+        ammi_mc_nuevo: esCarcasa ? mcNuevo : null
       };
 
-      await supabaseClient.from("componentes_retirados").update(datosActualizacion).eq("id", btn.dataset.id);
+      const { error: errGuardar } = await supabaseClient.from("componentes_retirados").update(datosActualizacion).eq("id", btn.dataset.id);
+      if (errGuardar) {
+        alert("No se pudo guardar el regreso: " + errGuardar.message);
+        return;
+      }
+
+      if (esCarcasa) {
+        const aviso = await registrarCambioCarcasaEnVidaDelEquipo(componente, mcNuevo, fecha, notas);
+        if (aviso) alert(aviso);
+      }
 
       editandoId = null;
       cargarEnvios();
     });
   });
+}
+
+// Cambio de carcasa: el MC físico (misma placa/IMEI) vuelve de AMMI con un
+// serial distinto. Se anota en Vida del Equipo como "Regresó de AMMI" con
+// mc = serial nuevo y mc_anterior = serial viejo. Devuelve un mensaje de
+// aviso (string) si algo no se pudo registrar, o null si todo salió bien.
+async function registrarCambioCarcasaEnVidaDelEquipo(componente, mcNuevo, fecha, notas) {
+  const mcViejo = componente.m_control;
+
+  let imei = null;
+  const { data: eq } = await supabaseClient.from("equipos").select("imei").eq("m_control", mcViejo).maybeSingle();
+  imei = eq?.imei || null;
+  if (!imei) {
+    const { data: ev } = await supabaseClient.from("historial_equipo").select("imei")
+      .eq("mc", mcViejo).not("imei", "is", null).order("fecha", { ascending: false }).limit(1).maybeSingle();
+    imei = ev?.imei || null;
+  }
+  if (!imei) {
+    return `El regreso se guardó, pero no encontré el IMEI del MC ${mcViejo}, así que NO se registró en Vida del Equipo. Revisa que ese MC tenga IMEI en Equipos.`;
+  }
+
+  const { data: existente } = await supabaseClient.from("historial_equipo").select("id")
+    .eq("mc", mcNuevo).eq("mc_anterior", mcViejo).eq("tipo_evento", "Regresó de AMMI").maybeSingle();
+
+  const datos = {
+    imei, mc: mcNuevo, tipo_evento: "Regresó de AMMI", mc_anterior: mcViejo,
+    id_ot: componente.id_ot || null,
+    fecha: new Date(fecha + "T12:00:00").toISOString(),
+    notas: `Reparado por AMMI con cambio de carcasa: serial ${mcViejo} → ${mcNuevo} (mismo IMEI)${notas ? ". " + notas : ""}`
+  };
+
+  const { error } = existente
+    ? await supabaseClient.from("historial_equipo").update(datos).eq("id", existente.id)
+    : await supabaseClient.from("historial_equipo").insert(datos);
+  if (error) return "El regreso se guardó, pero falló el registro en Vida del Equipo: " + error.message;
+
+  const { error: errRec } = await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imei });
+  if (errRec) return "Se registró en Vida del Equipo, pero falló recalcular el Registro Maestro: " + errRec.message;
+  return null;
 }
 
 ["filtro-mc-ammi", "filtro-estado-ammi", "filtro-categoria-regreso", "filtro-repetidos-ammi", "filtro-reposicion-ammi"].forEach(id => {

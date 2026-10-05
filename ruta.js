@@ -988,7 +988,13 @@ modalEnviarBtn.addEventListener("click", async () => {
           .limit(1)
           .maybeSingle();
 
-        if (envioPrevioAmmi) {
+        // Si AMMI ya registró este mismo cambio (cambio de carcasa), no duplicar.
+        const { data: yaPorAmmi } = envioPrevioAmmi ? await supabaseClient
+          .from("historial_equipo").select("id")
+          .eq("mc", mcNuevo).eq("mc_anterior", envioPrevioAmmi.mc).eq("tipo_evento", "Regresó de AMMI")
+          .limit(1).maybeSingle() : { data: null };
+
+        if (envioPrevioAmmi && !yaPorAmmi) {
           await supabaseClient.from("historial_equipo").insert({
             imei: imeiNuevo, mc: mcNuevo, tipo_evento: "Regresó de AMMI",
             mc_anterior: envioPrevioAmmi.mc, id_ot: idOtActiva,
