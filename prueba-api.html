@@ -44,6 +44,29 @@
     <p id="estado-comparacion" style="margin-top:8px; font-size:0.9rem; color:var(--gris-500);"></p>
   </div>
 
+  <div class="caja-formulario" style="margin-top:16px;">
+    <p style="font-weight:600;">3. Pruebas de escritura (solo preproducción)</p>
+    <p style="font-size:0.9rem; color:var(--gris-500);">Esto SÍ cambia datos en la API de pruebas. Cada envío queda registrado en nuestro historial. Para <strong>recycle</strong> usa solo equipos de prueba sin vincular (por ejemplo los MCP1231xx): crea un dispositivo nuevo y deshabilita el anterior.</p>
+    <div class="materiales-controles">
+      <input type="text" id="escritura-filtro" value="MC*" placeholder="Filtro por MC (admite *)">
+      <button id="btn-cargar-dispositivos" class="btn-secundario btn-compacto" type="button">Cargar dispositivos</button>
+    </div>
+    <div class="materiales-controles" style="margin-top:8px;">
+      <select id="escritura-dispositivo"><option value="">Primero carga los dispositivos</option></select>
+      <select id="escritura-accion">
+        <option value="battery">Cambiar batería (battery)</option>
+        <option value="lock">Cambiar cierre (lock)</option>
+        <option value="reader">Cambiar lector (reader)</option>
+        <option value="recycle">Reciclar con placa nueva (recycle)</option>
+      </select>
+      <input type="text" id="escritura-valor" placeholder="Serial nuevo">
+      <button id="btn-escribir" class="btn-primario btn-compacto" type="button">Enviar cambio</button>
+    </div>
+    <pre id="salida-escritura" style="margin-top:10px; white-space:pre-wrap;"></pre>
+    <p style="font-weight:600; margin-top:14px;">Últimas operaciones registradas</p>
+    <div id="log-operaciones"></div>
+  </div>
+
   <div id="resumen-api" class="resumen-cliente" style="margin-top:16px;"></div>
   <div id="resultado-api"></div>
 </div>

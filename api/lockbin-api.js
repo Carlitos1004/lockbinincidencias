@@ -1,18 +1,26 @@
 // =========================================================================
-// Puente (proxy) hacia la API de Operaciones de LockBin — SOLO LECTURA
+// Puente (proxy) hacia la API de Operaciones de LockBin
 // =========================================================================
 // La web NO puede llamar directamente a la API (CORS), y además las
 // credenciales de la API no deben estar nunca en el navegador. Esta función
 // corre en el servidor de Vercel: guarda la sesión de la API, la renueva sola
-// y solo deja pasar una lista cerrada de consultas de lectura.
+// y solo deja pasar una lista cerrada de operaciones.
+//
+//   GET  ?accion=whoami | equipos      → lectura
+//   POST {accion: battery|lock|reader|recycle, deviceId, valor} → escritura
 //
 // Variables de entorno (Vercel → Settings → Environment Variables):
-//   LOCKBIN_API_USER   usuario de la API (obligatoria)
-//   LOCKBIN_API_PASS   contraseña de la API (obligatoria)
-//   LOCKBIN_API_BASE   opcional, por defecto https://api.lockbin.dev
+//   LOCKBIN_API_USER          usuario de la API (obligatoria)
+//   LOCKBIN_API_PASS          contraseña de la API (obligatoria)
+//   LOCKBIN_API_BASE          opcional, por defecto https://api.lockbin.dev
+//   LOCKBIN_API_ALLOW_WRITES  opcional: "1" permite escribir en un host que NO
+//                             sea el de preproducción (api.lockbin.dev).
+//                             Mientras no se ponga, las escrituras solo
+//                             funcionan contra preproducción.
 //
 // Quién puede llamarla: solo usuarios de LockBin con rol "manager"
-// (se comprueba el token de Supabase en cada petición).
+// (se comprueba el token de Supabase en cada petición). Cada escritura
+// queda registrada en la tabla api_operaciones_log.
 // =========================================================================
 
 const API_BASE = (process.env.LOCKBIN_API_BASE || "https://api.lockbin.dev").replace(/\/$/, "");
@@ -20,6 +28,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || "https://haoveumvgejetfqpmwtj.s
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhhb3ZldW12Z2VqZXRmcXBtd3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1NjU1NjcsImV4cCI6MjEwMzE0MTU2N30.P0amDoIYqPZ60VCvGvr1ISUccNgXUzrD2BaJTSD-FIA";
 const ROLES_PERMITIDOS = ["manager"];
 const TIMEOUT_MS = 9000;
+const HOST_PREPRODUCCION = "api.lockbin.dev";
 
 // Cookies de la sesión de la API. Se conservan mientras la instancia del
 // servidor siga "caliente"; si se pierden, simplemente se vuelve a iniciar sesión.
@@ -81,10 +90,18 @@ async function renovarSesionApi() {
   return true;
 }
 
-// GET a la API con sesión; si responde 401 renueva (o vuelve a entrar) y reintenta UNA vez.
-async function getApi(ruta) {
+// Llamada a la API con sesión. Si responde 401 (la petición NO se procesó)
+// renueva o vuelve a entrar y reintenta UNA vez. Con cualquier otro estado
+// no se reintenta nunca, para no duplicar una escritura.
+async function llamarApi(ruta, { method = "GET", body = null } = {}) {
   const pedir = () => fetchConTiempo(API_BASE + ruta, {
-    headers: { Cookie: cabeceraCookie(), Accept: "application/json" }
+    method,
+    headers: {
+      Cookie: cabeceraCookie(),
+      Accept: "application/json",
+      ...(body ? { "Content-Type": "application/json" } : {})
+    },
+    body: body ? JSON.stringify(body) : undefined
   });
   if (!jar.lockbin) {
     if (jar["lockbin-rt"] && await renovarSesionApi()) { /* sesión renovada */ }
@@ -115,7 +132,7 @@ async function verificarUsuario(req) {
   const perfiles = rp.ok ? await rp.json() : [];
   const rol = perfiles[0]?.rol;
   if (!ROLES_PERMITIDOS.includes(rol)) throw fallo(403, "Tu rol no tiene acceso a esta función.");
-  return { id: usuario.id, rol };
+  return { id: usuario.id, email: usuario.email || null, rol, token };
 }
 
 function construirRutaEquipos(q) {
@@ -148,22 +165,93 @@ function construirRutaEquipos(q) {
   return "/api/operations/v1/equipment/?" + partes.join("&");
 }
 
+// ---------- Escrituras ----------
+const ESCRITURAS = {
+  battery: { metodo: "PATCH", sufijo: "battery", campo: "serial" },
+  lock:    { metodo: "PATCH", sufijo: "lock",    campo: "serial" },
+  reader:  { metodo: "PATCH", sufijo: "reader",  campo: "serial" },
+  recycle: { metodo: "POST",  sufijo: "recycle", campo: "newSerialBoard" }
+};
+
+function escrituraPermitida() {
+  let host = "";
+  try { host = new URL(API_BASE).host; } catch (e) { /* host vacío */ }
+  return host === HOST_PREPRODUCCION || process.env.LOCKBIN_API_ALLOW_WRITES === "1";
+}
+
+async function registrarOperacion(usuario, fila) {
+  try {
+    const r = await fetchConTiempo(`${SUPABASE_URL}/rest/v1/api_operaciones_log`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${usuario.token}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify({ usuario_id: usuario.id, usuario_email: usuario.email, ...fila })
+    });
+    return r.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function manejarEscritura(req, usuario) {
+  if (!escrituraPermitida()) {
+    throw fallo(403, "Las escrituras están desactivadas: la API configurada no es la de preproducción.");
+  }
+  let cuerpo = req.body;
+  if (typeof cuerpo === "string") { try { cuerpo = JSON.parse(cuerpo); } catch (e) { cuerpo = null; } }
+  if (!cuerpo || typeof cuerpo !== "object") throw fallo(400, "Cuerpo de la petición no válido.");
+
+  const def = ESCRITURAS[cuerpo.accion];
+  if (!def) throw fallo(400, "Acción de escritura no permitida.");
+  const deviceId = String(cuerpo.deviceId ?? "");
+  if (!/^\d{1,10}$/.test(deviceId)) throw fallo(400, "deviceId no válido.");
+  const valor = String(cuerpo.valor ?? "").trim();
+  if (!/^[A-Za-z0-9_.\-]{1,40}$/.test(valor)) throw fallo(400, "El serial indicado no es válido.");
+
+  const datosApi = { [def.campo]: valor };
+  const r = await llamarApi(`/api/operations/v1/device/${deviceId}/${def.sufijo}`, { method: def.metodo, body: datosApi });
+
+  const texto = await r.text();
+  let respuesta = null;
+  try { respuesta = texto ? JSON.parse(texto) : null; } catch (e) { respuesta = { texto: texto.slice(0, 300) }; }
+
+  const registrado = await registrarOperacion(usuario, {
+    accion: cuerpo.accion,
+    device_id: Number(deviceId),
+    datos: datosApi,
+    estado_api: r.status,
+    respuesta
+  });
+
+  return { estadoApi: r.status, respuesta, registrado };
+}
+
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  if (req.method !== "GET") return res.status(405).json({ error: "Método no permitido." });
+  if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ error: "Método no permitido." });
 
   try {
-    await verificarUsuario(req);
+    const usuario = await verificarUsuario(req);
+
+    if (req.method === "POST") {
+      return res.status(200).json(await manejarEscritura(req, usuario));
+    }
+
     const accion = Array.isArray(req.query.accion) ? req.query.accion[0] : req.query.accion;
 
     if (accion === "whoami") {
-      const r = await getApi("/api/auth/whoami");
+      const r = await llamarApi("/api/auth/whoami");
       if (!r.ok) throw fallo(502, `La API respondió HTTP ${r.status} en whoami.`);
-      return res.status(200).json(await r.json());
+      const u = await r.json();
+      return res.status(200).json({ ...u, escrituraPermitida: escrituraPermitida(), host: API_BASE.replace(/^https?:\/\//, "") });
     }
 
     if (accion === "equipos") {
-      const r = await getApi(construirRutaEquipos(req.query));
+      const r = await llamarApi(construirRutaEquipos(req.query));
       if (r.status === 204) return res.status(200).json({ total: 0, totalPaginas: 0, items: [] });
       if (r.status === 403) throw fallo(502, "La cuenta de la API no tiene ROLE_OPERATIONS (HTTP 403).");
       if (!r.ok) throw fallo(502, `La API respondió HTTP ${r.status}.`);

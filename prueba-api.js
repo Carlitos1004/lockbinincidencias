@@ -46,6 +46,19 @@ async function traerTodasLasFilas(tabla, columnas) {
   return todas;
 }
 
+async function enviarEscritura(cuerpo) {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) throw new Error("Sesión de LockBin vencida. Vuelve a entrar.");
+  const r = await fetch(RUTA_PUENTE, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(cuerpo)
+  });
+  const resp = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(resp.error || `Error HTTP ${r.status}`);
+  return resp;
+}
+
 // ---------- 1. Probar conexión ----------
 document.getElementById("btn-conexion").addEventListener("click", async () => {
   const salida = document.getElementById("salida-conexion");
@@ -54,7 +67,8 @@ document.getElementById("btn-conexion").addEventListener("click", async () => {
     const u = await llamarPuente({ accion: "whoami" });
     salida.textContent =
       `✅ Conexión correcta\nUsuario de la API: ${u.username}\nRoles: ${(u.roles || []).join(", ")}\n` +
-      `idCustomer: ${u.idCustomer ?? "null (ve todos los clientes)"}`;
+      `idCustomer: ${u.idCustomer ?? "null (ve todos los clientes)"}\n` +
+      `Servidor: ${u.host} — escrituras ${u.escrituraPermitida ? "permitidas (preproducción)" : "BLOQUEADAS"}`;
   } catch (e) {
     salida.textContent = "❌ " + e.message;
   }
@@ -185,3 +199,105 @@ document.getElementById("btn-csv").addEventListener("click", () => {
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 });
+
+
+// =========================================================================
+// 3. Pruebas de escritura (solo preproducción)
+// =========================================================================
+let dispositivosCargados = [];
+
+document.getElementById("btn-cargar-dispositivos").addEventListener("click", async () => {
+  const sel = document.getElementById("escritura-dispositivo");
+  const salida = document.getElementById("salida-escritura");
+  salida.textContent = "Cargando dispositivos...";
+  try {
+    const filtro = document.getElementById("escritura-filtro").value.trim();
+    const params = { accion: "equipos", pageNo: 0, pageSize: 120, sort: "id,asc" };
+    if (filtro) params.serialBoard = filtro;
+    const r = await llamarPuente(params);
+    dispositivosCargados = (r.items || []).filter(i => i.deviceId != null);
+    sel.innerHTML = dispositivosCargados.length === 0
+      ? '<option value="">Sin dispositivos con este filtro</option>'
+      : dispositivosCargados.map((i, n) =>
+          `<option value="${n}">${esc(i.serialBoard || "(sin MC)")} · dev ${i.deviceId} · ${esc(i.customerName)} · ${esc(i.installationStateTypeLabel)} · BA ${esc(i.serialBattery || "-")} CE ${esc(i.serialLock || "-")} LE ${esc(i.serialReader || "-")}</option>`
+        ).join("");
+    salida.textContent = `${dispositivosCargados.length} dispositivos cargados (de ${r.total} equipos).`;
+  } catch (e) {
+    salida.textContent = "❌ " + e.message;
+  }
+});
+
+function resumenDispositivo(i) {
+  return i ? `MC ${i.serialBoard} | dev ${i.deviceId} | BA ${i.serialBattery || "-"} (${i.batteryModelCode || "-"}) | CE ${i.serialLock || "-"} (${i.lockModelCode || "-"}) | LE ${i.serialReader || "-"} (${i.readerModelCode || "-"}) | ${i.installationStateTypeLabel}` : "(no encontrado)";
+}
+
+async function leerPorMc(mc) {
+  const r = await llamarPuente({ accion: "equipos", serialBoard: mc, pageSize: 5 });
+  return (r.items || []).find(i => norm(i.serialBoard) === norm(mc)) || null;
+}
+
+function interpretarEstado(estado, resp, accion) {
+  if (estado === 200 || estado === 201) return "✅ La API aceptó el cambio";
+  if (estado === 400 && resp?.code === "007") return `⚠️ 400 / código 007: el serial no está en el registro de preinstalación (${resp.description})`;
+  if (estado === 400) return "⚠️ 400: petición mal formada " + JSON.stringify(resp);
+  if (estado === 401) return "⚠️ 401: sin sesión en la API";
+  if (estado === 403) return "⚠️ 403: la cuenta de la API no tiene ROLE_MANAGER_OPERATIONS";
+  if (estado === 404) return "⚠️ 404: no existe ese dispositivo";
+  if (estado === 409 && resp?.code === "009") return "⚠️ 409 / código 009: el dispositivo sigue vinculado a un equipo (hay que desvincularlo antes de reciclar)";
+  if (estado === 409 && resp?.code === "010") return "⚠️ 409 / código 010: ese serial de placa ya existe en otro dispositivo habilitado";
+  if (estado === 415) return "⚠️ 415: tipo de contenido no válido";
+  return `⚠️ La API respondió HTTP ${estado}`;
+}
+
+document.getElementById("btn-escribir").addEventListener("click", async () => {
+  const salida = document.getElementById("salida-escritura");
+  const indice = document.getElementById("escritura-dispositivo").value;
+  const accion = document.getElementById("escritura-accion").value;
+  const valor = document.getElementById("escritura-valor").value.trim().toUpperCase();
+  const disp = dispositivosCargados[Number(indice)];
+
+  if (!disp) { salida.textContent = "Elige un dispositivo (primero pulsa \"Cargar dispositivos\")."; return; }
+  if (!valor) { salida.textContent = "Escribe el serial nuevo."; return; }
+  if (!confirm(`Se enviará a la API de PRUEBAS:\n\n${accion} → ${valor}\nDispositivo ${disp.deviceId} (MC ${disp.serialBoard})\n\n¿Continuar?`)) return;
+
+  const boton = document.getElementById("btn-escribir");
+  boton.disabled = true;
+  salida.textContent = "Enviando...";
+  try {
+    const antes = resumenDispositivo(disp);
+    const r = await enviarEscritura({ accion, deviceId: disp.deviceId, valor });
+
+    let texto = `${interpretarEstado(r.estadoApi, r.respuesta, accion)}\n`;
+    texto += `HTTP ${r.estadoApi}${r.respuesta ? " — " + JSON.stringify(r.respuesta) : ""}\n`;
+    texto += r.registrado ? "Registrado en el historial.\n" : "⚠️ No se pudo registrar en el historial (¿falta correr el SQL 69?).\n";
+
+    if (r.estadoApi === 200 || r.estadoApi === 201) {
+      const despues = accion === "recycle"
+        ? (await leerPorMc(valor)) // dispositivo nuevo
+        : (await leerPorMc(disp.serialBoard));
+      texto += `\nANTES:   ${antes}\nDESPUÉS: ${resumenDispositivo(despues)}`;
+      if (accion === "recycle") {
+        const viejo = await leerPorMc(disp.serialBoard);
+        texto += `\nMC anterior sigue en el listado: ${viejo ? "SÍ → " + resumenDispositivo(viejo) : "NO"}`;
+      }
+    }
+    salida.textContent = texto;
+    cargarLog();
+  } catch (e) {
+    salida.textContent = "❌ " + e.message;
+  } finally {
+    boton.disabled = false;
+  }
+});
+
+async function cargarLog() {
+  const caja = document.getElementById("log-operaciones");
+  const { data, error } = await supabaseClient.from("api_operaciones_log")
+    .select("fecha, usuario_email, accion, device_id, datos, estado_api")
+    .order("fecha", { ascending: false }).limit(10);
+  if (error) { caja.textContent = "Aún no hay historial (¿falta correr el SQL 69?): " + error.message; return; }
+  caja.innerHTML = !data.length ? "<p>Ninguna todavía.</p>" : `
+    <table class="tabla-revision"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Dispositivo</th><th>Enviado</th><th>HTTP</th></tr></thead>
+    <tbody>${data.map(l => `<tr><td>${esc(new Date(l.fecha).toLocaleString("es-ES"))}</td><td>${esc(l.usuario_email)}</td><td>${esc(l.accion)}</td><td>${esc(l.device_id)}</td><td>${esc(JSON.stringify(l.datos))}</td><td>${esc(l.estado_api)}</td></tr>`).join("")}</tbody></table>`;
+}
+cargarLog();
