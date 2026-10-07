@@ -123,6 +123,14 @@ document.getElementById("btn-comparar").addEventListener("click", async () => {
     const mcRepetidos = Object.keys(cuentaMc).filter(k => cuentaMc[k] > 1);
     const imeiRepetidos = Object.keys(cuentaImei).filter(k => cuentaImei[k] > 1);
 
+    // Seriales de componente repetidos entre dispositivos distintos (la API no lo impide)
+    const compRepetidos = [];
+    [["Batería", "serialBattery"], ["Cierre", "serialLock"], ["Lector", "serialReader"]].forEach(([etq, campo]) => {
+      const mapa = {};
+      items.forEach(i => { const v = norm(i[campo]); if (v) (mapa[v] = mapa[v] || []).push(i.serialBoard || ("dev " + i.deviceId)); });
+      Object.entries(mapa).filter(([, l]) => l.length > 1).forEach(([v, l]) => compRepetidos.push([etq, v, l.join(", ")]));
+    });
+
     const CAMPOS = [
       ["IMEI", "imei", "imei", norm],
       ["Cliente", "cliente", "customerName", normSinAcentos],
@@ -162,6 +170,7 @@ document.getElementById("btn-comparar").addEventListener("click", async () => {
       <div class="tarjeta-resumen"><strong>${coincidenTodo}</strong><span>Coinciden en todos los campos</span></div>
       <div class="tarjeta-resumen ${soloApi.length ? "tarjeta-alerta" : ""}"><strong>${soloApi.length}</strong><span>Solo en la API</span></div>
       <div class="tarjeta-resumen"><strong>${soloNuestros}</strong><span>Solo en nuestra tabla (con este filtro es normal)</span></div>
+      <div class="tarjeta-resumen ${compRepetidos.length ? "tarjeta-alerta" : ""}"><strong>${compRepetidos.length}</strong><span>Seriales de componente repetidos en la API</span></div>
       <div class="tarjeta-resumen ${mcRepetidos.length + imeiRepetidos.length ? "tarjeta-alerta" : ""}"><strong>${mcRepetidos.length} / ${imeiRepetidos.length}</strong><span>MC repetidos / IMEI repetidos en la API</span></div>
     `;
 
@@ -178,6 +187,7 @@ document.getElementById("btn-comparar").addEventListener("click", async () => {
         soloApi.map(i => [i.serialBoard, i.imei, i.customerName, i.installationStateTypeLabel])) +
       tabla("Estado de montaje: nuestro vs API (solo informativo)", ["MC", "Nuestro estado_montaje", "Estado API", "Fila nuestra actualizada"],
         estados.map(e => [e.mc, e.nuestro, e.api, e.actualizado ? new Date(e.actualizado).toLocaleDateString("es-ES") : ""])) +
+      (compRepetidos.length ? tabla("Seriales de componente en más de un dispositivo (la API no lo impide)", ["Componente", "Serial", "Dispositivos"], compRepetidos) : "") +
       (mcRepetidos.length || imeiRepetidos.length ? tabla("Repetidos dentro de la API", ["Tipo", "Valor"],
         [...mcRepetidos.map(v => ["MC", v]), ...imeiRepetidos.map(v => ["IMEI", v])]) : "");
 
@@ -240,6 +250,7 @@ function interpretarEstado(estado, resp, accion) {
   if (estado === 200 || estado === 201) return "✅ La API aceptó el cambio";
   if (estado === 400 && resp?.code === "007") return `⚠️ 400 / código 007: el serial no está en el registro de preinstalación (${resp.description})`;
   if (estado === 400) return "⚠️ 400: petición mal formada " + JSON.stringify(resp);
+  if (estado >= 500) return `⚠️ ${estado}: error interno de la API. OJO: puede haber aplicado el cambio igualmente (se comprueba abajo)`;
   if (estado === 401) return "⚠️ 401: sin sesión en la API";
   if (estado === 403) return "⚠️ 403: la cuenta de la API no tiene ROLE_MANAGER_OPERATIONS";
   if (estado === 404) return "⚠️ 404: no existe ese dispositivo";
@@ -271,11 +282,19 @@ document.getElementById("btn-escribir").addEventListener("click", async () => {
     texto += `HTTP ${r.estadoApi}${r.respuesta ? " — " + JSON.stringify(r.respuesta) : ""}\n`;
     texto += r.registrado ? "Registrado en el historial.\n" : "⚠️ No se pudo registrar en el historial (¿falta correr el SQL 69?).\n";
 
-    if (r.estadoApi === 200 || r.estadoApi === 201) {
+    if (r.estadoApi === 200 || r.estadoApi === 201 || r.estadoApi >= 500) {
       const despues = accion === "recycle"
         ? (await leerPorMc(valor)) // dispositivo nuevo
         : (await leerPorMc(disp.serialBoard));
       texto += `\nANTES:   ${antes}\nDESPUÉS: ${resumenDispositivo(despues)}`;
+      const campoComprobar = { battery: "serialBattery", lock: "serialLock", reader: "serialReader" }[accion];
+      if (campoComprobar) {
+        const aplicado = !!despues && norm(despues[campoComprobar]) === norm(valor);
+        texto += `\n➡️ El cambio ${aplicado ? "SÍ" : "NO"} quedó aplicado en la API.`;
+        if (aplicado && r.estadoApi >= 500) texto += "\n⚠️ La API respondió con error pero guardó el cambio: no reintentar a ciegas.";
+      } else if (accion === "recycle") {
+        texto += `\n➡️ Dispositivo nuevo ${despues ? "SÍ" : "NO"} aparece en el listado con la placa ${valor}.`;
+      }
       if (accion === "recycle") {
         const viejo = await leerPorMc(disp.serialBoard);
         texto += `\nMC anterior sigue en el listado: ${viejo ? "SÍ → " + resumenDispositivo(viejo) : "NO"}`;
