@@ -46,7 +46,7 @@
 
   <div class="caja-formulario" style="margin-top:16px;">
     <p style="font-weight:600;">3. Pruebas de escritura (solo preproducción)</p>
-    <p style="font-size:0.9rem; color:var(--gris-500);">Esto SÍ cambia datos en la API de pruebas. Cada envío queda registrado en nuestro historial. Para <strong>recycle</strong> usa solo equipos de prueba sin vincular (por ejemplo los MCP1231xx): crea un dispositivo nuevo y deshabilita el anterior.</p>
+    <p style="font-size:0.9rem; color:var(--gris-500);">Esto SÍ cambia datos en la API de pruebas. Cada envío queda registrado en nuestro historial. <strong>recycle</strong> NO cambia entre dos MC existentes: da de baja el dispositivo elegido (que debe estar desvinculado) y crea uno nuevo con un serial de placa que NO exista ya. Un dispositivo desvinculado no sale en la lista: escribe su deviceId a mano.</p>
     <div class="materiales-controles">
       <input type="text" id="escritura-filtro" value="MC*" placeholder="Filtro por MC (admite *)">
       <button id="btn-cargar-dispositivos" class="btn-secundario btn-compacto" type="button">Cargar dispositivos</button>
@@ -59,6 +59,7 @@
         <option value="reader">Cambiar lector (reader)</option>
         <option value="recycle">Reciclar con placa nueva (recycle)</option>
       </select>
+      <input type="number" id="escritura-device-manual" min="1" placeholder="…o deviceId a mano (ej. 1301)">
       <input type="text" id="escritura-valor" placeholder="Serial nuevo">
       <button id="btn-escribir" class="btn-primario btn-compacto" type="button">Enviar cambio</button>
     </div>

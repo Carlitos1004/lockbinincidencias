@@ -265,40 +265,48 @@ document.getElementById("btn-escribir").addEventListener("click", async () => {
   const indice = document.getElementById("escritura-dispositivo").value;
   const accion = document.getElementById("escritura-accion").value;
   const valor = document.getElementById("escritura-valor").value.trim().toUpperCase();
-  const disp = dispositivosCargados[Number(indice)];
+  const manual = document.getElementById("escritura-device-manual").value.trim();
 
-  if (!disp) { salida.textContent = "Elige un dispositivo (primero pulsa \"Cargar dispositivos\")."; return; }
+  // Un dispositivo SIN equipo (desvinculado) no sale en el listado de equipos,
+  // así que su deviceId se puede escribir a mano.
+  const esManual = manual !== "";
+  const disp = esManual ? { deviceId: Number(manual), serialBoard: null } : dispositivosCargados[Number(indice)];
+
+  if (!disp || !Number.isInteger(disp.deviceId) || disp.deviceId < 1) {
+    salida.textContent = "Elige un dispositivo de la lista (pulsa \"Cargar dispositivos\") o escribe un deviceId válido.";
+    return;
+  }
   if (!valor) { salida.textContent = "Escribe el serial nuevo."; return; }
-  if (!confirm(`Se enviará a la API de PRUEBAS:\n\n${accion} → ${valor}\nDispositivo ${disp.deviceId} (MC ${disp.serialBoard})\n\n¿Continuar?`)) return;
+  if (!confirm(`Se enviará a la API de PRUEBAS:\n\n${accion} → ${valor}\nDispositivo ${disp.deviceId}${disp.serialBoard ? " (MC " + disp.serialBoard + ")" : " (deviceId manual)"}\n\n¿Continuar?`)) return;
 
   const boton = document.getElementById("btn-escribir");
   boton.disabled = true;
   salida.textContent = "Enviando...";
   try {
-    const antes = resumenDispositivo(disp);
+    const antes = disp.serialBoard ? resumenDispositivo(disp) : `dispositivo ${disp.deviceId} (sin datos previos: se indicó a mano)`;
     const r = await enviarEscritura({ accion, deviceId: disp.deviceId, valor });
 
     let texto = `${interpretarEstado(r.estadoApi, r.respuesta, accion)}\n`;
     texto += `HTTP ${r.estadoApi}${r.respuesta ? " — " + JSON.stringify(r.respuesta) : ""}\n`;
     texto += r.registrado ? "Registrado en el historial.\n" : "⚠️ No se pudo registrar en el historial (¿falta correr el SQL 69?).\n";
 
-    if (r.estadoApi === 200 || r.estadoApi === 201 || r.estadoApi >= 500) {
-      const despues = accion === "recycle"
-        ? (await leerPorMc(valor)) // dispositivo nuevo
-        : (await leerPorMc(disp.serialBoard));
+    const huboEscritura = r.estadoApi === 200 || r.estadoApi === 201 || r.estadoApi >= 500;
+    if (huboEscritura && accion === "recycle") {
+      texto += `\nANTES: ${antes}`;
+      if (r.respuesta?.newDeviceId) texto += `\n➡️ Dispositivo nuevo creado: deviceId ${r.respuesta.newDeviceId}, placa ${r.respuesta.serialBoard}.`;
+      texto += "\nUn dispositivo sin equipo no sale en el listado de equipos: comprueba el resultado en la interfaz de preproducción (gestión de dispositivos).";
+      if (r.estadoApi >= 500) texto += "\n⚠️ La API respondió con error: comprueba en la interfaz si se creó el dispositivo nuevo ANTES de reintentar (un reintento daría 409).";
+    } else if (huboEscritura && disp.serialBoard) {
+      const despues = await leerPorMc(disp.serialBoard);
       texto += `\nANTES:   ${antes}\nDESPUÉS: ${resumenDispositivo(despues)}`;
       const campoComprobar = { battery: "serialBattery", lock: "serialLock", reader: "serialReader" }[accion];
       if (campoComprobar) {
         const aplicado = !!despues && norm(despues[campoComprobar]) === norm(valor);
         texto += `\n➡️ El cambio ${aplicado ? "SÍ" : "NO"} quedó aplicado en la API.`;
         if (aplicado && r.estadoApi >= 500) texto += "\n⚠️ La API respondió con error pero guardó el cambio: no reintentar a ciegas.";
-      } else if (accion === "recycle") {
-        texto += `\n➡️ Dispositivo nuevo ${despues ? "SÍ" : "NO"} aparece en el listado con la placa ${valor}.`;
       }
-      if (accion === "recycle") {
-        const viejo = await leerPorMc(disp.serialBoard);
-        texto += `\nMC anterior sigue en el listado: ${viejo ? "SÍ → " + resumenDispositivo(viejo) : "NO"}`;
-      }
+    } else if (huboEscritura) {
+      texto += "\nComo el dispositivo se indicó a mano, no se puede releer desde el listado: compruébalo en la interfaz de preproducción.";
     }
     salida.textContent = texto;
     cargarLog();
