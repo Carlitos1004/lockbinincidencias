@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Prueba de la API</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Prueba de la API</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Página de pruebas de la integración con la API de Operaciones (solo lectura, no cambia ningún dato). Las consultas pasan por un puente en el servidor: las credenciales de la API nunca llegan al navegador.</p>
+
+  <div class="caja-formulario">
+    <p style="font-weight:600;">1. Probar la conexión</p>
+    <button id="btn-conexion" class="btn-primario btn-compacto" type="button">Probar conexión</button>
+    <pre id="salida-conexion" style="margin-top:10px; white-space:pre-wrap;"></pre>
+  </div>
+
+  <div class="caja-formulario" style="margin-top:16px;">
+    <p style="font-weight:600;">2. Comparar la API con la tabla de equipos</p>
+    <div class="materiales-controles">
+      <input type="text" id="filtro-serial-board" value="MC*" placeholder="Filtro por MC (admite *). Vacío = todos">
+      <input type="number" id="filtro-customer-id" min="1" placeholder="customerId (opcional)">
+      <button id="btn-comparar" class="btn-primario btn-compacto" type="button">Comparar</button>
+      <button id="btn-csv" class="btn-secundario btn-compacto" type="button" hidden>Descargar diferencias (CSV)</button>
+    </div>
+    <p id="estado-comparacion" style="margin-top:8px; font-size:0.9rem; color:var(--gris-500);"></p>
+  </div>
+
+  <div id="resumen-api" class="resumen-cliente" style="margin-top:16px;"></div>
+  <div id="resultado-api"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="prueba-api.js"></script>
+</body>
+</html>
