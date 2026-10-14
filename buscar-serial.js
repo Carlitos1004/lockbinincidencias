@@ -79,12 +79,19 @@ async function buscar() {
       ticketsPorComponente = data || [];
     }
 
+    // 2b. Notas activas de equipo cuyo MC coincide con lo buscado
+    const { data: notasPorMc } = await supabaseClient
+      .from("notas_equipo")
+      .select("*")
+      .eq("activa", true)
+      .ilike("mc", `%${termino}%`);
+
     // Unimos y quitamos duplicados de tickets
     const mapaTickets = {};
     [...(ticketsPorMc || []), ...ticketsPorComponente].forEach(t => { mapaTickets[t.id_registro] = t; });
     const todosLosTickets = Object.values(mapaTickets);
 
-    if (todosLosTickets.length === 0 && (componentes || []).length === 0) {
+    if (todosLosTickets.length === 0 && (componentes || []).length === 0 && (notasPorMc || []).length === 0) {
       mostrarMensaje("No se encontró nada con ese término.", true);
       buscarBtn.disabled = false;
       buscarBtn.textContent = "Buscar";
@@ -117,22 +124,62 @@ async function buscar() {
     // Info adicional del/los MC involucrados: fecha de instalación (de la
     // lista de Equipos actual, si sigue ahí) y su línea de tiempo de
     // vinculación/desvinculación (de Vida del Equipo)
+    const notasHuerfanas = [];
     const mcsInvolucrados = [...new Set([
       ...todosLosTickets.map(t => t.m_control),
       ...(componentes || []).map(c => c.m_control)
     ].filter(Boolean))];
 
+    // Notas que coinciden con lo buscado pero no son de ninguno de esos MC
+    // (un MC que solo tiene nota, o el serial de un componente suelto)
+    (notasPorMc || []).forEach(n => { if (!mcsInvolucrados.includes(n.mc)) notasHuerfanas.push(n); });
+
+    // Una nota puede ser del MC o del serial de un componente. Para cada MC
+    // juntamos sus seriales (los de hoy en Equipos y los que pasaron por OT)
+    // y buscamos notas activas de cualquiera de ellos.
     let infoEquipos = {};
-    if (mcsInvolucrados.length > 0) {
+    const clavesNotas = mcsInvolucrados.concat(notasHuerfanas.map(n => n.mc));
+    const mcsParaInfo = [...new Set(clavesNotas)];
+    if (mcsParaInfo.length > 0) {
       const [{ data: equiposInfo }, { data: eventosEquipo }] = await Promise.all([
-        supabaseClient.from("equipos").select("m_control, fecha_instalacion, fecha_fabricacion, imei").in("m_control", mcsInvolucrados),
-        supabaseClient.from("historial_equipo").select("*").in("mc", mcsInvolucrados).order("fecha", { ascending: true })
+        supabaseClient.from("equipos").select("m_control, fecha_instalacion, fecha_fabricacion, imei, serie_lector, serie_cierre, serie_bateria").in("m_control", mcsParaInfo),
+        supabaseClient.from("historial_equipo").select("*").in("mc", mcsParaInfo).order("fecha", { ascending: true })
       ]);
 
-      mcsInvolucrados.forEach(mc => {
+      const serialesPorMc = {};
+      mcsParaInfo.forEach(mc => {
+        const set = new Set();
+        const eq = (equiposInfo || []).find(e => e.m_control === mc);
+        if (eq) [eq.serie_lector, eq.serie_cierre, eq.serie_bateria].filter(Boolean).forEach(x => set.add(x.toUpperCase()));
+        (componentes || []).filter(c => c.m_control === mc).forEach(c => {
+          [c.serial_retirado, c.serial_nuevo].filter(Boolean).forEach(x => set.add(x.toUpperCase()));
+        });
+        serialesPorMc[mc] = set;
+      });
+
+      const todasLasClaves = [...new Set([...mcsParaInfo, ...Object.values(serialesPorMc).flatMap(set => [...set])])];
+      const { data: notasEquipo } = await supabaseClient
+        .from("notas_equipo")
+        .select("*")
+        .eq("activa", true)
+        .in("mc", todasLasClaves)
+        .order("fecha", { ascending: false });
+
+      // Cuántas fotos tiene cada nota (para el enlace a la galería)
+      const conteoFotosNota = {};
+      const idsNotas = (notasEquipo || []).map(n => n.id);
+      if (idsNotas.length > 0) {
+        const { data: fotosNotas } = await supabaseClient.from("fotos_nota_equipo").select("nota_id").in("nota_id", idsNotas);
+        (fotosNotas || []).forEach(f => { conteoFotosNota[f.nota_id] = (conteoFotosNota[f.nota_id] || 0) + 1; });
+      }
+
+      mcsParaInfo.forEach(mc => {
+        // Notas del propio MC + notas de sus componentes (sin repetir)
+        const notas = (notasEquipo || []).filter(n => n.mc === mc || serialesPorMc[mc].has((n.mc || "").toUpperCase()));
         infoEquipos[mc] = {
           equipo: (equiposInfo || []).find(e => e.m_control === mc) || null,
-          eventos: (eventosEquipo || []).filter(ev => ev.mc === mc)
+          eventos: (eventosEquipo || []).filter(ev => ev.mc === mc),
+          notas: notas.map(n => ({ ...n, cantidadFotos: conteoFotosNota[n.id] || 0 }))
         };
       });
     }
@@ -160,7 +207,7 @@ function renderResultados(porOt, infoEquipos = {}) {
   const bloqueInfoEquipos = mcsConInfo.map(mc => {
     const info = infoEquipos[mc];
     const eq = info.equipo;
-    const tieneAlgo = eq?.fecha_instalacion || eq?.fecha_fabricacion || info.eventos.length > 0;
+    const tieneAlgo = eq?.fecha_instalacion || eq?.fecha_fabricacion || info.eventos.length > 0 || info.notas.length > 0;
     if (!tieneAlgo) return "";
 
     const fechas = [
@@ -175,9 +222,22 @@ function renderResultados(porOt, infoEquipos = {}) {
       </div>
     `).join("");
 
+    const bloqueNotas = info.notas.map(n => {
+      const fotos = n.cantidadFotos > 1
+        ? ` <a href="ver-fotos.html?origen=nota&id=${n.id}" target="_blank" rel="noopener">Ver fotos (${n.cantidadFotos}) →</a>`
+        : n.foto_url ? ` <a href="${n.foto_url}" target="_blank" rel="noopener">Ver foto →</a>` : "";
+      return `
+        <div class="resultado-nota-equipo">
+          📝 <strong>${n.mc === mc ? "Nota del equipo" : "Nota del componente " + escaparHtml(n.mc)}:</strong> ${escaparHtml(n.nota)}
+          <span class="resultado-sublinea">${new Date(n.fecha).toLocaleDateString("es-ES")}${n.autor ? " · " + escaparHtml(n.autor) : ""}</span>${fotos}
+        </div>
+      `;
+    }).join("");
+
     return `
       <div class="resultado-info-equipo">
         <strong>📋 ${mc}</strong>${fechas ? " — " + fechas : ""}
+        ${bloqueNotas}
         ${lineaEventos}
       </div>
     `;
@@ -185,7 +245,7 @@ function renderResultados(porOt, infoEquipos = {}) {
 
   resultados.innerHTML =
     bloqueInfoEquipos +
-    `<p class="resultado-msg resultado-ok" style="display:block;">Se encontró en ${ots.length} OT.</p>` +
+    (ots.length > 0 ? `<p class="resultado-msg resultado-ok" style="display:block;">Se encontró en ${ots.length} OT.</p>` : `<p class="resultado-msg resultado-ok" style="display:block;">Sin OT registradas para este equipo.</p>`) +
     ots.map((ot, idx) => {
       const entradas = porOt[ot];
       const cliente = entradas.find(e => e.ticket?.cliente)?.ticket?.cliente
@@ -241,4 +301,8 @@ function mostrarMensaje(texto, esError) {
   buscarMsg.textContent = texto;
   buscarMsg.className = esError ? "resultado-msg resultado-error" : "resultado-msg resultado-ok";
   buscarMsg.hidden = false;
+}
+
+function escaparHtml(texto) {
+  return String(texto ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
