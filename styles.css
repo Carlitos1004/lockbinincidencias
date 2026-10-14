@@ -2112,3 +2112,8 @@ a.tarjeta-resumen:hover {
   border-radius: 6px;
   font-size: 0.82rem;
 }
+
+/* Revisión de Taller: lista de fotos por componente */
+.fotos-revision-lista { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.foto-revision-item { display: inline-flex; align-items: center; gap: 4px; background: var(--gris-100, #eef1ee); border-radius: 6px; padding: 2px 6px; font-size: 0.85rem; }
+.btn-borrar-foto-revision { border: none; background: none; cursor: pointer; color: #b3261e; font-size: 0.9rem; padding: 0 2px; }

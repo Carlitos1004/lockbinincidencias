@@ -7,7 +7,7 @@ cargarFotos();
 async function cargarFotos() {
   const params = new URLSearchParams(window.location.search);
   const id = params.get("id");
-  const origen = params.get("origen") || "ticket"; // "ticket" (fotos_reporte) o "nota" (fotos_nota_equipo)
+  const origen = params.get("origen") || "ticket"; // "ticket" (fotos_reporte), "nota" (fotos_nota_equipo) o "revision" (fotos_revision)
   const msg = document.getElementById("cargar-msg");
   const galeria = document.getElementById("galeria");
 
@@ -16,8 +16,8 @@ async function cargarFotos() {
     return;
   }
 
-  const tabla = origen === "nota" ? "fotos_nota_equipo" : "fotos_reporte";
-  const columnaId = origen === "nota" ? "nota_id" : "id_registro";
+  const tabla = origen === "nota" ? "fotos_nota_equipo" : origen === "revision" ? "fotos_revision" : "fotos_reporte";
+  const columnaId = origen === "nota" ? "nota_id" : origen === "revision" ? "componente_id" : "id_registro";
 
   const { data, error } = await supabaseClient
     .from(tabla)

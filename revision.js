@@ -38,6 +38,23 @@ let clientesReales = [];
 let mostrarClienteHistorico = false;
 let modoTodosPendientes = false;
 let otsInternasLibres = new Set();
+// Fotos de revisión por componente (tabla fotos_revision): { componente_id: [fotos] }
+let fotosPorComponente = {};
+
+async function cargarFotosRevision(componentes) {
+  fotosPorComponente = {};
+  const ids = (componentes || []).map(c => c.id);
+  if (ids.length === 0) return;
+  const { data } = await supabaseClient
+    .from("fotos_revision")
+    .select("id, componente_id, url, fecha")
+    .in("componente_id", ids)
+    .order("fecha", { ascending: true });
+  (data || []).forEach(f => {
+    (fotosPorComponente[f.componente_id] = fotosPorComponente[f.componente_id] || []).push(f);
+  });
+}
+
 async function cargarClientesReales() {
   const TAM_PAGINA = 1000;
   let desde = 0;
@@ -101,6 +118,7 @@ async function verTodosPendientes() {
     (ots || []).filter(o => o.origen === "libre" && o.cliente === "INTERNO").map(o => o.id_ot)
   );
 
+  await cargarFotosRevision(data);
   renderTabla(data, true);
   tabla.hidden = false;
   document.getElementById("guardar-todo-btn").hidden = false;
@@ -144,6 +162,7 @@ async function buscarComponentes() {
   const normales = data.filter(c => c.estado !== "Faltante/Perdido");
   const faltantes = data.filter(c => c.estado === "Faltante/Perdido");
 
+  await cargarFotosRevision(normales);
   renderTabla(normales);
   tabla.hidden = normales.length === 0;
   document.getElementById("guardar-todo-btn").hidden = normales.length === 0;
@@ -152,6 +171,23 @@ async function buscarComponentes() {
   }
 
   renderFaltantes(faltantes);
+}
+
+function celdaFotosRevision(c) {
+  const fotos = fotosPorComponente[c.id] || [];
+  // Si aún no se corrió el SQL de fotos múltiples (o es una foto vieja sin copiar), usamos la foto única
+  if (fotos.length === 0) {
+    return c.foto_revision ? `<a href="${c.foto_revision}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto actual →</a>` : "";
+  }
+  const items = fotos.map((f, i) => `
+    <span class="foto-revision-item">
+      <a href="${f.url}" target="_blank" rel="noopener">Foto ${i + 1}</a>
+      <button type="button" class="btn-borrar-foto-revision" data-id="${f.id}" data-comp="${c.id}" title="Borrar esta foto">✕</button>
+    </span>`).join(" ");
+  const todas = fotos.length > 1
+    ? `<a href="ver-fotos.html?origen=revision&id=${c.id}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver todas (${fotos.length}) →</a>`
+    : "";
+  return `<div class="fotos-revision-lista">${items}</div>${todas}`;
 }
 
 function renderTabla(componentes, mostrarOt = false) {
@@ -265,8 +301,8 @@ function renderTabla(componentes, mostrarOt = false) {
         <td>${celdaAmmi}</td>
         <td>${celdaDevuelto}</td>
         <td>
-          <input type="file" class="input-foto-revision" accept="image/*" capture="environment">
-          ${c.foto_revision ? `<a href="${c.foto_revision}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto actual →</a>` : ""}
+          <input type="file" class="input-foto-revision" accept="image/*" capture="environment" multiple>
+          ${celdaFotosRevision(c)}
         </td>
         <td><button class="btn-guardar-fila" ${bloqueado ? "disabled" : ""}>Guardar</button></td>
         <td><button class="btn-eliminar-ticket btn-eliminar-componente" data-id="${c.id}" title="Eliminar este componente">🗑️</button></td>
@@ -300,6 +336,31 @@ function renderTabla(componentes, mostrarOt = false) {
         btn.textContent = "📦 Listo — Marcar como devuelto";
         return;
       }
+      refrescarListaActual();
+    });
+  });
+
+  tbody.querySelectorAll(".btn-borrar-foto-revision").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("¿Borrar esta foto? No se puede deshacer.")) return;
+      btn.disabled = true;
+      const { error } = await supabaseClient.from("fotos_revision").delete().eq("id", btn.dataset.id);
+      if (error) {
+        alert("Error al borrar la foto: " + error.message);
+        btn.disabled = false;
+        return;
+      }
+      // foto_revision guarda la primera foto: la dejamos apuntando a la que quede (o vacía)
+      const { data: restante } = await supabaseClient
+        .from("fotos_revision")
+        .select("url")
+        .eq("componente_id", btn.dataset.comp)
+        .order("fecha", { ascending: true })
+        .limit(1);
+      await supabaseClient
+        .from("componentes_retirados")
+        .update({ foto_revision: restante && restante[0] ? restante[0].url : null })
+        .eq("id", btn.dataset.comp);
       refrescarListaActual();
     });
   });
@@ -359,18 +420,18 @@ async function guardarFila(btn) {
   btn.disabled = true;
   btn.textContent = "Guardando...";
 
-  // Subir foto de revisión, si se eligió una
-  let fotoRevisionUrl = null;
-  const archivoFoto = fila.querySelector(".input-foto-revision").files[0];
-  if (archivoFoto) {
+  // Subir las fotos de revisión que se hayan elegido (se AÑADEN a las que ya haya)
+  const fotosNuevasUrls = [];
+  const archivosFoto = [...fila.querySelector(".input-foto-revision").files];
+  for (let i = 0; i < archivosFoto.length; i++) {
     try {
-      const nombreArchivo = `revision_${Date.now()}_${archivoFoto.name}`;
-      const { error: errorSubida } = await supabaseClient.storage.from("fotos-reportes").upload(nombreArchivo, archivoFoto);
+      const nombreArchivo = `revision_${Date.now()}_${i}_${archivosFoto[i].name}`;
+      const { error: errorSubida } = await supabaseClient.storage.from("fotos-reportes").upload(nombreArchivo, archivosFoto[i]);
       if (errorSubida) throw errorSubida;
       const { data: urlData } = supabaseClient.storage.from("fotos-reportes").getPublicUrl(nombreArchivo);
-      fotoRevisionUrl = urlData.publicUrl;
+      fotosNuevasUrls.push(urlData.publicUrl);
     } catch (err) {
-      alert("⚠️ No se pudo subir la foto, se sigue guardando el resto: " + err.message);
+      alert(`⚠️ No se pudo subir la foto ${archivosFoto[i].name}, se sigue guardando el resto: ` + err.message);
     }
   }
 
@@ -400,7 +461,8 @@ async function guardarFila(btn) {
     condicion_fisica: condicionFisica.length > 0 ? condicionFisica : null,
     causa_falla: causaFalla.length > 0 ? causaFalla : null
   };
-  if (fotoRevisionUrl) datosActualizacion.foto_revision = fotoRevisionUrl;
+  // foto_revision guarda solo la PRIMERA foto (para lo que ya la lee); no la pisamos si ya hay una
+  if (fotosNuevasUrls.length > 0 && !componente.foto_revision) datosActualizacion.foto_revision = fotosNuevasUrls[0];
 
   // 2. Actualizamos el componente
   const { error: errorUpdate } = await supabaseClient
@@ -413,6 +475,15 @@ async function guardarFila(btn) {
     btn.disabled = false;
     btn.textContent = "Guardar";
     return;
+  }
+
+  // 2b. Guardamos cada foto nueva en fotos_revision
+  if (fotosNuevasUrls.length > 0) {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    const { error: errorFotos } = await supabaseClient.from("fotos_revision").insert(
+      fotosNuevasUrls.map(url => ({ componente_id: componenteId, url, subido_por: user ? user.email : null }))
+    );
+    if (errorFotos) alert("⚠️ El resto se guardó, pero las fotos no se pudieron registrar: " + errorFotos.message + "\n(¿Corriste el SQL 70?)");
   }
 
   // 3. Si se envía a AMMI, creamos/actualizamos su fila en "garantias" —
