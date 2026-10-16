@@ -6,7 +6,8 @@
 // corre en el servidor de Vercel: guarda la sesión de la API, la renueva sola
 // y solo deja pasar una lista cerrada de operaciones.
 //
-//   GET  ?accion=whoami | equipos | dispositivos      → lectura
+//   GET  ?accion=whoami | equipos | dispositivos      → lectura (solo manager)
+//   GET  ?accion=comunicacion&mc=MC123456              → ¿ha comunicado este equipo? (manager y operario)
 //   POST {accion: battery|lock|reader|recycle, deviceId, valor} → escritura
 //
 // Variables de entorno (Vercel → Settings → Environment Variables):
@@ -27,6 +28,8 @@ const API_BASE = (process.env.LOCKBIN_API_BASE || "https://api.lockbin.dev").rep
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://haoveumvgejetfqpmwtj.supabase.co";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhhb3ZldW12Z2VqZXRmcXBtd3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1NjU1NjcsImV4cCI6MjEwMzE0MTU2N30.P0amDoIYqPZ60VCvGvr1ISUccNgXUzrD2BaJTSD-FIA";
 const ROLES_PERMITIDOS = ["manager"];
+// Acciones de solo lectura mínima que también puede usar el personal de campo.
+const ROLES_COMUNICACION = ["manager", "operario"];
 const TIMEOUT_MS = 9000;
 const HOST_PREPRODUCCION = "api.lockbin.dev";
 
@@ -115,7 +118,7 @@ async function llamarApi(ruta, { method = "GET", body = null } = {}) {
   return r;
 }
 
-async function verificarUsuario(req) {
+async function verificarUsuario(req, rolesPermitidos = ROLES_PERMITIDOS) {
   const cab = req.headers.authorization || "";
   const token = cab.startsWith("Bearer ") ? cab.slice(7) : "";
   if (!token) throw fallo(401, "Falta la sesión de LockBin.");
@@ -131,7 +134,7 @@ async function verificarUsuario(req) {
   );
   const perfiles = rp.ok ? await rp.json() : [];
   const rol = perfiles[0]?.rol;
-  if (!ROLES_PERMITIDOS.includes(rol)) throw fallo(403, "Tu rol no tiene acceso a esta función.");
+  if (!rolesPermitidos.includes(rol)) throw fallo(403, "Tu rol no tiene acceso a esta función.");
   return { id: usuario.id, email: usuario.email || null, rol, token };
 }
 
@@ -282,13 +285,32 @@ module.exports = async (req, res) => {
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ error: "Método no permitido." });
 
   try {
-    const usuario = await verificarUsuario(req);
+    const accion = req.method === "GET" ? (Array.isArray(req.query.accion) ? req.query.accion[0] : req.query.accion) : null;
+    const usuario = await verificarUsuario(req, accion === "comunicacion" ? ROLES_COMUNICACION : ROLES_PERMITIDOS);
 
     if (req.method === "POST") {
       return res.status(200).json(await manejarEscritura(req, usuario));
     }
 
-    const accion = Array.isArray(req.query.accion) ? req.query.accion[0] : req.query.accion;
+    // Comprobación puntual desde Ruta: devuelve SOLO lo necesario para saber
+    // si un equipo ha comunicado. El MC debe ser exacto (sin comodines).
+    if (accion === "comunicacion") {
+      const mcQ = Array.isArray(req.query.mc) ? req.query.mc[0] : req.query.mc;
+      const mc = String(mcQ || "").trim().toUpperCase();
+      if (!/^[A-Z0-9\-]{3,30}$/.test(mc)) throw fallo(400, "MC no válido.");
+      const r = await llamarApi("/api/operations/v1/equipment/?serialBoard=" + encodeURIComponent(mc) + "&pageNo=0&pageSize=5");
+      const consultadoEn = new Date().toISOString();
+      if (r.status === 204) return res.status(200).json({ mc, encontrado: false, consultadoEn });
+      if (!r.ok) throw fallo(502, `La API respondió HTTP ${r.status}.`);
+      const e = (await r.json()).map(aplanarEquipo).find(x => String(x.serialBoard || "").toUpperCase() === mc);
+      if (!e) return res.status(200).json({ mc, encontrado: false, consultadoEn });
+      return res.status(200).json({
+        mc, encontrado: true, consultadoEn,
+        lastReceptionAt: e.lastReceptionAt || null,
+        lastCommunicationAt: e.lastCommunicationAt || null,
+        alertCommunications: !!e.alertCommunications
+      });
+    }
 
     if (accion === "whoami") {
       const r = await llamarApi("/api/auth/whoami");

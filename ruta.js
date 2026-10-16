@@ -39,6 +39,8 @@ const modalCerrar = document.getElementById("modal-cerrar");
 const modalMc = document.getElementById("modal-mc");
 const modalInfo = document.getElementById("modal-info");
 const modalTickets = document.getElementById("modal-tickets");
+const btnComprobarCom = document.getElementById("btn-comprobar-comunicacion");
+const resultadoCom = document.getElementById("resultado-comunicacion");
 const modalForm = document.getElementById("modal-form");
 const modalEnviarBtn = document.getElementById("modal-enviar-btn");
 const modalMsg = document.getElementById("modal-msg");
@@ -250,6 +252,8 @@ async function abrirModal(mc) {
   tipoRetiradaDetectado = null;
   tipoInstaladaDetectado = null;
 
+  resultadoCom.textContent = "";
+  resultadoCom.className = "resultado-comunicacion";
   const info = equiposPorMC[mc];
   modalMc.textContent = mc;
   modalInfo.textContent = `Cliente: ${info.equipo.cliente || "—"} — Fracción: ${info.equipo.fraccion || "—"}`;
@@ -1223,3 +1227,60 @@ function comprimirImagen(archivo) {
     lector.readAsDataURL(archivo);
   });
 }
+
+
+// =========================================================================
+// Comprobar si el equipo ha comunicado (tras pasar tarjeta reset o cambiar
+// la batería). Pregunta al puente, que consulta la API de la plataforma.
+// =========================================================================
+function textoHace(ms) {
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "hace menos de 1 minuto";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 48) return `hace ${h} h ${min % 60} min`;
+  return `hace ${Math.floor(h / 24)} días`;
+}
+
+btnComprobarCom.addEventListener("click", async () => {
+  const mc = equipoAbierto;
+  if (!mc) return;
+  btnComprobarCom.disabled = true;
+  resultadoCom.className = "resultado-comunicacion";
+  resultadoCom.textContent = "Consultando...";
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) throw new Error("Sesión vencida. Vuelve a entrar.");
+    const r = await fetch(`/api/lockbin-api?accion=comunicacion&mc=${encodeURIComponent(mc)}`,
+      { headers: { Authorization: `Bearer ${session.access_token}` } });
+    const texto = await r.text();
+    let d = {};
+    try { d = JSON.parse(texto); } catch (e) { /* no era JSON */ }
+    if (!r.ok) throw new Error(d.error || `Error HTTP ${r.status}`);
+
+    if (mc !== equipoAbierto) return; // se cerró o se abrió otro equipo mientras tanto
+    if (!d.encontrado) {
+      resultadoCom.className = "resultado-comunicacion com-aviso";
+      resultadoCom.textContent = "La plataforma no tiene este equipo con dispositivo asociado.";
+      return;
+    }
+    const hora = new Date(d.consultadoEn).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    if (!d.lastReceptionAt) {
+      resultadoCom.className = "resultado-comunicacion com-mal";
+      resultadoCom.textContent = `❌ Sin ningún mensaje registrado. (Consultado a las ${hora})`;
+      return;
+    }
+    const ms = new Date(d.consultadoEn).getTime() - new Date(d.lastReceptionAt).getTime();
+    const reciente = ms <= 30 * 60000;
+    const fecha = new Date(d.lastReceptionAt).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
+    resultadoCom.className = "resultado-comunicacion " + (reciente ? "com-ok" : "com-aviso");
+    resultadoCom.textContent = `${reciente ? "✅ Ha comunicado" : "⚠️ Último mensaje"} ${textoHace(ms)} (${fecha}).` +
+      (d.alertCommunications ? " La alerta «no comunica» sigue activa; puede tardar en limpiarse." : "") +
+      ` Consultado a las ${hora}.`;
+  } catch (e) {
+    resultadoCom.className = "resultado-comunicacion com-mal";
+    resultadoCom.textContent = "❌ " + e.message;
+  } finally {
+    btnComprobarCom.disabled = false;
+  }
+});
