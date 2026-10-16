@@ -74,6 +74,19 @@ document.getElementById("btn-conexion").addEventListener("click", async () => {
   }
 });
 
+// La API devuelve el estado de montaje en inglés; nuestra tabla lo guarda en español.
+const ESTADO_API_ES = { PENDING_INSTALL: "Pendiente", INSTALLED: "Instalado", ON_REVISION: "En revisión" };
+function nombreEstado(n) { return n == null ? "" : (ESTADO_API_ES[n] || n); }
+
+// Texto "hace X" a partir de una cantidad de horas.
+function textoHace(horas) {
+  if (horas < 1) return "menos de 1 h";
+  if (horas < 48) return Math.floor(horas) + " h";
+  const d = Math.floor(horas / 24);
+  return d + " d " + Math.floor(horas - d * 24) + " h";
+}
+function fechaCorta(v) { return v ? new Date(v).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : "—"; }
+
 // ---------- 2. Comparar ----------
 async function traerEquiposApi(filtro, customerId, estado) {
   let items = [], pagina = 0, totalPaginas = 1, total = 0;
@@ -153,10 +166,22 @@ document.getElementById("btn-comparar").addEventListener("click", async () => {
         }
       });
       if (!hayDif) coincidenTodo++;
-      estados.push({ mc: i.serialBoard, nuestro: nuestro.estado_montaje ?? "", api: i.installationStateTypeLabel ?? "", actualizado: nuestro.actualizado_en });
+      estados.push({ mc: i.serialBoard, nuestro: nuestro.estado_montaje ?? "", api: nombreEstado(i.installationStateName) ?? "", actualizado: nuestro.actualizado_en });
     });
 
     const soloNuestros = nuestros.filter(e => !conMc.some(i => norm(i.serialBoard) === norm(e.m_control))).length;
+
+    // Comunicación según lastReceptionAt (fecha del último mensaje recibido del equipo)
+    const umbralHoras = Math.max(1, Number(document.getElementById("filtro-horas").value) || 36);
+    const ahora = Date.now();
+    const conFecha = items.filter(i => i.lastReceptionAt)
+      .map(i => ({ i, horas: (ahora - new Date(i.lastReceptionAt).getTime()) / 36e5 }));
+    const nuncaEnviaron = items.filter(i => !i.lastReceptionAt);
+    const sinMensajes = conFecha.filter(x => x.horas > umbralHoras).sort((a, b) => b.horas - a.horas);
+    const conMensajes = conFecha.length - sinMensajes.length;
+    const filaComunicacion = (i, horas) => [i.serialBoard || "(sin MC)", i.serial || "", i.customerName || "",
+      fechaCorta(i.lastReceptionAt), horas == null ? "Nunca" : textoHace(horas),
+      fechaCorta(i.lastCommunicationAt), i.alertCommunications ? "Sí" : "No"];
 
     diferenciasCsv = diferencias;
     document.getElementById("btn-csv").hidden = diferencias.length === 0;
@@ -170,6 +195,9 @@ document.getElementById("btn-comparar").addEventListener("click", async () => {
       <div class="tarjeta-resumen"><strong>${coincidenTodo}</strong><span>Coinciden en todos los campos</span></div>
       <div class="tarjeta-resumen ${soloApi.length ? "tarjeta-alerta" : ""}"><strong>${soloApi.length}</strong><span>Solo en la API</span></div>
       <div class="tarjeta-resumen"><strong>${soloNuestros}</strong><span>Solo en nuestra tabla (con este filtro es normal)</span></div>
+      <div class="tarjeta-resumen"><strong>${conMensajes}</strong><span>Con mensajes en las últimas ${umbralHoras} h (lastReceptionAt)</span></div>
+      <div class="tarjeta-resumen ${sinMensajes.length ? "tarjeta-alerta" : ""}"><strong>${sinMensajes.length}</strong><span>Sin mensajes desde hace más de ${umbralHoras} h</span></div>
+      <div class="tarjeta-resumen ${nuncaEnviaron.length ? "tarjeta-alerta" : ""}"><strong>${nuncaEnviaron.length}</strong><span>Sin ningún mensaje registrado</span></div>
       <div class="tarjeta-resumen ${compRepetidos.length ? "tarjeta-alerta" : ""}"><strong>${compRepetidos.length}</strong><span>Seriales de componente repetidos en la API</span></div>
       <div class="tarjeta-resumen ${mcRepetidos.length + imeiRepetidos.length ? "tarjeta-alerta" : ""}"><strong>${mcRepetidos.length} / ${imeiRepetidos.length}</strong><span>MC repetidos / IMEI repetidos en la API</span></div>
     `;
@@ -180,11 +208,14 @@ document.getElementById("btn-comparar").addEventListener("click", async () => {
       <table class="tabla-revision"><thead><tr>${cabecera.map(c => `<th>${c}</th>`).join("")}</tr></thead>
       <tbody>${filas.map(f => `<tr>${f.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`}`;
 
+    const cabComunicacion = ["MC", "Contenedor", "Cliente", "Último mensaje recibido", "Hace", "Última comunicación (estadísticas)", "Alerta «no comunica»"];
     document.getElementById("resultado-api").innerHTML =
+      tabla(`Equipos sin mensajes desde hace más de ${umbralHoras} h (de más antiguo a más reciente)`, cabComunicacion,
+        [...nuncaEnviaron.map(i => filaComunicacion(i, null)), ...sinMensajes.map(x => filaComunicacion(x.i, x.horas))]) +
       tabla("Diferencias entre la API y nuestra tabla", ["MC", "Campo", "Nuestro valor", "Valor de la API"],
         diferencias.map(d => [d.mc, d.campo, d.nuestro, d.api])) +
       tabla("MC que están en la API y no en nuestra tabla", ["MC", "IMEI", "Cliente", "Estado API"],
-        soloApi.map(i => [i.serialBoard, i.imei, i.customerName, i.installationStateTypeLabel])) +
+        soloApi.map(i => [i.serialBoard, i.imei, i.customerName, nombreEstado(i.installationStateName)])) +
       tabla("Estado de montaje: nuestro vs API (solo informativo)", ["MC", "Nuestro estado_montaje", "Estado API", "Fila nuestra actualizada"],
         estados.map(e => [e.mc, e.nuestro, e.api, e.actualizado ? new Date(e.actualizado).toLocaleDateString("es-ES") : ""])) +
       (compRepetidos.length ? tabla("Seriales de componente en más de un dispositivo (la API no lo impide)", ["Componente", "Serial", "Dispositivos"], compRepetidos) : "") +
@@ -222,27 +253,27 @@ document.getElementById("btn-cargar-dispositivos").addEventListener("click", asy
   salida.textContent = "Cargando dispositivos...";
   try {
     const filtro = document.getElementById("escritura-filtro").value.trim();
-    const params = { accion: "equipos", pageNo: 0, pageSize: 120, sort: "id,asc" };
+    const params = { accion: "dispositivos", pageNo: 0, pageSize: 120, sort: "id,asc" };
     if (filtro) params.serialBoard = filtro;
     const r = await llamarPuente(params);
     dispositivosCargados = (r.items || []).filter(i => i.deviceId != null);
     sel.innerHTML = dispositivosCargados.length === 0
       ? '<option value="">Sin dispositivos con este filtro</option>'
       : dispositivosCargados.map((i, n) =>
-          `<option value="${n}">${esc(i.serialBoard || "(sin MC)")} · dev ${i.deviceId} · ${esc(i.customerName)} · ${esc(i.installationStateTypeLabel)} · BA ${esc(i.serialBattery || "-")} CE ${esc(i.serialLock || "-")} LE ${esc(i.serialReader || "-")}</option>`
+          `<option value="${n}">${esc(i.serialBoard || "(sin MC)")} · dev ${i.deviceId} · ${esc(i.deviceCustomerName || "sin cliente")} · ${esc(nombreEstado(i.installationStateName))} · BA ${esc(i.serialBattery || "-")} CE ${esc(i.serialLock || "-")} LE ${esc(i.serialReader || "-")}</option>`
         ).join("");
-    salida.textContent = `${dispositivosCargados.length} dispositivos cargados (de ${r.total} equipos).`;
+    salida.textContent = `${dispositivosCargados.length} dispositivos cargados (de ${r.total} dispositivos).`;
   } catch (e) {
     salida.textContent = "❌ " + e.message;
   }
 });
 
 function resumenDispositivo(i) {
-  return i ? `MC ${i.serialBoard} | dev ${i.deviceId} | BA ${i.serialBattery || "-"} (${i.batteryModelCode || "-"}) | CE ${i.serialLock || "-"} (${i.lockModelCode || "-"}) | LE ${i.serialReader || "-"} (${i.readerModelCode || "-"}) | ${i.installationStateTypeLabel}` : "(no encontrado)";
+  return i ? `MC ${i.serialBoard} | dev ${i.deviceId} | BA ${i.serialBattery || "-"} (${i.batteryModelCode || "-"}) | CE ${i.serialLock || "-"} (${i.lockModelCode || "-"}) | LE ${i.serialReader || "-"} (${i.readerModelCode || "-"}) | ${nombreEstado(i.installationStateName)}` : "(no encontrado)";
 }
 
 async function leerPorMc(mc) {
-  const r = await llamarPuente({ accion: "equipos", serialBoard: mc, pageSize: 5 });
+  const r = await llamarPuente({ accion: "dispositivos", serialBoard: mc, pageSize: 5 });
   return (r.items || []).find(i => norm(i.serialBoard) === norm(mc)) || null;
 }
 

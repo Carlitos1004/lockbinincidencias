@@ -6,7 +6,7 @@
 // corre en el servidor de Vercel: guarda la sesión de la API, la renueva sola
 // y solo deja pasar una lista cerrada de operaciones.
 //
-//   GET  ?accion=whoami | equipos      → lectura
+//   GET  ?accion=whoami | equipos | dispositivos      → lectura
 //   POST {accion: battery|lock|reader|recycle, deviceId, valor} → escritura
 //
 // Variables de entorno (Vercel → Settings → Environment Variables):
@@ -135,14 +135,19 @@ async function verificarUsuario(req) {
   return { id: usuario.id, email: usuario.email || null, rol, token };
 }
 
-function construirRutaEquipos(q) {
+// Construye la ruta de un listado (equipos o dispositivos). "filtros" son los
+// filtros de texto que admite cada listado: equipos solo serialBoard;
+// dispositivos serialBoard, imei e iccid.
+function construirRutaListado(q, ruta, filtros) {
   const partes = [];
   const unico = (v) => (Array.isArray(v) ? v[0] : v);
 
-  const serialBoard = unico(q.serialBoard);
-  if (serialBoard) {
-    if (!/^[A-Za-z0-9_*\-]{1,40}$/.test(serialBoard)) throw fallo(400, "serialBoard no válido.");
-    partes.push("serialBoard=" + encodeURIComponent(serialBoard));
+  for (const nombre of filtros) {
+    const valor = unico(q[nombre]);
+    if (valor) {
+      if (!/^[A-Za-z0-9_*\-]{1,40}$/.test(valor)) throw fallo(400, nombre + " no válido.");
+      partes.push(nombre + "=" + encodeURIComponent(valor));
+    }
   }
   const customerId = unico(q.customerId);
   if (customerId) {
@@ -162,7 +167,49 @@ function construirRutaEquipos(q) {
     if (!/^[A-Za-z]{1,30}(,(asc|desc))?$/.test(sort)) throw fallo(400, "sort no válido.");
     partes.push("sort=" + sort);
   }
-  return "/api/operations/v1/equipment/?" + partes.join("&");
+  return ruta + "?" + partes.join("&");
+}
+
+// Desde el 15/10/2026 la API devuelve cada equipo con dos bloques anidados:
+// "device" (dispositivo instalado) y "telemetry" (comunicación y batería).
+// Aquí los aplanamos para que el resto de la web trabaje con una fila plana:
+//   - los campos propios del equipo se quedan igual (serial, customerName...)
+//   - device.id pasa a llamarse deviceId; el cliente del dispositivo, a
+//     deviceCustomerId / deviceCustomerName (el del equipo sigue en customerId)
+//   - el resto de device.* y telemetry.* suben al primer nivel con su nombre.
+function aplanarEquipo(e) {
+  if (!e || typeof e !== "object") return e;
+  const { device, telemetry, ...raiz } = e;
+  const d = device || {};
+  const { id, customerId, customerName, ...restoDispositivo } = d;
+  return {
+    ...raiz,
+    deviceId: device ? id : null,
+    ...restoDispositivo,
+    deviceCustomerId: device ? customerId : null,
+    deviceCustomerName: device ? customerName : null,
+    ...(telemetry || {})
+  };
+}
+
+// El listado de dispositivos ya viene plano; solo se renombra id → deviceId.
+function aplanarDispositivo(d) {
+  if (!d || typeof d !== "object") return d;
+  const { id, customerId, customerName, ...resto } = d;
+  return { deviceId: id, ...resto, deviceCustomerId: customerId ?? null, deviceCustomerName: customerName ?? null };
+}
+
+async function listar(res, ruta, aplanar) {
+  const r = await llamarApi(ruta);
+  if (r.status === 204) return res.status(200).json({ total: 0, totalPaginas: 0, items: [] });
+  if (r.status === 403) throw fallo(502, "La cuenta de la API no tiene ROLE_OPERATIONS (HTTP 403).");
+  if (!r.ok) throw fallo(502, `La API respondió HTTP ${r.status}.`);
+  const items = (await r.json()).map(aplanar);
+  return res.status(200).json({
+    total: Number(r.headers.get("x-allsnsd-total")) || items.length,
+    totalPaginas: Number(r.headers.get("x-allsnsd-totalpages")) || 1,
+    items
+  });
 }
 
 // ---------- Escrituras ----------
@@ -251,16 +298,11 @@ module.exports = async (req, res) => {
     }
 
     if (accion === "equipos") {
-      const r = await llamarApi(construirRutaEquipos(req.query));
-      if (r.status === 204) return res.status(200).json({ total: 0, totalPaginas: 0, items: [] });
-      if (r.status === 403) throw fallo(502, "La cuenta de la API no tiene ROLE_OPERATIONS (HTTP 403).");
-      if (!r.ok) throw fallo(502, `La API respondió HTTP ${r.status}.`);
-      const items = await r.json();
-      return res.status(200).json({
-        total: Number(r.headers.get("x-allsnsd-total")) || items.length,
-        totalPaginas: Number(r.headers.get("x-allsnsd-totalpages")) || 1,
-        items
-      });
+      return await listar(res, construirRutaListado(req.query, "/api/operations/v1/equipment/", ["serialBoard"]), aplanarEquipo);
+    }
+
+    if (accion === "dispositivos") {
+      return await listar(res, construirRutaListado(req.query, "/api/operations/v1/device/", ["serialBoard", "imei", "iccid"]), aplanarDispositivo);
     }
 
     throw fallo(400, "Acción no permitida.");

@@ -38,6 +38,7 @@
     <div class="materiales-controles">
       <input type="text" id="filtro-serial-board" value="MC*" placeholder="Filtro por MC (admite *). Vacío = todos">
       <input type="number" id="filtro-customer-id" min="1" placeholder="customerId (opcional)">
+      <input type="number" id="filtro-horas" min="1" value="36" title="Horas sin recibir mensajes para considerar que un equipo no comunica. Los equipos envían 1 vez al día: 36 = un envío perdido, 48 = dos. Para una prueba en calle tras un reset, usa 1." style="max-width:130px;" placeholder="Horas sin mensaje">
       <button id="btn-comparar" class="btn-primario btn-compacto" type="button">Comparar</button>
       <button id="btn-csv" class="btn-secundario btn-compacto" type="button" hidden>Descargar diferencias (CSV)</button>
     </div>
