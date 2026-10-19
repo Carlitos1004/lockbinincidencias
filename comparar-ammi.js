@@ -71,7 +71,7 @@ amuBtn.addEventListener("click", async () => {
       const informes = [];
       hojasRec.forEach(n => {
         XLSX.utils.sheet_to_json(libro.Sheets[n], { defval: null }).forEach(f => {
-          if (!cfTexto(f["SERIAL NUMBER A11000"])) { if (Object.values(f).some(v => v !== null && v !== "")) auxiliares++; return; }
+          if (!/^(MC|CE|LE|BA)\d{6,}$/.test(cfNormId(f["SERIAL NUMBER A11000"]) || "")) { if (Object.values(f).some(v => v !== null && v !== "")) auxiliares++; return; }
           const ref = cfTexto(f["Semana"]) || cfFecha(f["FECHA ANUNCIO"]) || n;
           informes.push({ ...f, "Código envío": `${ref}-${cfNormId(f["SERIAL NUMBER A11000"])}` });
         });
