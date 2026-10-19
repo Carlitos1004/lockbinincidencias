@@ -63,10 +63,26 @@ amuBtn.addEventListener("click", async () => {
   amuEstado.textContent = "Leyendo el Excel...";
   try {
     const libro = await amuLeerLibro(amuArchivo.files[0]);
-    const control = amuHojaControl(libro);
-    const informes = amuHojaInformes(libro);
-    if (!control || !informes) throw new Error('No encuentro las hojas "ControlFraAMMI" e "Informes AMMI". ¿Es el archivo GestionGarantias?');
-    const archivo = amLeerArchivo(control, informes);
+    let archivo, modoRecibidos = false, auxiliares = 0;
+    const hojasRec = libro.SheetNames.filter(n => /^Equipos recibidos de AMMI/i.test(n));
+    if (hojasRec.length) {
+      // Archivo de "Anotaciones generales": una hoja por tanda recibida de AMMI
+      modoRecibidos = true;
+      const informes = [];
+      hojasRec.forEach(n => {
+        XLSX.utils.sheet_to_json(libro.Sheets[n], { defval: null }).forEach(f => {
+          if (!cfTexto(f["SERIAL NUMBER A11000"])) { if (Object.values(f).some(v => v !== null && v !== "")) auxiliares++; return; }
+          const ref = cfTexto(f["Semana"]) || cfFecha(f["FECHA ANUNCIO"]) || n;
+          informes.push({ ...f, "Código envío": `${ref}-${cfNormId(f["SERIAL NUMBER A11000"])}` });
+        });
+      });
+      archivo = amLeerArchivo([], informes);
+    } else {
+      const control = amuHojaControl(libro);
+      const informes = amuHojaInformes(libro);
+      if (!control || !informes) throw new Error('No encuentro las hojas "ControlFraAMMI" e "Informes AMMI" (GestionGarantias) ni las de "Equipos recibidos de AMMI". ¿Es el archivo correcto?');
+      archivo = amLeerArchivo(control, informes);
+    }
 
     amuEstado.textContent = "Leyendo los envíos que ya hay en el sistema...";
     const db = await amuLeerTabla("componentes_retirados", "*", q => q.eq("destino", AM_DESTINO));
@@ -76,6 +92,7 @@ amuBtn.addEventListener("click", async () => {
     amuRes = amComparar(archivo, db, equipos);
     amuRes.nuevos.forEach(n => { n.serialEnSistema = n.serialEnSistema || []; }); // por si el core está desactualizado
     amuRes._db = db;
+    amuRes._modoRecibidos = modoRecibidos; amuRes._auxiliares = auxiliares;
     amuRes._imeis = new Map(equipos.map(q => [String(q.m_control).toUpperCase(), q.imei]));
     amuRes._t = { archivo: archivo.envios.length, ambas: archivo.ambas, soloControl: archivo.soloControl, soloInformes: archivo.soloInformes, bd: db.length };
     amuEstado.textContent = "";
@@ -113,6 +130,12 @@ function amuPintar() {
     ${tarjeta(r.nuevos.filter(n => n.serialEnSistema.length).length, "Reenvíos: mismo serial, otro periodo")}
   </div>
   <p style="margin-top:10px;">Archivo: ${r._t.archivo} envíos (${r._t.ambas} en las dos hojas, ${r._t.soloControl} solo en Control, ${r._t.soloInformes} solo en Informes; ${r.pendientesArchivo} pendientes de regreso). Sin serial (descartados): ${r.sinSerial.length}. En el sistema: ${r._t.bd} envíos a AMMI, de los cuales ${r.soloBD.length} no aparecen en el archivo (no se tocan).</p>`);
+
+  const corregibles = amuCorregibles();
+  if (r._modoRecibidos) h.push(`<p style="margin-top:8px;">Archivo de equipos recibidos de AMMI (${r._t.archivo} filas con serial; ${r._auxiliares} filas auxiliares sin serial ignoradas). Aquí cada fila es un regreso: se compara con los envíos que ya tienes y se rellena fecha de regreso, acción, albarán, causa confirmada, importe, serial recibido y categoría.</p>`);
+  if (corregibles.length) h.push(`<div class="caja-formulario" style="margin-top:12px;">
+    <label style="cursor:pointer;"><input type="checkbox" id="am-corregir"> <strong>Corregir con lo recibido físicamente (${corregibles.length} datos en ${new Set(corregibles.map(x => x.id)).size} envíos)</strong></label>
+    <p style="margin:6px 0 0;">Afecta solo al serial de reposición y a la categoría de regreso, cuando el archivo trae el serial físico o la categoría y el sistema tiene otro valor. Si no lo marcas, no se cambia ninguno.</p></div>`);
 
   h.push(amuTabla(`Datos distintos (${r.difieren.length}) — no se cambia ese dato, solo se rellenan los campos vacíos`,
     ["Serial", "Envío", "Qué difiere"],
@@ -192,6 +215,12 @@ async function amuRegistrarCarcasa(c) {
   return { ok: true, imei };
 }
 
+function amuCorregibles() {
+  const out = [];
+  amuRes.difieren.forEach(d => d.diferencias.filter(x => x.clave && AM_CORREGIBLES.includes(x.clave)).forEach(x => out.push({ id: d.bd.id, serial: d.e.serial, clave: x.clave, valor: x.valor })));
+  return out;
+}
+
 function amuCsv() {
   const r = amuRes;
   const l = [["categoria", "serial", "tipo", "codigo_envio", "fecha_envio", "fecha_regreso", "accion", "mc_sistema", "sn_utilizado", "detalle"]];
@@ -214,9 +243,14 @@ async function amuImportar() {
   const r = amuRes;
   const incluirDup = !!(document.getElementById("am-incluir-dup") || {}).checked;
   const nuevas = r.nuevos.filter(n => n.e.tipo && (incluirDup || !n.serialEnSistema.length)).map(amFilaNueva);
-  const parches = [...r.completar, ...r.difieren].filter(x => Object.keys(x.parche).length);
+  const corregir = !!(document.getElementById("am-corregir") || {}).checked;
+  const correcciones = corregir ? amuCorregibles() : [];
+  const parches = [...r.completar, ...r.difieren].map(x => {
+    const extra = Object.fromEntries(correcciones.filter(c => c.id === x.bd.id).map(c => [c.clave, c.valor]));
+    return { ...x, parche: { ...x.parche, ...extra } };
+  }).filter(x => Object.keys(x.parche).length);
   if (!nuevas.length && !parches.length) { caja.textContent = "No hay nada que importar."; return; }
-  if (!confirm(`Se crearán ${nuevas.length} registros históricos y se completarán ${parches.length} envíos existentes. ¿Continuar?`)) return;
+  if (!confirm(`Se crearán ${nuevas.length} registros históricos y se completarán ${parches.length} envíos existentes${correcciones.length ? `, corrigiendo ${correcciones.length} datos con lo recibido físicamente` : ""}. ¿Continuar?`)) return;
 
   boton.disabled = true;
   try {

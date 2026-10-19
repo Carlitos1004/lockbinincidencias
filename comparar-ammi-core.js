@@ -124,7 +124,7 @@ function amLeerArchivo(filasControl, filasInformes) {
       comDiscrepancia: cfTexto(c ? c["Comentarios discrepancias"] : null),
       accion,
       facturada,
-      albaran: cfTexto(c ? c["Albarán AMMI"] : null) || cfTexto(i ? i["Albarán"] : null),
+      albaran: cfTexto(c ? c["Albarán AMMI"] : null) || cfTexto(i ? i["Albarán"] : null) || cfTexto(i ? i["Numero de albarán"] : null),
       tipoRep: cfTexto(c ? c["Tipo reparación"] : null),
       importe: amNum(c ? c["Importe"] : null) ?? amNum(i ? i["Importe"] : null),
       causaConfirmada: cfTexto(i ? i["Causa confirmada"] : null),
@@ -132,6 +132,9 @@ function amLeerArchivo(filasControl, filasInformes) {
       codReparacion: cfTexto(i ? i["Código reparación"] : null),
       refFruto: cfTexto(i ? i["Fruto DS"] : null),
       snUtilizado: amSerialValido(snRaw) && snRaw !== serial ? snRaw : null,
+      // Solo en la hoja de "equipos recibidos": lo que llegó físicamente y su categoría
+      serialFisico: (() => { const f = i ? amSerial(i["Seriales recibidos fisico"]) : null; return amSerialValido(f) ? f : null; })(),
+      catRegreso: i && cfTexto(i["Equipos categoria 1"]) ? "1ra categoría" : (i && cfTexto(i["Equipos categoria 2"]) ? "2da categoría" : null),
       enControl: !!c, enInformes: !!i
     });
   });
@@ -151,17 +154,24 @@ function amCamposDelArchivo(e) {
   };
   if (e.fechaDevolucion && !e.pendiente) {
     o.ammi_fecha_regreso = e.fechaDevolucion + "T12:00:00Z";
+    const sn = e.serialFisico && e.serialFisico !== e.serial ? e.serialFisico : e.snUtilizado; // lo recibido físicamente manda
     if (e.accion === "Reposición") {
-      o.ammi_categoria_regreso = "1ra categoría"; // regla del sistema: reposición = siempre 1ra
+      o.ammi_categoria_regreso = e.catRegreso || "1ra categoría"; // sin dato explícito: regla del sistema (reposición = 1ra)
       o.ammi_es_reposicion = true;
-      if (e.snUtilizado) o.ammi_serial_reposicion = e.snUtilizado;
-    } else if (e.tipo === "Módulo de Control" && e.snUtilizado && /^MC/.test(e.snUtilizado) && /nuevo sn|nueva carcasa/i.test(e.accionRealizada || "")) {
-      o.ammi_cambio_carcasa = true;
-      o.ammi_mc_nuevo = e.snUtilizado;
+      if (sn) o.ammi_serial_reposicion = sn;
+    } else {
+      if (e.catRegreso) o.ammi_categoria_regreso = e.catRegreso;
+      if (e.tipo === "Módulo de Control" && sn && /^MC/.test(sn) && /nuevo sn|nueva carcasa/i.test(e.accionRealizada || "")) {
+        o.ammi_cambio_carcasa = true;
+        o.ammi_mc_nuevo = sn;
+      }
     }
   }
   return o;
 }
+
+// Campos que el usuario puede decidir corregir con lo recibido físicamente (opt-in)
+const AM_CORREGIBLES = ["ammi_serial_reposicion", "ammi_categoria_regreso"];
 
 const AM_VACIO = v => v === null || v === undefined || v === "";
 
@@ -214,11 +224,13 @@ function amComparar(archivo, db, equipos) {
       if (AM_VACIO(actual) || (k === "ammi_es_reposicion" && actual === false) || (k === "ammi_cambio_carcasa" && actual === false)) {
         parche[k] = v;
       } else if (k === "ammi_fecha_regreso") {
-        if (amDias(actual, v) > 2) diferencias.push({ campo: "fecha de regreso", sistema: String(actual).slice(0, 10), archivo: v.slice(0, 10) });
+        if (amDias(actual, v) > 2) diferencias.push({ campo: "fecha de regreso", sistema: String(actual).slice(0, 10), archivo: v.slice(0, 10), clave: k, valor: v });
       } else if (["ammi_serial_reposicion", "ammi_mc_nuevo"].includes(k)) {
-        if (String(actual).toUpperCase() !== String(v).toUpperCase()) diferencias.push({ campo: k.replace("ammi_", "").replace(/_/g, " "), sistema: actual, archivo: v });
+        if (String(actual).toUpperCase() !== String(v).toUpperCase()) diferencias.push({ campo: k.replace("ammi_", "").replace(/_/g, " "), sistema: actual, archivo: v, clave: k, valor: v });
+      } else if (k === "ammi_categoria_regreso") {
+        if (actual !== v && e.catRegreso) diferencias.push({ campo: "categoría de regreso", sistema: actual, archivo: v, clave: k, valor: v });
       } else if (k === "ammi_es_reposicion" && actual !== v) {
-        diferencias.push({ campo: "reposición", sistema: actual, archivo: v });
+        diferencias.push({ campo: "reposición", sistema: actual, archivo: v, clave: k, valor: v });
       }
     });
     if (e.pendiente && mejor.ammi_fecha_regreso) {
@@ -264,5 +276,5 @@ function amFilaNueva(n) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { amLeerArchivo, amComparar, amFilaNueva, amCamposDelArchivo, AM_CAMPOS_NUEVOS };
+  module.exports = { AM_CORREGIBLES, amLeerArchivo, amComparar, amFilaNueva, amCamposDelArchivo, AM_CAMPOS_NUEVOS };
 }
