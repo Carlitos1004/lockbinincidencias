@@ -172,7 +172,7 @@ function amDias(a, b) { return Math.abs((new Date(a) - new Date(b)) / 86400000);
 function amComparar(archivo, db, equipos) {
   const porSerial = new Map();
   db.forEach(r => {
-    const k = String(r.serial_retirado || "").trim().toUpperCase();
+    const k = String(r.serial_retirado || "").replace(/\s+/g, "").toUpperCase();
     if (!k) return;
     if (!porSerial.has(k)) porSerial.set(k, []);
     porSerial.get(k).push(r);
@@ -190,7 +190,9 @@ function amComparar(archivo, db, equipos) {
       if (d < mejorD) { mejor = r; mejorD = d; }
     });
     if (!mejor || (e.fechaEnvio && mejor.fecha && mejorD > AM_VENTANA_DIAS)) {
-      res.nuevos.push({ e });
+      // ¿Hay en el sistema ese mismo serial (con otra fecha)? Posible duplicado.
+      const mismos = (porSerial.get(e.serial) || []).map(r => String(r.fecha || "").slice(0, 10));
+      res.nuevos.push({ e, serialEnSistema: mismos });
       return;
     }
     usados.add(mejor.id);

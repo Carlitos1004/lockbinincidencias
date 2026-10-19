@@ -71,9 +71,10 @@ amuBtn.addEventListener("click", async () => {
     amuEstado.textContent = "Leyendo los envíos que ya hay en el sistema...";
     const db = await amuLeerTabla("componentes_retirados", "*", q => q.eq("destino", AM_DESTINO));
     if (db.length && !("ammi_codigo_envio" in db[0])) throw new Error("faltan las columnas nuevas de AMMI");
-    const equipos = await amuLeerTabla("equipos", "m_control,cliente,serie_bateria,serie_cierre,serie_lector");
+    const equipos = await amuLeerTabla("equipos", "m_control,cliente,imei,serie_bateria,serie_cierre,serie_lector");
 
     amuRes = amComparar(archivo, db, equipos);
+    amuRes._imeis = new Map(equipos.map(q => [String(q.m_control).toUpperCase(), q.imei]));
     amuRes._t = { archivo: archivo.envios.length, ambas: archivo.ambas, soloControl: archivo.soloControl, soloInformes: archivo.soloInformes, bd: db.length };
     amuEstado.textContent = "";
     amuPintar();
@@ -128,6 +129,7 @@ function amuPintar() {
   h.push(`<div class="caja-formulario" style="margin-top:16px;">
     <p style="font-weight:600;">Importar</p>
     <p>Se crearán hasta <strong>${r.nuevos.length}</strong> registros históricos (${nuevosSinMc} sin MC en la tabla de equipos: quedan sin MC pero con su serial) y se completarán datos vacíos en <strong>${r.completar.length + r.difieren.length}</strong> envíos que ya existen. No se borra ni se pisa nada.</p>
+    <p>Cambios de carcasa: <strong>${amuCarcasas(false).length}</strong> se registrarán también en Vida del Equipo («Regresó de AMMI», con el mismo IMEI del MC anterior) y se recalculará el Registro Maestro.</p>
     ${r.nuevos.some(n => n.serialEnSistema.length) ? `<p><label style="cursor:pointer;"><input type="checkbox" id="am-incluir-dup"> Crear también los ${r.nuevos.filter(n => n.serialEnSistema.length).length} que ya tienen ese serial en el sistema con otra fecha (por defecto NO se crean)</label></p>` : ""}
     <button class="btn-secundario btn-compacto" type="button" id="am-csv">Descargar CSV</button>
     <button class="btn-primario" type="button" id="am-importar">Importar</button>
@@ -137,6 +139,47 @@ function amuPintar() {
   amuSalida.innerHTML = h.join("");
   document.getElementById("am-csv").addEventListener("click", amuCsv);
   document.getElementById("am-importar").addEventListener("click", amuImportar);
+}
+
+
+// Cambios de carcasa que se van a importar (para registrarlos en Vida del Equipo)
+function amuCarcasas(incluirDup) {
+  const r = amuRes;
+  const lista = [];
+  const fechaDe = v => String(v || "").slice(0, 10);
+  r.nuevos.filter(n => n.e.tipo && (incluirDup || !n.serialEnSistema.length)).forEach(n => {
+    const c = amCamposDelArchivo(n.e);
+    if (c.ammi_cambio_carcasa && c.ammi_mc_nuevo && n.e.serial !== c.ammi_mc_nuevo)
+      lista.push({ mcViejo: n.e.serial, mcNuevo: c.ammi_mc_nuevo, fecha: fechaDe(c.ammi_fecha_regreso), idOt: null });
+  });
+  [...r.completar, ...r.difieren].forEach(p => {
+    if (p.parche.ammi_cambio_carcasa && p.parche.ammi_mc_nuevo && p.e.serial !== p.parche.ammi_mc_nuevo)
+      lista.push({ mcViejo: p.e.serial, mcNuevo: p.parche.ammi_mc_nuevo, fecha: fechaDe(p.parche.ammi_fecha_regreso || p.bd.ammi_fecha_regreso), idOt: p.bd.id_ot || null });
+  });
+  return lista;
+}
+
+async function amuRegistrarCarcasa(c) {
+  let imei = amuRes._imeis.get(c.mcViejo.toUpperCase()) || null;
+  if (!imei) {
+    const { data: ev } = await supabaseClient.from("historial_equipo").select("imei")
+      .eq("mc", c.mcViejo).not("imei", "is", null).order("fecha", { ascending: false }).limit(1).maybeSingle();
+    imei = ev?.imei || null;
+  }
+  if (!imei) return { ok: false, motivo: "sin IMEI" };
+
+  const { data: existente } = await supabaseClient.from("historial_equipo").select("id")
+    .eq("mc", c.mcNuevo).eq("mc_anterior", c.mcViejo).eq("tipo_evento", "Regresó de AMMI").maybeSingle();
+  const datos = {
+    imei, mc: c.mcNuevo, tipo_evento: "Regresó de AMMI", mc_anterior: c.mcViejo, id_ot: c.idOt,
+    fecha: new Date((c.fecha || new Date().toISOString().slice(0, 10)) + "T12:00:00").toISOString(),
+    notas: `Reparado por AMMI con cambio de carcasa: serial ${c.mcViejo} → ${c.mcNuevo} (mismo IMEI). Importado del Excel de AMMI.`
+  };
+  const { error } = existente
+    ? await supabaseClient.from("historial_equipo").update(datos).eq("id", existente.id)
+    : await supabaseClient.from("historial_equipo").insert(datos);
+  if (error) return { ok: false, motivo: error.message };
+  return { ok: true, imei };
 }
 
 function amuCsv() {
@@ -179,7 +222,26 @@ async function amuImportar() {
       const fallo = resultados.find(x => x.error);
       if (fallo) throw new Error(`completar: ${fallo.error.message}`);
     }
-    caja.innerHTML = `<span class="resultado-msg resultado-ok" style="display:block;">✅ ${nuevas.length} registros creados y ${parches.length} completados. Vuelve a pulsar «Comparar» para verificar; no repitas «Importar» sin comparar antes, porque duplicaría los nuevos.</span>`;
+    const carcasas = amuCarcasas(incluirDup);
+    const sinImei = [], conError = [], imeis = new Set();
+    for (let i = 0; i < carcasas.length; i++) {
+      caja.textContent = `Registrando cambios de carcasa ${i + 1} de ${carcasas.length}...`;
+      const x = await amuRegistrarCarcasa(carcasas[i]);
+      if (x.ok) imeis.add(x.imei);
+      else if (x.motivo === "sin IMEI") sinImei.push(`${carcasas[i].mcViejo} → ${carcasas[i].mcNuevo}`);
+      else conError.push(`${carcasas[i].mcViejo}: ${x.motivo}`);
+    }
+    let errRec = 0;
+    for (const imei of imeis) {
+      const { error } = await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imei });
+      if (error) errRec++;
+    }
+    const avisos = [
+      sinImei.length ? `<br>⚠️ ${sinImei.length} cambios de carcasa NO se registraron en Vida del Equipo por no encontrar el IMEI del MC viejo: ${amuEsc(sinImei.join(", "))}` : "",
+      conError.length ? `<br>⚠️ Errores al registrar: ${amuEsc(conError.join(" | "))}` : "",
+      errRec ? `<br>⚠️ Falló el recálculo del Registro Maestro en ${errRec} IMEI.` : ""
+    ].join("");
+    caja.innerHTML = `<span class="resultado-msg resultado-ok" style="display:block;">✅ ${nuevas.length} registros creados, ${parches.length} completados y ${carcasas.length - sinImei.length - conError.length} cambios de carcasa registrados en Vida del Equipo.${avisos}<br>Vuelve a pulsar «Comparar» para verificar; no repitas «Importar» sin comparar antes, porque duplicaría los nuevos.</span>`;
   } catch (err) {
     caja.innerHTML = `<span class="resultado-msg resultado-error" style="display:block;">❌ ${amuEsc(err.message)}. Lo anterior a ese error quedó guardado: vuelve a pulsar «Comparar» antes de reintentar.</span>`;
   } finally {
