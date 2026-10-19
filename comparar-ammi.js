@@ -74,6 +74,7 @@ amuBtn.addEventListener("click", async () => {
     const equipos = await amuLeerTabla("equipos", "m_control,cliente,imei,serie_bateria,serie_cierre,serie_lector");
 
     amuRes = amComparar(archivo, db, equipos);
+    amuRes.nuevos.forEach(n => { n.serialEnSistema = n.serialEnSistema || []; }); // por si el core está desactualizado
     amuRes._imeis = new Map(equipos.map(q => [String(q.m_control).toUpperCase(), q.imei]));
     amuRes._t = { archivo: archivo.envios.length, ambas: archivo.ambas, soloControl: archivo.soloControl, soloInformes: archivo.soloInformes, bd: db.length };
     amuEstado.textContent = "";
