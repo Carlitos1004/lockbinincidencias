@@ -185,5 +185,5 @@ function cfPrepararEscritura(res, opciones) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { cfLeerArchivo, cfAgrupar, cfComparar, cfPrepararEscritura, cfFecha, cfNormCliente };
+  module.exports = { cfTexto, cfNormId, cfLeerArchivo, cfAgrupar, cfComparar, cfPrepararEscritura, cfFecha, cfNormCliente };
 }
