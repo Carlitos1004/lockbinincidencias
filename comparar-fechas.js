@@ -103,6 +103,13 @@ function cfPintar() {
   </div>
   <p style="margin-top:10px;">Archivo: ${r._totales.archivo} filas (${r.repetidosIguales} repetidas idénticas, ${r.sinIdentificador} sin identificador, descartadas). En el sistema: ${r._totales.bd} fechas de entrega y ${r._totales.equipos} equipos. Solo en el sistema (no tocados): ${r.soloBD.length}.</p>`);
 
+  if (r.difieren.length) {
+    html.push(`<div class="caja-formulario" style="margin-top:12px;">
+      <label style="cursor:pointer;"><input type="checkbox" id="cf-usar-todas">
+      <strong>Usar la fecha del archivo en TODAS las fechas distintas (${r.difieren.length})</strong></label>
+      <p style="margin:6px 0 0;">Se aplica a las ${r.difieren.length}, no solo a las que se ven en la tabla. Si no lo marcas, solo se cambian las que marques una a una.</p>
+    </div>`);
+  }
   html.push(cfTabla(`Fechas distintas (${r.difieren.length}) — marca las que quieras sustituir por la del archivo`,
     ["Usar archivo", "Identificador", "Campo", "Sistema", "Archivo"],
     r.difieren.map(d => `<tr><td><input type="checkbox" class="cf-usar" data-id="${cfEsc(d.id)}"></td><td>${cfEsc(d.id)}</td>
@@ -146,6 +153,10 @@ function cfPintar() {
   </div>`);
 
   cfSalida.innerHTML = html.join("");
+  const todas = document.getElementById("cf-usar-todas");
+  if (todas) todas.addEventListener("change", () => {
+    document.querySelectorAll(".cf-usar").forEach(c => { c.checked = todas.checked; c.disabled = todas.checked; });
+  });
   document.getElementById("cf-csv").addEventListener("click", cfDescargarCsv);
   document.getElementById("cf-importar").addEventListener("click", cfImportar);
 }
@@ -173,11 +184,15 @@ function cfDescargarCsv() {
 async function cfImportar() {
   const boton = document.getElementById("cf-importar");
   const caja = document.getElementById("cf-resultado");
-  const usarArchivoEn = new Set([...document.querySelectorAll(".cf-usar:checked")].map(c => c.dataset.id));
+  const todas = document.getElementById("cf-usar-todas");
+  const usarArchivoEn = (todas && todas.checked)
+    ? new Set(cfResultado.difieren.map(d => d.id))
+    : new Set([...document.querySelectorAll(".cf-usar:checked")].map(c => c.dataset.id));
   const elegidoConflicto = new Map([...document.querySelectorAll(".cf-conf")].map(s => [s.dataset.id, Number(s.value)]));
   const filas = cfPrepararEscritura(cfResultado, { usarArchivoEn, elegidoConflicto });
   if (!filas.length) { caja.textContent = "No hay nada que importar."; return; }
-  if (!confirm(`Se van a escribir ${filas.length} filas en fechas_entrega (nuevas y actualizadas). ¿Continuar?`)) return;
+  const nConf = [...elegidoConflicto.values()].filter(v => v >= 0).length;
+  if (!confirm(`Se van a escribir ${filas.length} filas en fechas_entrega (nuevas y actualizadas).\nFechas distintas sustituidas por las del archivo: ${usarArchivoEn.size}.\nRepetidos resueltos: ${nConf} de ${cfResultado.conflictos.length}.\n¿Continuar?`)) return;
 
   boton.disabled = true;
   try {
@@ -191,5 +206,71 @@ async function cfImportar() {
     caja.innerHTML = `<span class="resultado-msg resultado-error" style="display:block;">❌ ${cfEsc(err.message)}. Lo anterior a ese error quedó guardado; puedes repetir sin duplicar.</span>`;
   } finally {
     boton.disabled = false;
+  }
+}
+
+
+// =========================================================================
+// CONSULTA por MC o serial
+// =========================================================================
+
+const csTexto = document.getElementById("cs-texto");
+const csResultado = document.getElementById("cs-resultado");
+document.getElementById("cs-buscar").addEventListener("click", cfConsultar);
+csTexto.addEventListener("keydown", e => { if (e.key === "Enter") cfConsultar(); });
+
+function cfVence(entrega) {
+  if (!entrega) return "—";
+  const d = new Date(entrega + "T12:00:00");
+  d.setDate(d.getDate() + DIAS_GARANTIA);
+  return d.toISOString().slice(0, 10);
+}
+
+async function cfConsultar() {
+  const t = csTexto.value.trim().toUpperCase().replace(/[^A-Z0-9\-_ ]/g, "");
+  if (t.length < 3) { csResultado.textContent = "Escribe al menos 3 caracteres."; return; }
+  csResultado.textContent = "Buscando...";
+  try {
+    const patron = `%${t.replace(/ /g, "")}%`;
+    const [fe, eq] = await Promise.all([
+      supabaseClient.from("fechas_entrega")
+        .select("identificador,cliente,fecha_entrega,fecha_factura,fecha_inicio_contrato")
+        .ilike("identificador", patron).order("identificador").limit(50),
+      supabaseClient.from("equipos")
+        .select("m_control,cliente,imei,serie_bateria,serie_cierre,serie_lector")
+        .or(["m_control", "imei", "serie_bateria", "serie_cierre", "serie_lector"].map(c => `${c}.ilike.${patron}`).join(","))
+        .limit(50)
+    ]);
+    if (fe.error) throw new Error(fe.error.message);
+    if (eq.error) throw new Error(eq.error.message);
+
+    // Fecha de los MC encontrados vía equipos (por si el serial pertenece a un MC)
+    const mcs = [...new Set(eq.data.map(e => e.m_control))];
+    const porMc = new Map(fe.data.map(r => [r.identificador.toUpperCase(), r]));
+    const faltan = mcs.filter(m => !porMc.has(String(m).toUpperCase()));
+    if (faltan.length) {
+      const extra = await supabaseClient.from("fechas_entrega")
+        .select("identificador,cliente,fecha_entrega,fecha_factura,fecha_inicio_contrato").in("identificador", faltan);
+      (extra.data || []).forEach(r => porMc.set(r.identificador.toUpperCase(), r));
+    }
+
+    const f = d => d || "—";
+    const filas = [];
+    fe.data.forEach(r => filas.push({ ident: r.identificador, cliente: r.cliente, via: "Fecha registrada", r }));
+    eq.data.forEach(e => {
+      const campo = ["m_control", "imei", "serie_bateria", "serie_cierre", "serie_lector"].find(c => String(e[c] || "").toUpperCase().includes(t.replace(/ /g, "")));
+      if (campo === "m_control" && porMc.has(String(e.m_control).toUpperCase()) && fe.data.some(x => x.identificador === e.m_control)) return;
+      filas.push({ ident: e.m_control, cliente: e.cliente, via: campo === "m_control" ? "Equipo" : `Coincide en ${campo.replace("serie_", "serial ")}: ${e[campo]}`, r: porMc.get(String(e.m_control).toUpperCase()) || null });
+    });
+
+    if (!filas.length) { csResultado.textContent = "Sin resultados."; return; }
+    csResultado.innerHTML = `<div class="tabla-garantias-wrap" style="overflow-x:auto;"><table class="tabla-revision">
+      <thead><tr><th>Identificador</th><th>Cliente</th><th>Encontrado como</th><th>Entrega</th><th>Factura</th><th>Inicio contrato</th><th>Garantía</th></tr></thead><tbody>
+      ${filas.map(x => `<tr><td>${cfEsc(x.ident)}</td><td>${cfEsc(x.cliente || x.r?.cliente)}</td><td>${cfEsc(x.via)}</td>
+        <td>${f(x.r?.fecha_entrega)}</td><td>${f(x.r?.fecha_factura)}</td><td>${f(x.r?.fecha_inicio_contrato)}</td>
+        <td>${x.r?.fecha_entrega ? `${calcularGarantiaTiempo(x.r.fecha_entrega)}<br>hasta ${cfVence(x.r.fecha_entrega)}` : "Sin fecha registrada"}</td></tr>`).join("")}
+      </tbody></table></div>${filas.length >= 50 ? "<p>Se muestran los primeros resultados; afina la búsqueda.</p>" : ""}`;
+  } catch (err) {
+    csResultado.innerHTML = `<span class="resultado-msg resultado-error" style="display:block;">❌ ${cfEsc(err.message)}</span>`;
   }
 }

@@ -27,6 +27,16 @@
 
   <p style="margin-top:20px;">Sube el Excel <strong>FechasEntregasEquipos</strong> (hojas «Equipos nuevos» y «Módulos sueltos»). Primero solo se compara con lo que ya hay en el sistema; no se cambia nada hasta que pulses «Importar». Se guardan las tres fechas: entrega, factura e inicio de contrato.</p>
 
+  <div class="caja-formulario" style="margin-top:20px;">
+    <p style="font-weight:600;">Consultar fecha por MC o por serial</p>
+    <div class="materiales-controles">
+      <input type="text" id="cs-texto" placeholder="MC o serial (batería, cierre, lector, IMEI…). Admite parte del código">
+      <button id="cs-buscar" class="btn-primario btn-compacto" type="button">Buscar</button>
+    </div>
+    <div id="cs-resultado" style="margin-top:10px;"></div>
+  </div>
+
+  <p style="margin-top:20px;font-weight:600;">Actualizar fechas desde Excel</p>
   <div class="import-box">
     <input type="file" id="cf-archivo" accept=".xlsx,.xls">
     <button id="cf-analizar" disabled class="btn-primario">Comparar</button>
@@ -40,6 +50,7 @@
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "manager";</script>
 <script src="sesion.js"></script>
+<script src="garantia-utils.js"></script>
 <script src="comparar-fechas-core.js"></script>
 <script src="comparar-fechas.js"></script>
 </body>
