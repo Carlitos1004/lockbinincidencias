@@ -165,6 +165,8 @@ function amCamposDelArchivo(e) {
 
 const AM_VACIO = v => v === null || v === undefined || v === "";
 
+function amSumar(fecha, dias) { const d = new Date(fecha + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + dias); return d.toISOString().slice(0, 10); }
+
 function amDias(a, b) { return Math.abs((new Date(a) - new Date(b)) / 86400000); }
 
 // db: filas de componentes_retirados con destino AMMI (select *)
@@ -184,12 +186,18 @@ function amComparar(archivo, db, equipos) {
   ordenados.forEach(e => {
     if (e.pendiente) res.pendientesArchivo++;
     const cands = (porSerial.get(e.serial) || []).filter(r => !usados.has(r.id));
+    // Mismo envío = el registro del sistema cae entre (envío − 20 días) y
+    // (regreso + 20 días); si aún está pendiente, hasta envío + 60 días.
+    const ini = e.fechaEnvio ? amSumar(e.fechaEnvio, -AM_VENTANA_DIAS) : null;
+    const fin = e.fechaEnvio ? (e.fechaDevolucion && !e.pendiente ? amSumar(e.fechaDevolucion, AM_VENTANA_DIAS) : amSumar(e.fechaEnvio, 60)) : null;
     let mejor = null, mejorD = Infinity;
     cands.forEach(r => {
-      const d = e.fechaEnvio && r.fecha ? amDias(e.fechaEnvio, r.fecha) : 0;
+      const f = String(r.fecha || "").slice(0, 10);
+      if (ini && f && (f < ini || f > fin)) return;
+      const d = e.fechaEnvio && f ? amDias(e.fechaEnvio, f) : 0;
       if (d < mejorD) { mejor = r; mejorD = d; }
     });
-    if (!mejor || (e.fechaEnvio && mejor.fecha && mejorD > AM_VENTANA_DIAS)) {
+    if (!mejor) {
       // ¿Hay en el sistema ese mismo serial (con otra fecha)? Posible duplicado.
       const mismos = (porSerial.get(e.serial) || []).map(r => String(r.fecha || "").slice(0, 10));
       res.nuevos.push({ e, serialEnSistema: mismos });

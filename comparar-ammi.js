@@ -75,6 +75,7 @@ amuBtn.addEventListener("click", async () => {
 
     amuRes = amComparar(archivo, db, equipos);
     amuRes.nuevos.forEach(n => { n.serialEnSistema = n.serialEnSistema || []; }); // por si el core está desactualizado
+    amuRes._db = db;
     amuRes._imeis = new Map(equipos.map(q => [String(q.m_control).toUpperCase(), q.imei]));
     amuRes._t = { archivo: archivo.envios.length, ambas: archivo.ambas, soloControl: archivo.soloControl, soloInformes: archivo.soloInformes, bd: db.length };
     amuEstado.textContent = "";
@@ -109,7 +110,7 @@ function amuPintar() {
     ${tarjeta(r.completar.length, "Están y se pueden completar")}
     ${tarjeta(r.difieren.length, "Están con datos distintos")}
     ${tarjeta(r.completos.length, "Ya completos")}
-    ${tarjeta(r.nuevos.filter(n => n.serialEnSistema.length).length, "«Nuevos» con el mismo serial en el sistema (posible duplicado)")}
+    ${tarjeta(r.nuevos.filter(n => n.serialEnSistema.length).length, "Reenvíos: mismo serial, otro periodo")}
   </div>
   <p style="margin-top:10px;">Archivo: ${r._t.archivo} envíos (${r._t.ambas} en las dos hojas, ${r._t.soloControl} solo en Control, ${r._t.soloInformes} solo en Informes; ${r.pendientesArchivo} pendientes de regreso). Sin serial (descartados): ${r.sinSerial.length}. En el sistema: ${r._t.bd} envíos a AMMI, de los cuales ${r.soloBD.length} no aparecen en el archivo (no se tocan).</p>`);
 
@@ -118,7 +119,7 @@ function amuPintar() {
     r.difieren.map(d => `<tr><td>${amuEsc(d.e.serial)}</td><td>${f(d.e.fechaEnvio)}</td><td>${d.diferencias.map(x => `${amuEsc(x.campo)}: sistema «${amuEsc(x.sistema)}» / archivo «${amuEsc(x.archivo)}»`).join("<br>")}</td></tr>`), r.difieren.length > 0));
 
   h.push(amuTabla(`No están en el sistema (${r.nuevos.length}) — se crearán como registro histórico`,
-    ["Serial", "Tipo", "Envío", "Regreso", "Acción", "MC / cliente en el sistema", "SN reposición / MC nuevo", "Mismo serial en el sistema"],
+    ["Serial", "Tipo", "Envío", "Regreso", "Acción", "MC / cliente en el sistema", "SN reposición / MC nuevo", "Ya en el sistema con fecha (otro periodo)"],
     r.nuevos.map(n => `<tr><td>${amuEsc(n.e.serial)}</td><td>${f(n.e.tipo)}</td><td>${f(n.e.fechaEnvio)}</td><td>${n.e.pendiente ? "Pendiente" : f(n.e.fechaDevolucion)}</td><td>${f(n.e.accion)}</td>
       <td>${n.mc ? amuEsc(n.mc) + " · " + amuEsc(n.clienteSistema) : "<em>no encontrado</em> · " + amuEsc(n.e.cliente)}</td><td>${f(n.e.snUtilizado)}</td><td>${n.serialEnSistema.length ? "⚠️ " + n.serialEnSistema.join(", ") : "—"}</td></tr>`)));
 
@@ -131,13 +132,19 @@ function amuPintar() {
     <p style="font-weight:600;">Importar</p>
     <p>Se crearán hasta <strong>${r.nuevos.length}</strong> registros históricos (${nuevosSinMc} sin MC en la tabla de equipos: quedan sin MC pero con su serial) y se completarán datos vacíos en <strong>${r.completar.length + r.difieren.length}</strong> envíos que ya existen. No se borra ni se pisa nada.</p>
     <p>Cambios de carcasa: <strong>${amuCarcasas(false).length}</strong> se registrarán también en Vida del Equipo («Regresó de AMMI», con el mismo IMEI del MC anterior) y se recalculará el Registro Maestro.</p>
-    ${r.nuevos.some(n => n.serialEnSistema.length) ? `<p><label style="cursor:pointer;"><input type="checkbox" id="am-incluir-dup"> Crear también los ${r.nuevos.filter(n => n.serialEnSistema.length).length} que ya tienen ese serial en el sistema con otra fecha (por defecto NO se crean)</label></p>` : ""}
+    ${r.nuevos.some(n => n.serialEnSistema.length) ? `<p><label style="cursor:pointer;"><input type="checkbox" id="am-incluir-dup" checked> Crear también los ${r.nuevos.filter(n => n.serialEnSistema.length).length} reenvíos: el mismo serial ya está en el sistema pero con una fecha fuera del periodo de este envío, así que son envíos distintos (desmarca para omitirlos)</label></p>` : ""}
     <button class="btn-secundario btn-compacto" type="button" id="am-csv">Descargar CSV</button>
     <button class="btn-primario" type="button" id="am-importar">Importar</button>
     <div id="am-resultado" style="margin-top:10px;"></div>
   </div>`);
 
+  h.push(`<div class="caja-formulario" style="margin-top:16px;">
+    <p style="font-weight:600;">Cambios de carcasa sin registrar en Vida del Equipo</p>
+    <div id="am-pend-carcasa">Comprobando...</div>
+  </div>`);
+
   amuSalida.innerHTML = h.join("");
+  amuCalcularPendientesCarcasa();
   document.getElementById("am-csv").addEventListener("click", amuCsv);
   document.getElementById("am-importar").addEventListener("click", amuImportar);
 }
@@ -161,10 +168,12 @@ function amuCarcasas(incluirDup) {
 }
 
 async function amuRegistrarCarcasa(c) {
-  let imei = amuRes._imeis.get(c.mcViejo.toUpperCase()) || null;
-  if (!imei) {
+  // El MC nuevo comparte placa (y IMEI) con el viejo: se busca por cualquiera de los dos
+  let imei = amuRes._imeis.get(c.mcViejo.toUpperCase()) || amuRes._imeis.get(c.mcNuevo.toUpperCase()) || null;
+  for (const mc of [c.mcViejo, c.mcNuevo]) {
+    if (imei) break;
     const { data: ev } = await supabaseClient.from("historial_equipo").select("imei")
-      .eq("mc", c.mcViejo).not("imei", "is", null).order("fecha", { ascending: false }).limit(1).maybeSingle();
+      .eq("mc", mc).not("imei", "is", null).order("fecha", { ascending: false }).limit(1).maybeSingle();
     imei = ev?.imei || null;
   }
   if (!imei) return { ok: false, motivo: "sin IMEI" };
@@ -248,4 +257,46 @@ async function amuImportar() {
   } finally {
     boton.disabled = false;
   }
+}
+
+
+// =========================================================================
+// Cambios de carcasa que ya están en componentes_retirados pero no en Vida del Equipo
+// =========================================================================
+
+let amuPendCarcasa = [];
+
+async function amuCalcularPendientesCarcasa() {
+  const caja = document.getElementById("am-pend-carcasa");
+  try {
+    const eventos = await amuLeerTabla("historial_equipo", "mc,mc_anterior", q => q.eq("tipo_evento", "Regresó de AMMI"));
+    const hechos = new Set(eventos.map(e => `${String(e.mc).toUpperCase()}|${String(e.mc_anterior).toUpperCase()}`));
+    amuPendCarcasa = amuRes._db
+      .filter(r => r.ammi_cambio_carcasa && r.ammi_mc_nuevo)
+      .map(r => ({ mcViejo: r.m_control || r.serial_retirado, mcNuevo: r.ammi_mc_nuevo, fecha: String(r.ammi_fecha_regreso || "").slice(0, 10), idOt: r.id_ot || null }))
+      .filter(c => c.mcViejo && !hechos.has(`${c.mcNuevo.toUpperCase()}|${c.mcViejo.toUpperCase()}`));
+    caja.innerHTML = amuPendCarcasa.length
+      ? `<p><strong>${amuPendCarcasa.length}</strong>: ${amuEsc(amuPendCarcasa.map(c => c.mcViejo + " → " + c.mcNuevo).join(", "))}</p>
+         <button class="btn-primario btn-compacto" type="button" id="am-reg-carcasa">Registrar en Vida del Equipo</button>
+         <div id="am-reg-carcasa-res" style="margin-top:8px;"></div>`
+      : "Ninguno pendiente: todos los cambios de carcasa están registrados.";
+    const b = document.getElementById("am-reg-carcasa");
+    if (b) b.addEventListener("click", amuRegistrarPendientes);
+  } catch (err) {
+    caja.textContent = "No se pudo comprobar: " + err.message;
+  }
+}
+
+async function amuRegistrarPendientes() {
+  const res = document.getElementById("am-reg-carcasa-res");
+  const b = document.getElementById("am-reg-carcasa");
+  b.disabled = true;
+  const sin = [], err = [], imeis = new Set();
+  for (const c of amuPendCarcasa) {
+    const x = await amuRegistrarCarcasa(c);
+    if (x.ok) imeis.add(x.imei); else (x.motivo === "sin IMEI" ? sin : err).push(`${c.mcViejo} → ${c.mcNuevo}${x.motivo === "sin IMEI" ? "" : " (" + x.motivo + ")"}`);
+  }
+  for (const imei of imeis) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imei });
+  res.innerHTML = `✅ ${amuPendCarcasa.length - sin.length - err.length} registrados.${sin.length ? `<br>⚠️ Sin IMEI en equipos ni historial (ni el MC viejo ni el nuevo): ${amuEsc(sin.join(", "))}` : ""}${err.length ? `<br>⚠️ ${amuEsc(err.join(" | "))}` : ""}`;
+  b.disabled = false;
 }
