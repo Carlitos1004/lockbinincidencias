@@ -107,6 +107,7 @@ function amuPintar() {
     ${tarjeta(r.completar.length, "Están y se pueden completar")}
     ${tarjeta(r.difieren.length, "Están con datos distintos")}
     ${tarjeta(r.completos.length, "Ya completos")}
+    ${tarjeta(r.nuevos.filter(n => n.serialEnSistema.length).length, "«Nuevos» con el mismo serial en el sistema (posible duplicado)")}
   </div>
   <p style="margin-top:10px;">Archivo: ${r._t.archivo} envíos (${r._t.ambas} en las dos hojas, ${r._t.soloControl} solo en Control, ${r._t.soloInformes} solo en Informes; ${r.pendientesArchivo} pendientes de regreso). Sin serial (descartados): ${r.sinSerial.length}. En el sistema: ${r._t.bd} envíos a AMMI, de los cuales ${r.soloBD.length} no aparecen en el archivo (no se tocan).</p>`);
 
@@ -115,9 +116,9 @@ function amuPintar() {
     r.difieren.map(d => `<tr><td>${amuEsc(d.e.serial)}</td><td>${f(d.e.fechaEnvio)}</td><td>${d.diferencias.map(x => `${amuEsc(x.campo)}: sistema «${amuEsc(x.sistema)}» / archivo «${amuEsc(x.archivo)}»`).join("<br>")}</td></tr>`), r.difieren.length > 0));
 
   h.push(amuTabla(`No están en el sistema (${r.nuevos.length}) — se crearán como registro histórico`,
-    ["Serial", "Tipo", "Envío", "Regreso", "Acción", "MC / cliente en el sistema", "SN reposición / MC nuevo"],
+    ["Serial", "Tipo", "Envío", "Regreso", "Acción", "MC / cliente en el sistema", "SN reposición / MC nuevo", "Mismo serial en el sistema"],
     r.nuevos.map(n => `<tr><td>${amuEsc(n.e.serial)}</td><td>${f(n.e.tipo)}</td><td>${f(n.e.fechaEnvio)}</td><td>${n.e.pendiente ? "Pendiente" : f(n.e.fechaDevolucion)}</td><td>${f(n.e.accion)}</td>
-      <td>${n.mc ? amuEsc(n.mc) + " · " + amuEsc(n.clienteSistema) : "<em>no encontrado</em> · " + amuEsc(n.e.cliente)}</td><td>${f(n.e.snUtilizado)}</td></tr>`)));
+      <td>${n.mc ? amuEsc(n.mc) + " · " + amuEsc(n.clienteSistema) : "<em>no encontrado</em> · " + amuEsc(n.e.cliente)}</td><td>${f(n.e.snUtilizado)}</td><td>${n.serialEnSistema.length ? "⚠️ " + n.serialEnSistema.join(", ") : "—"}</td></tr>`)));
 
   h.push(amuTabla(`Se completan (${r.completar.length})`, ["Serial", "Envío", "Campos que se rellenan"],
     r.completar.map(c => `<tr><td>${amuEsc(c.e.serial)}</td><td>${f(c.e.fechaEnvio)}</td><td>${Object.keys(c.parche).map(k => k.replace("ammi_", "")).join(", ")}</td></tr>`)));
@@ -126,7 +127,8 @@ function amuPintar() {
 
   h.push(`<div class="caja-formulario" style="margin-top:16px;">
     <p style="font-weight:600;">Importar</p>
-    <p>Se crearán <strong>${r.nuevos.length}</strong> registros históricos (${nuevosSinMc} sin MC en la tabla de equipos: quedan sin MC pero con su serial) y se completarán datos vacíos en <strong>${r.completar.length + r.difieren.length}</strong> envíos que ya existen. No se borra ni se pisa nada.</p>
+    <p>Se crearán hasta <strong>${r.nuevos.length}</strong> registros históricos (${nuevosSinMc} sin MC en la tabla de equipos: quedan sin MC pero con su serial) y se completarán datos vacíos en <strong>${r.completar.length + r.difieren.length}</strong> envíos que ya existen. No se borra ni se pisa nada.</p>
+    ${r.nuevos.some(n => n.serialEnSistema.length) ? `<p><label style="cursor:pointer;"><input type="checkbox" id="am-incluir-dup"> Crear también los ${r.nuevos.filter(n => n.serialEnSistema.length).length} que ya tienen ese serial en el sistema con otra fecha (por defecto NO se crean)</label></p>` : ""}
     <button class="btn-secundario btn-compacto" type="button" id="am-csv">Descargar CSV</button>
     <button class="btn-primario" type="button" id="am-importar">Importar</button>
     <div id="am-resultado" style="margin-top:10px;"></div>
@@ -157,7 +159,8 @@ async function amuImportar() {
   const boton = document.getElementById("am-importar");
   const caja = document.getElementById("am-resultado");
   const r = amuRes;
-  const nuevas = r.nuevos.filter(n => n.e.tipo).map(amFilaNueva);
+  const incluirDup = !!(document.getElementById("am-incluir-dup") || {}).checked;
+  const nuevas = r.nuevos.filter(n => n.e.tipo && (incluirDup || !n.serialEnSistema.length)).map(amFilaNueva);
   const parches = [...r.completar, ...r.difieren].filter(x => Object.keys(x.parche).length);
   if (!nuevas.length && !parches.length) { caja.textContent = "No hay nada que importar."; return; }
   if (!confirm(`Se crearán ${nuevas.length} registros históricos y se completarán ${parches.length} envíos existentes. ¿Continuar?`)) return;
