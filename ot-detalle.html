@@ -13,7 +13,11 @@
 <link rel="stylesheet" href="styles.css">
 <style>
   .panel-body-ancho { max-width: 98vw; }
-  .scroll-x-tabla { overflow-x: auto; max-width: 100%; }
+  /* La tabla scrollea dentro de su propia caja: así la barra horizontal queda
+     siempre visible abajo en pantalla y los encabezados/filtros no se pierden */
+  .scroll-x-tabla { overflow: auto; max-width: 100%; max-height: calc(100vh - 70px); }
+  .scroll-x-tabla thead tr:first-child th { position: sticky; top: 0; z-index: 3; background: var(--gris-100, #f3f4f1); }
+  .scroll-x-tabla thead tr.fila-filtros th { position: sticky; top: var(--fila1-h, 34px); z-index: 2; }
   .componente-retirado-linea { margin-bottom: 6px; }
   .componente-retirado-linea:last-child { margin-bottom: 0; }
   .componente-retirado-detalle { color: var(--gris-700); font-size: 0.82rem; }
@@ -22,7 +26,7 @@
   .badge-vandalismo { display:inline-block; padding:2px 8px; border-radius:10px; background:#fdecea; color:#b71c1c; font-weight:600; font-size:0.78rem; }
   .select-vandalismo { font-size:0.8rem; padding:4px 6px; border-radius:8px; border:1.5px solid var(--gris-200); }
   .select-vandalismo.es-vandalismo { border-color:#b71c1c; background:#fdecea; color:#b71c1c; font-weight:600; }
-  #tabla-ot .fila-filtros th { position: sticky; top: 0; z-index: 1; }
+
 </style>
 </head>
 <body>

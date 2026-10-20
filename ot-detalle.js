@@ -193,6 +193,7 @@ async function buscarOT() {
   // no tiene sentido mostrar una tabla vacía con sus filtros.
   const sinTickets = ticketsCargados.length === 0;
   document.getElementById("tabla-ot-wrap").hidden = sinTickets;
+  setTimeout(ajustarEncabezadoSticky, 0);
   document.getElementById("ot-resumen-filtros").hidden = sinTickets;
   document.getElementById("guardar-todo-btn").hidden = sinTickets || window.perfilActual?.rol !== "manager";
   document.getElementById("ot-sin-tickets-msg").hidden = !sinTickets;
@@ -883,6 +884,7 @@ async function cargarComponentesSinTicket(idOt) {
 
   box.hidden = false;
   renderSinTicket();
+  setTimeout(ajustarEncabezadoSticky, 0);
 }
 
 function renderSinTicket() {
@@ -1026,3 +1028,13 @@ function distanciaKm(lat1, lng1, lat2, lng2) {
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+
+// Mide la altura de la 1ª fila de encabezados para que la fila de filtros
+// se quede pegada justo debajo de ella al desplazarse
+function ajustarEncabezadoSticky() {
+  document.querySelectorAll(".scroll-x-tabla").forEach(w => {
+    const tr = w.querySelector("thead tr");
+    if (tr && tr.offsetHeight) w.style.setProperty("--fila1-h", tr.offsetHeight + "px");
+  });
+}
+window.addEventListener("resize", ajustarEncabezadoSticky);
