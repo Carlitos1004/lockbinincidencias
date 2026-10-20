@@ -21,6 +21,9 @@ let conteoFotosPorRegistro = {};
 let componentesPorRegistro = {};
 let conteoFotosRevisionPorRegistro = {};
 const VANDALISMO_CAMPOS = true;
+const SIN_CONDICION = "__sin__";
+const etiquetaCondicion = c => `<span class="tag-condicion ${/agua/i.test(c) ? "agua" : ""}">${/agua/i.test(c) ? "💧 " : ""}${c}</span>`;
+const condicionesDeComps = comps => [...new Set((comps || []).flatMap(c => c.condicion_fisica || []))];
 
 // Consulta con .in() en bloques (una OT puede tener cientos de equipos y
 // una lista muy larga en la URL hace fallar la petición)
@@ -173,6 +176,10 @@ async function buscarOT() {
   document.getElementById("filtro-fraccion").innerHTML =
     `<option value="">Todas</option><option value="__sin__">(sin fracción)</option>` +
     fraccionesUnicas.map(f => `<option value="${f}">${f}</option>`).join("");
+  const condicionesUnicas = [...new Set(Object.values(componentesPorRegistro).flatMap(cs => condicionesDeComps(cs)))].sort();
+  document.getElementById("filtro-condicion").innerHTML =
+    `<option value="">Todas</option><option value="${SIN_CONDICION}">(sin problema)</option>` +
+    condicionesUnicas.map(c => `<option value="${c}">${c}</option>`).join("");
   limpiarFiltros(false);
 
   document.getElementById("ot-titulo").textContent = idOt;
@@ -209,6 +216,7 @@ function renderTabla() {
   const filtroEstado = document.getElementById("filtro-estado-ticket").value;
   const filtroFraccion = document.getElementById("filtro-fraccion").value;
   const filtroComp = val("filtro-componentes");
+  const filtroCondicion = document.getElementById("filtro-condicion").value;
   const filtroSerialNuevo = val("filtro-serial-nuevo");
   const filtroFotos = document.getElementById("filtro-fotos").value;
   const filtroVand = document.getElementById("filtro-vandalismo").value;
@@ -227,6 +235,9 @@ function renderTabla() {
       (!filtroEstado || t.estado === filtroEstado) &&
       (!filtroFraccion || (filtroFraccion === "__sin__" ? !t.equipos?.fraccion : t.equipos?.fraccion === filtroFraccion)) &&
       (!filtroComp || textoComponentes(t).includes(filtroComp)) &&
+      (!filtroCondicion || (filtroCondicion === SIN_CONDICION
+        ? condicionesDeComps(componentesPorRegistro[t.id_registro]).length === 0
+        : condicionesDeComps(componentesPorRegistro[t.id_registro]).includes(filtroCondicion))) &&
       (!filtroSerialNuevo || String(t.nuevo_serial || "").toLowerCase().includes(filtroSerialNuevo)) &&
       (!filtroFotos || (filtroFotos === "con" ? (fotosReporte + fotosRevision) > 0
         : filtroFotos === "reporte" ? fotosReporte > 0
@@ -286,11 +297,14 @@ function renderTabla() {
     const celdaComponentes = compsDelTicket.length > 0
       ? compsDelTicket.map(c => {
           const etiquetaTipo = c.serial_retirado ? `${c.tipo_componente} (${c.serial_retirado})` : c.tipo_componente;
-          const detalle = [c.causa_falla, c.condicion_fisica, c.reparacion].filter(Boolean).join(" — ");
+          const detalle = [c.causa_falla, c.reparacion].filter(Boolean).join(" — ");
           const aAmmi = c.destino === DESTINO_AMMI ? " · → AMMI" : "";
           return `<div class="componente-retirado-linea"><strong>${etiquetaTipo}</strong>${aAmmi}${detalle ? "<br><span class='componente-retirado-detalle'>" + detalle + "</span>" : ""}</div>`;
         }).join("")
       : "—";
+
+    const condiciones = condicionesDeComps(compsDelTicket);
+    const celdaCondicion = condiciones.length ? condiciones.map(etiquetaCondicion).join("") : "—";
 
     return `
       <tr>
@@ -299,6 +313,7 @@ function renderTabla() {
         <td>${t.falla}</td>
         <td>${t.estado}${t.estado_equipo ? " — " + t.estado_equipo : ""}</td>
         <td>${celdaComponentes}</td>
+        <td>${celdaCondicion}</td>
         <td>${t.nuevo_serial || "—"}</td>
         <td>${celdaFoto}</td>
         <td>${celdaVandalismo}</td>
@@ -474,6 +489,7 @@ descargarBtn.addEventListener("click", () => {
       "Falla": t.falla,
       "Estado": t.estado,
       "Estado Equipo": t.estado_equipo || "",
+      "Condición física": condicionesDeComps(compsDelTicket).join(", "),
       "Vandalismo": (t.vandalismo === true || compsDelTicket.some(c => c.vandalismo)) ? "Sí" : t.vandalismo === false ? "No" : "Sin revisar",
       "Componentes retirados / Motivo": componentesTexto,
       "Acción en calle": t.accion_calle || "",
@@ -685,12 +701,12 @@ document.getElementById("agregar-equipo-btn").addEventListener("click", async ()
 
 ["filtro-modulo", "filtro-componentes", "filtro-serial-nuevo", "filtro-accion"].forEach(id =>
   document.getElementById(id).addEventListener("input", renderTabla));
-["filtro-falla-select", "filtro-estado-ticket", "filtro-fraccion", "filtro-fotos", "filtro-vandalismo"].forEach(id =>
+["filtro-falla-select", "filtro-estado-ticket", "filtro-fraccion", "filtro-condicion", "filtro-fotos", "filtro-vandalismo"].forEach(id =>
   document.getElementById(id).addEventListener("change", renderTabla));
 
 function limpiarFiltros(repintar = true) {
   ["filtro-modulo", "filtro-componentes", "filtro-serial-nuevo", "filtro-accion",
-   "filtro-falla-select", "filtro-estado-ticket", "filtro-fraccion", "filtro-fotos", "filtro-vandalismo"
+   "filtro-falla-select", "filtro-estado-ticket", "filtro-fraccion", "filtro-condicion", "filtro-fotos", "filtro-vandalismo"
   ].forEach(id => { document.getElementById(id).value = ""; });
   if (repintar) renderTabla();
 }
@@ -881,6 +897,9 @@ async function cargarComponentesSinTicket(idOt) {
   rellenar("sf-estado", data.map(c => c.estado));
   rellenar("sf-cliente", data.map(c => c.cliente_original));
   rellenar("sf-destino", data.map(c => c.destino));
+  rellenar("sf-condicion", data.flatMap(c => c.condicion_fisica || []));
+  const selCond = document.getElementById("sf-condicion");
+  selCond.insertAdjacentHTML("beforeend", `<option value="${SIN_CONDICION}">(sin problema)</option>`);
 
   box.hidden = false;
   renderSinTicket();
@@ -894,6 +913,7 @@ function renderSinTicket() {
   const fm = val("sf-modulo"), fs = val("sf-serial"), fh = val("sf-hallazgo");
   const fComp = document.getElementById("sf-componente").value, fEst = document.getElementById("sf-estado").value;
   const fCli = document.getElementById("sf-cliente").value, fDes = document.getElementById("sf-destino").value;
+  const fCond = document.getElementById("sf-condicion").value;
   const fFotos = document.getElementById("sf-fotos").value, fVand = document.getElementById("sf-vandalismo").value;
 
   const filas = sinTicketCargados.filter(c => {
@@ -902,6 +922,7 @@ function renderSinTicket() {
       (!fs || String(c.serial_retirado || "").toLowerCase().includes(fs)) &&
       (!fh || String(c.reparacion || "").toLowerCase().includes(fh)) &&
       (!fComp || c.tipo_componente === fComp) && (!fEst || c.estado === fEst) &&
+      (!fCond || (fCond === SIN_CONDICION ? !(c.condicion_fisica || []).length : (c.condicion_fisica || []).includes(fCond))) &&
       (!fCli || c.cliente_original === fCli) && (!fDes || c.destino === fDes) &&
       (!fFotos || (fFotos === "con" ? nFotos > 0 : nFotos === 0)) &&
       (!fVand || (fVand === "si") === !!c.vandalismo);
@@ -929,6 +950,7 @@ function renderSinTicket() {
       <td>${c.estado}</td>
       <td>${c.cliente_original || "—"}</td>
       <td>${c.destino || "—"}</td>
+      <td>${(c.condicion_fisica || []).length ? c.condicion_fisica.map(etiquetaCondicion).join("") : "—"}</td>
       <td>${c.reparacion || "—"}</td>
       <td>${fotos}</td>
       <td>${vand}</td>
@@ -951,9 +973,9 @@ function renderSinTicket() {
 }
 
 ["sf-modulo", "sf-serial", "sf-hallazgo"].forEach(id => document.getElementById(id).addEventListener("input", renderSinTicket));
-["sf-componente", "sf-estado", "sf-cliente", "sf-destino", "sf-fotos", "sf-vandalismo"].forEach(id => document.getElementById(id).addEventListener("change", renderSinTicket));
+["sf-componente", "sf-estado", "sf-cliente", "sf-destino", "sf-condicion", "sf-fotos", "sf-vandalismo"].forEach(id => document.getElementById(id).addEventListener("change", renderSinTicket));
 document.getElementById("sf-limpiar").addEventListener("click", () => {
-  ["sf-modulo", "sf-serial", "sf-hallazgo", "sf-componente", "sf-estado", "sf-cliente", "sf-destino", "sf-fotos", "sf-vandalismo"].forEach(id => { document.getElementById(id).value = ""; });
+  ["sf-modulo", "sf-serial", "sf-hallazgo", "sf-componente", "sf-estado", "sf-cliente", "sf-destino", "sf-condicion", "sf-fotos", "sf-vandalismo"].forEach(id => { document.getElementById(id).value = ""; });
   renderSinTicket();
 });
 

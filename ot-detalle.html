@@ -23,6 +23,10 @@
   .componente-retirado-detalle { color: var(--gris-700); font-size: 0.82rem; }
   .btn-foto-ot { display:inline-block; margin:2px 4px 2px 0; padding:3px 8px; border-radius:8px; border:1.5px solid var(--gris-200); background:#fff; font-size:0.78rem; color:var(--verde-oscuro, #1b5e20); text-decoration:none; white-space:nowrap; }
   .btn-foto-ot:hover { border-color: var(--verde-medio); }
+  .tag-condicion { display:inline-block; margin:1px 3px 1px 0; padding:2px 7px; border-radius:10px; background:#eef1ea; font-size:0.76rem; white-space:nowrap; }
+  .tag-condicion.agua { background:#e3f2fd; color:#0d47a1; font-weight:600; }
+  #tabla-ot td:nth-child(5), #tabla-sin-ticket td:nth-child(8) { max-width: 300px; }
+  #tabla-sin-ticket td:nth-child(7) { max-width: 240px; }
   .badge-vandalismo { display:inline-block; padding:2px 8px; border-radius:10px; background:#fdecea; color:#b71c1c; font-weight:600; font-size:0.78rem; }
   .select-vandalismo { font-size:0.8rem; padding:4px 6px; border-radius:8px; border:1.5px solid var(--gris-200); }
   .select-vandalismo.es-vandalismo { border-color:#b71c1c; background:#fdecea; color:#b71c1c; font-weight:600; }
@@ -150,7 +154,7 @@
       <div class="scroll-x-tabla">
       <table class="tabla-revision" id="tabla-sin-ticket">
         <thead>
-          <tr><th>Módulo</th><th>Componente</th><th>Serial</th><th>Estado</th><th>Cliente Histórico</th><th>Destino</th><th>Hallazgo</th><th>Fotos</th><th>Vandalismo</th><th></th></tr>
+          <tr><th>Módulo</th><th>Componente</th><th>Serial</th><th>Estado</th><th>Cliente Histórico</th><th>Destino</th><th>Condición física</th><th>Hallazgo</th><th>Fotos</th><th>Vandalismo</th><th></th></tr>
           <tr class="fila-filtros">
             <th><input type="text" id="sf-modulo" placeholder="Filtrar..."></th>
             <th><select id="sf-componente"><option value="">Todos</option></select></th>
@@ -158,6 +162,7 @@
             <th><select id="sf-estado"><option value="">Todos</option></select></th>
             <th><select id="sf-cliente"><option value="">Todos</option></select></th>
             <th><select id="sf-destino"><option value="">Todos</option></select></th>
+            <th><select id="sf-condicion"><option value="">Todas</option></select></th>
             <th><input type="text" id="sf-hallazgo" placeholder="Filtrar..."></th>
             <th><select id="sf-fotos"><option value="">Todas</option><option value="con">Con fotos</option><option value="sin">Sin fotos</option></select></th>
             <th><select id="sf-vandalismo"><option value="">Todos</option><option value="si">🔨 Vandalismo</option><option value="no">No</option></select></th>
@@ -176,7 +181,7 @@
     <div class="scroll-x-tabla" id="tabla-ot-wrap">
     <table class="tabla-revision" id="tabla-ot">
       <thead>
-        <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Componentes retirados / Motivo</th><th>Serial Nuevo</th><th>Fotos</th><th>Vandalismo</th><th>Acción / Comentarios</th><th></th></tr>
+        <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Componentes retirados / Motivo</th><th>Condición física</th><th>Serial Nuevo</th><th>Fotos</th><th>Vandalismo</th><th>Acción / Comentarios</th><th></th></tr>
         <tr class="fila-filtros">
           <th><input type="text" id="filtro-modulo" placeholder="Filtrar..."></th>
           <th><select id="filtro-fraccion"><option value="">Todas</option></select></th>
@@ -189,6 +194,7 @@
             </select>
           </th>
           <th><input type="text" id="filtro-componentes" placeholder="Filtrar..."></th>
+          <th><select id="filtro-condicion"><option value="">Todas</option></select></th>
           <th><input type="text" id="filtro-serial-nuevo" placeholder="Filtrar..."></th>
           <th>
             <select id="filtro-fotos">
