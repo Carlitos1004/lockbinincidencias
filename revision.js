@@ -192,6 +192,7 @@ function celdaFotosRevision(c) {
 
 function renderTabla(componentes, mostrarOt = false) {
   document.getElementById("th-ot").hidden = !mostrarOt;
+  document.getElementById("th-ot-filtro").hidden = !mostrarOt;
 
   tbody.innerHTML = componentes.map(c => {
     const celdaOt = mostrarOt
@@ -291,6 +292,7 @@ function renderTabla(componentes, mostrarOt = false) {
         <td>${celdaEnCalle}</td>
         <td>${celdaCondicionFisica}</td>
         <td>${celdaCausaFalla}</td>
+        <td style="text-align:center;"><input type="checkbox" class="input-vandalismo" ${c.vandalismo ? "checked" : ""} ${bloqueado ? "disabled" : ""} title="Vandalismo / mal uso"></td>
         <td><textarea class="input-reparacion" rows="2" ${bloqueado ? "disabled" : ""}>${c.reparacion || ""}</textarea></td>
         <td>
           <select class="input-destino" ${bloqueado ? "disabled" : ""}>
@@ -309,6 +311,8 @@ function renderTabla(componentes, mostrarOt = false) {
       </tr>
     `;
   }).join("");
+
+  prepararFiltrosRevision();
 
   tbody.querySelectorAll(".condicion-fisica-desplegable").forEach(detalle => {
     const resumen = detalle.querySelector(".condicion-fisica-resumen");
@@ -407,6 +411,7 @@ async function guardarFila(btn) {
   const estuvoEnCalle = enCalleValor === "" ? null : enCalleValor === "true";
   const condicionFisica = [...fila.querySelectorAll(".input-condicion-fisica:checked")].map(chk => chk.value);
   const causaFalla = [...fila.querySelectorAll(".input-causa-falla:checked")].map(chk => chk.value);
+  const esVandalismo = !!fila.querySelector(".input-vandalismo")?.checked;
 
   if (!destino) {
     alert("Elige un Destino antes de guardar.");
@@ -459,7 +464,8 @@ async function guardarFila(btn) {
     cliente_original: clienteOriginal || null,
     estuvo_en_calle: estuvoEnCalle,
     condicion_fisica: condicionFisica.length > 0 ? condicionFisica : null,
-    causa_falla: causaFalla.length > 0 ? causaFalla : null
+    causa_falla: causaFalla.length > 0 ? causaFalla : null,
+    vandalismo: esVandalismo
   };
   // foto_revision guarda solo la PRIMERA foto (para lo que ya la lee); no la pisamos si ya hay una
   if (fotosNuevasUrls.length > 0 && !componente.foto_revision) datosActualizacion.foto_revision = fotosNuevasUrls[0];
@@ -535,6 +541,15 @@ async function guardarFila(btn) {
       .from("historial_fallas")
       .update({ destino: destino, estatus_revision: nuevoEstado })
       .eq("id_registro", componente.id_registro);
+
+    // Vandalismo del ticket = hay vandalismo si CUALQUIER componente de ese
+    // ticket está marcado. Si se desmarca el último, el ticket pasa a "No".
+    const { data: hermanos } = await supabaseClient
+      .from("componentes_retirados")
+      .select("vandalismo")
+      .eq("id_registro", componente.id_registro);
+    const hayVandalismo = (hermanos || []).some(x => x.vandalismo);
+    await supabaseClient.from("historial_fallas").update({ vandalismo: hayVandalismo }).eq("id_registro", componente.id_registro);
   }
 
   // 5. Recalculamos materiales de esa OT (por si acaso)
@@ -690,3 +705,70 @@ document.getElementById("guardar-todo-btn").addEventListener("click", async () =
     alert(`✅ ${guardadas} fila(s) guardada(s).\n⚠️ ${saltadas} fila(s) sin Destino elegido — no se guardaron, elígeles un Destino y usa "Guardar todo" de nuevo.`);
   }
 });
+
+
+// =========================================================================
+// FILTROS POR COLUMNA — ocultan filas sin volver a pintar la tabla, así no
+// se pierde lo que ya se haya escrito en las filas sin guardar.
+// =========================================================================
+function textoCeldaRevision(td) {
+  if (!td) return "";
+  const sel = td.querySelector("select");
+  if (sel && !td.querySelector(".detalle-ammi")) return (sel.selectedOptions[0]?.textContent || "").trim();
+  const chk = td.querySelector("input.input-vandalismo");
+  if (chk) return chk.checked ? "Sí" : "No";
+  if (td.querySelector(".input-foto-revision")) return td.querySelector("a") ? "Con foto" : "Sin foto";
+  const inp = td.querySelector('input[type="text"], textarea');
+  if (inp) return (inp.value || "").trim();
+  const resumen = td.querySelector("summary");
+  if (resumen) return resumen.textContent.trim();
+  const ammi = td.querySelector(".detalle-ammi");
+  if (ammi) return ammi.hidden ? "" : [...ammi.querySelectorAll("select")].map(s => s.selectedOptions[0]?.textContent || "").join(" ");
+  return td.textContent.trim();
+}
+
+function filtrosRevisionActivos() {
+  return [...document.querySelectorAll("#tabla-revision .fila-filtros th:not([hidden]) .rf")];
+}
+
+function prepararFiltrosRevision() {
+  const filtros = filtrosRevisionActivos();
+  const filas = [...tbody.querySelectorAll("tr")];
+  filtros.forEach((f, i) => {
+    if (f.dataset.tipo !== "select") return;
+    const actual = f.value;
+    const valores = [...new Set(filas.map(tr => textoCeldaRevision(tr.children[i])).filter(Boolean))].sort();
+    f.innerHTML = `<option value="">Todos</option>` +
+      valores.map(v => `<option value="${escaparHtml(v)}">${escaparHtml(v)}</option>`).join("");
+    f.value = valores.includes(actual) ? actual : "";
+  });
+  aplicarFiltrosRevision();
+}
+
+function aplicarFiltrosRevision() {
+  const filtros = filtrosRevisionActivos();
+  const filas = [...tbody.querySelectorAll("tr")];
+  let visibles = 0;
+  filas.forEach(tr => {
+    const ok = filtros.every((f, i) => {
+      const v = f.value.trim().toLowerCase();
+      if (!v) return true;
+      const t = textoCeldaRevision(tr.children[i]).toLowerCase();
+      return f.dataset.tipo === "select" ? t === v : t.includes(v);
+    });
+    tr.hidden = !ok;
+    if (ok) visibles++;
+  });
+  const cont = document.getElementById("rf-contador");
+  if (cont) cont.textContent = filas.length ? `${visibles}/${filas.length}` : "";
+}
+
+document.querySelectorAll("#tabla-revision .fila-filtros .rf").forEach(f => {
+  f.addEventListener(f.dataset.tipo === "select" ? "change" : "input", aplicarFiltrosRevision);
+});
+document.getElementById("rf-limpiar").addEventListener("click", () => {
+  document.querySelectorAll("#tabla-revision .fila-filtros .rf").forEach(f => { f.value = ""; });
+  aplicarFiltrosRevision();
+});
+// Si algo cambia dentro de una fila (destino, vandalismo...), se reevalúa
+tbody.addEventListener("change", () => aplicarFiltrosRevision());

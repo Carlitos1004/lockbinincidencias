@@ -49,6 +49,7 @@
         <th>En Calle</th>
         <th>Condición Física</th>
         <th>Causa de la Falla</th>
+        <th title="Marca si hay algo roto a propósito o mal uso">Vandalismo</th>
         <th>Reparación / Hallazgo</th>
         <th>Destino</th>
         <th>Detalles AMMI</th>
@@ -56,6 +57,25 @@
         <th>Foto</th>
         <th></th>
         <th></th>
+      </tr>
+      <tr class="fila-filtros">
+        <th><input type="text" class="rf" data-tipo="texto" placeholder="Filtrar..."></th>
+        <th id="th-ot-filtro" hidden><input type="text" class="rf" data-tipo="texto" placeholder="Filtrar..."></th>
+        <th><select class="rf" data-tipo="select"><option value="">Todos</option></select></th>
+        <th><input type="text" class="rf" data-tipo="texto" placeholder="Filtrar..."></th>
+        <th><select class="rf" data-tipo="select"><option value="">Todos</option></select></th>
+        <th><input type="text" class="rf" data-tipo="texto" placeholder="Filtrar..."></th>
+        <th><select class="rf" data-tipo="select"><option value="">Todos</option></select></th>
+        <th><input type="text" class="rf" data-tipo="texto" placeholder="Filtrar..."></th>
+        <th><input type="text" class="rf" data-tipo="texto" placeholder="Filtrar..."></th>
+        <th><select class="rf" data-tipo="select"><option value="">Todos</option></select></th>
+        <th><input type="text" class="rf" data-tipo="texto" placeholder="Filtrar..."></th>
+        <th><select class="rf" data-tipo="select"><option value="">Todos</option></select></th>
+        <th><input type="text" class="rf" data-tipo="texto" placeholder="Filtrar..."></th>
+        <th><select class="rf" data-tipo="select"><option value="">Todos</option></select></th>
+        <th><select class="rf" data-tipo="select"><option value="">Todos</option></select></th>
+        <th><button type="button" id="rf-limpiar" class="btn-secundario" title="Quitar todos los filtros">✕</button></th>
+        <th id="rf-contador" style="font-size:0.75rem;font-weight:400;"></th>
       </tr>
     </thead>
     <tbody id="revision-tbody"></tbody>

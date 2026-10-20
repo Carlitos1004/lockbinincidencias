@@ -19,6 +19,20 @@ let otActualCargada = null;
 let ticketsCargados = [];
 let conteoFotosPorRegistro = {};
 let componentesPorRegistro = {};
+let conteoFotosRevisionPorRegistro = {};
+const VANDALISMO_CAMPOS = true;
+
+// Consulta con .in() en bloques (una OT puede tener cientos de equipos y
+// una lista muy larga en la URL hace fallar la petición)
+async function consultarEnBloques(tabla, columnas, columnaIn, valores, tam = 80) {
+  let todos = [];
+  for (let i = 0; i < valores.length; i += tam) {
+    const { data, error } = await supabaseClient.from(tabla).select(columnas).in(columnaIn, valores.slice(i, i + tam));
+    if (error) throw error;
+    todos = todos.concat(data || []);
+  }
+  return todos;
+}
 
 const otInput = document.getElementById("ot-input");
 const buscarBtn = document.getElementById("buscar-btn");
@@ -104,41 +118,62 @@ async function buscarOT() {
   otActualCargada = ot;
   ticketsCargados = tickets || [];
 
-  // Conteo de fotos por ticket, para saber si mostrar "Ver foto" (una) o
-  // "Ver todas las fotos (N)" (varias)
+  // Fotos por ticket: de reporte (fotos_reporte) y de revisión de taller
+  // (fotos_revision, a través de los componentes del ticket)
   conteoFotosPorRegistro = {};
+  conteoFotosRevisionPorRegistro = {};
+  componentesPorRegistro = {};
   const idsRegistro = ticketsCargados.map(t => t.id_registro).filter(Boolean);
   if (idsRegistro.length > 0) {
-    const { data: fotos } = await supabaseClient
-      .from("fotos_reporte")
-      .select("id_registro")
-      .in("id_registro", idsRegistro);
-    (fotos || []).forEach(f => {
-      conteoFotosPorRegistro[f.id_registro] = (conteoFotosPorRegistro[f.id_registro] || 0) + 1;
-    });
-  }
+    try {
+      const fotos = await consultarEnBloques("fotos_reporte", "id_registro", "id_registro", idsRegistro);
+      fotos.forEach(f => { conteoFotosPorRegistro[f.id_registro] = (conteoFotosPorRegistro[f.id_registro] || 0) + 1; });
 
-  // Componentes retirados asociados a cada ticket — para mostrar, en OTs
-  // viejas migradas ("Hist...") y en las nuevas, cuáles componentes se le
-  // sacaron al equipo y por qué (tipo, serial, causa/hallazgo).
-  componentesPorRegistro = {};
-  if (idsRegistro.length > 0) {
-    const { data: comps } = await supabaseClient
-      .from("componentes_retirados")
-      .select("id_registro, tipo_componente, serial_retirado, causa_falla, condicion_fisica, reparacion, destino")
-      .in("id_registro", idsRegistro);
-    (comps || []).forEach(c => {
-      if (!componentesPorRegistro[c.id_registro]) componentesPorRegistro[c.id_registro] = [];
-      componentesPorRegistro[c.id_registro].push(c);
-    });
+      // Componentes retirados asociados a cada ticket — cuáles se le sacaron
+      // al equipo y por qué (tipo, serial, causa/hallazgo)
+      const comps = await consultarEnBloques(
+        "componentes_retirados",
+        "id, id_registro, tipo_componente, serial_retirado, causa_falla, condicion_fisica, reparacion, destino, foto_revision, vandalismo",
+        "id_registro", idsRegistro);
+      comps.forEach(c => {
+        if (!componentesPorRegistro[c.id_registro]) componentesPorRegistro[c.id_registro] = [];
+        componentesPorRegistro[c.id_registro].push(c);
+      });
+
+      const idsComp = comps.map(c => c.id);
+      const idComp2Registro = Object.fromEntries(comps.map(c => [c.id, c.id_registro]));
+      const conFotoMultiple = new Set();
+      if (idsComp.length > 0) {
+        try {
+          const fotosRev = await consultarEnBloques("fotos_revision", "componente_id", "componente_id", idsComp);
+          fotosRev.forEach(f => {
+            const reg = idComp2Registro[f.componente_id];
+            if (!reg) return;
+            conteoFotosRevisionPorRegistro[reg] = (conteoFotosRevisionPorRegistro[reg] || 0) + 1;
+            conFotoMultiple.add(f.componente_id);
+          });
+        } catch (e) { /* tabla de fotos múltiples aún sin crear: se usa foto_revision */ }
+      }
+      // Foto única antigua (foto_revision) de componentes que no tienen filas en fotos_revision
+      comps.forEach(c => {
+        if (c.foto_revision && !conFotoMultiple.has(c.id)) {
+          conteoFotosRevisionPorRegistro[c.id_registro] = (conteoFotosRevisionPorRegistro[c.id_registro] || 0) + 1;
+        }
+      });
+    } catch (e) {
+      mostrarMensaje(buscarMsg, "⚠️ No se pudieron cargar todas las fotos/componentes: " + e.message, true);
+    }
   }
 
   const fallasUnicas = [...new Set(ticketsCargados.map(t => t.falla).filter(Boolean))].sort();
   document.getElementById("filtro-falla-select").innerHTML =
     `<option value="">Todas las fallas</option>` +
     fallasUnicas.map(f => `<option value="${f}">${f}</option>`).join("");
-  document.getElementById("filtro-falla-select").value = "";
-  document.getElementById("filtro-estado-ticket").value = "";
+  const fraccionesUnicas = [...new Set(ticketsCargados.map(t => t.equipos?.fraccion).filter(Boolean))].sort();
+  document.getElementById("filtro-fraccion").innerHTML =
+    `<option value="">Todas</option><option value="__sin__">(sin fracción)</option>` +
+    fraccionesUnicas.map(f => `<option value="${f}">${f}</option>`).join("");
+  limpiarFiltros(false);
 
   document.getElementById("ot-titulo").textContent = idOt;
   document.getElementById("ot-meta").textContent =
@@ -158,15 +193,43 @@ async function buscarOT() {
 
 function renderTabla() {
   const esManager = window.perfilActual?.rol === "manager";
-  const filtroModulo = document.getElementById("filtro-modulo").value.trim().toLowerCase();
+  const val = id => document.getElementById(id).value.trim().toLowerCase();
+  const filtroModulo = val("filtro-modulo");
   const filtroFalla = document.getElementById("filtro-falla-select").value;
   const filtroEstado = document.getElementById("filtro-estado-ticket").value;
+  const filtroFraccion = document.getElementById("filtro-fraccion").value;
+  const filtroComp = val("filtro-componentes");
+  const filtroSerialNuevo = val("filtro-serial-nuevo");
+  const filtroFotos = document.getElementById("filtro-fotos").value;
+  const filtroVand = document.getElementById("filtro-vandalismo").value;
+  const filtroAccion = val("filtro-accion");
 
-  const filasFiltradas = ticketsCargados.filter(t =>
-    (!filtroModulo || t.m_control.toLowerCase().includes(filtroModulo)) &&
-    (!filtroFalla || t.falla === filtroFalla) &&
-    (!filtroEstado || t.estado === filtroEstado)
-  );
+  const textoComponentes = t => (componentesPorRegistro[t.id_registro] || [])
+    .map(c => [c.tipo_componente, c.serial_retirado, ...(c.causa_falla || []), ...(c.condicion_fisica || []), c.reparacion].filter(Boolean).join(" ")).join(" ").toLowerCase();
+  const estadoVand = t => (t.vandalismo === true || (componentesPorRegistro[t.id_registro] || []).some(c => c.vandalismo)) ? "si"
+    : t.vandalismo === false ? "no" : "pendiente";
+
+  const filasFiltradas = ticketsCargados.filter(t => {
+    const fotosReporte = (conteoFotosPorRegistro[t.id_registro] || 0) + (t.link_foto && !conteoFotosPorRegistro[t.id_registro] ? 1 : 0);
+    const fotosRevision = conteoFotosRevisionPorRegistro[t.id_registro] || 0;
+    return (!filtroModulo || String(t.m_control || "").toLowerCase().includes(filtroModulo)) &&
+      (!filtroFalla || t.falla === filtroFalla) &&
+      (!filtroEstado || t.estado === filtroEstado) &&
+      (!filtroFraccion || (filtroFraccion === "__sin__" ? !t.equipos?.fraccion : t.equipos?.fraccion === filtroFraccion)) &&
+      (!filtroComp || textoComponentes(t).includes(filtroComp)) &&
+      (!filtroSerialNuevo || String(t.nuevo_serial || "").toLowerCase().includes(filtroSerialNuevo)) &&
+      (!filtroFotos || (filtroFotos === "con" ? (fotosReporte + fotosRevision) > 0
+        : filtroFotos === "reporte" ? fotosReporte > 0
+        : filtroFotos === "revision" ? fotosRevision > 0
+        : (fotosReporte + fotosRevision) === 0)) &&
+      (!filtroVand || estadoVand(t) === filtroVand) &&
+      (!filtroAccion || [t.accion_calle, t.comentarios].filter(Boolean).join(" ").toLowerCase().includes(filtroAccion));
+  });
+
+  const totalVand = ticketsCargados.filter(t => estadoVand(t) === "si").length;
+  const totalPend = ticketsCargados.filter(t => estadoVand(t) === "pendiente").length;
+  document.getElementById("ot-resumen-filtros").textContent =
+    `Mostrando ${filasFiltradas.length} de ${ticketsCargados.length} equipos — 🔨 ${totalVand} vandalismo, ${totalPend} sin revisar`;
 
   tbody.innerHTML = filasFiltradas.map(t => {
     const abierto = t.estado === "🚨 ABIERTO";
@@ -185,12 +248,25 @@ function renderTabla() {
          <button class="btn-guardar-ticket" data-id="${t.id_registro}">Guardar</button>`
       : ([t.accion_calle, t.comentarios].filter(Boolean).join(" | ") || "—");
 
-    const cantidadFotos = conteoFotosPorRegistro[t.id_registro] || 0;
-    const celdaFoto = cantidadFotos > 1
-      ? `<a href="ver-fotos.html?id=${encodeURIComponent(t.id_registro)}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver todas las fotos (${cantidadFotos}) →</a>`
-      : t.link_foto
-        ? `<a href="${t.link_foto}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver foto →</a>`
-        : "—";
+    const nReporte = conteoFotosPorRegistro[t.id_registro] || 0;
+    const nRevision = conteoFotosRevisionPorRegistro[t.id_registro] || 0;
+    const botonesFotos = [];
+    if (nReporte > 1) botonesFotos.push(`<a href="ver-fotos.html?id=${encodeURIComponent(t.id_registro)}" target="_blank" rel="noopener" class="btn-foto-ot" title="Fotos que subió el técnico en el reporte">📷 Reporte (${nReporte})</a>`);
+    else if (nReporte === 1 && t.link_foto) botonesFotos.push(`<a href="${t.link_foto}" target="_blank" rel="noopener" class="btn-foto-ot" title="Foto del reporte">📷 Reporte</a>`);
+    else if (nReporte === 1) botonesFotos.push(`<a href="ver-fotos.html?id=${encodeURIComponent(t.id_registro)}" target="_blank" rel="noopener" class="btn-foto-ot">📷 Reporte</a>`);
+    else if (t.link_foto) botonesFotos.push(`<a href="${t.link_foto}" target="_blank" rel="noopener" class="btn-foto-ot" title="Foto del reporte">📷 Reporte</a>`);
+    if (nRevision > 0) botonesFotos.push(`<a href="ver-fotos.html?origen=revision-ticket&id=${encodeURIComponent(t.id_registro)}" target="_blank" rel="noopener" class="btn-foto-ot" title="Fotos que se tomaron en Revisión de Taller">🔧 Revisión${nRevision > 1 ? " (" + nRevision + ")" : ""}</a>`);
+    const celdaFoto = botonesFotos.length ? botonesFotos.join("") : "—";
+
+    const hayCompVand = (componentesPorRegistro[t.id_registro] || []).some(c => c.vandalismo);
+    const valVand = t.vandalismo === true || hayCompVand ? "si" : t.vandalismo === false ? "no" : "";
+    const celdaVandalismo = esManager
+      ? `<select class="select-vandalismo ${valVand === "si" ? "es-vandalismo" : ""}" data-id="${t.id_registro}">
+           <option value="" ${valVand === "" ? "selected" : ""}>— Sin revisar —</option>
+           <option value="si" ${valVand === "si" ? "selected" : ""}>🔨 Vandalismo</option>
+           <option value="no" ${valVand === "no" ? "selected" : ""}>No</option>
+         </select>`
+      : (valVand === "si" ? `<span class="badge-vandalismo">🔨 Vandalismo</span>` : valVand === "no" ? "No" : "—");
 
     const celdaEliminar = esManager
       ? `<button class="btn-eliminar-ticket" data-id="${t.id_registro}" title="Quitar este equipo de la OT">🗑️</button>`
@@ -215,6 +291,7 @@ function renderTabla() {
         <td>${celdaComponentes}</td>
         <td>${t.nuevo_serial || "—"}</td>
         <td>${celdaFoto}</td>
+        <td>${celdaVandalismo}</td>
         <td>${celdaAccionComentarios}</td>
         <td>${celdaEliminar}</td>
       </tr>
@@ -223,6 +300,27 @@ function renderTabla() {
 
   tbody.querySelectorAll(".btn-eliminar-ticket").forEach(btn => {
     btn.addEventListener("click", () => eliminarTicketDeOT(btn.dataset.id));
+  });
+
+  tbody.querySelectorAll(".select-vandalismo").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const nuevo = sel.value === "" ? null : sel.value === "si";
+      sel.disabled = true;
+      const { error } = await supabaseClient.from("historial_fallas").update({ vandalismo: nuevo }).eq("id_registro", sel.dataset.id);
+      sel.disabled = false;
+      if (error) { alert("No se pudo guardar el vandalismo: " + error.message + "\n(¿Corriste el SQL 74?)"); renderTabla(); return; }
+      const tk = ticketsCargados.find(x => x.id_registro === sel.dataset.id);
+      if (tk) tk.vandalismo = nuevo;
+      // Si se pone "No"/"Sin revisar" se limpia también la marca de sus componentes, para que no contradiga
+      if (nuevo !== true) {
+        const comps = componentesPorRegistro[sel.dataset.id] || [];
+        if (comps.some(c => c.vandalismo)) {
+          await supabaseClient.from("componentes_retirados").update({ vandalismo: false }).eq("id_registro", sel.dataset.id);
+          comps.forEach(c => { c.vandalismo = false; });
+        }
+      }
+      renderTabla();
+    });
   });
 
   tbody.querySelectorAll(".btn-guardar-ticket").forEach(btn => {
@@ -366,6 +464,7 @@ descargarBtn.addEventListener("click", () => {
       "Falla": t.falla,
       "Estado": t.estado,
       "Estado Equipo": t.estado_equipo || "",
+      "Vandalismo": (t.vandalismo === true || compsDelTicket.some(c => c.vandalismo)) ? "Sí" : t.vandalismo === false ? "No" : "Sin revisar",
       "Componentes retirados / Motivo": componentesTexto,
       "Acción en calle": t.accion_calle || "",
       "Comentarios": t.comentarios || ""
@@ -574,9 +673,18 @@ document.getElementById("agregar-equipo-btn").addEventListener("click", async ()
   buscarOT();
 });
 
-document.getElementById("filtro-modulo").addEventListener("input", renderTabla);
-document.getElementById("filtro-falla-select").addEventListener("change", renderTabla);
-document.getElementById("filtro-estado-ticket").addEventListener("change", renderTabla);
+["filtro-modulo", "filtro-componentes", "filtro-serial-nuevo", "filtro-accion"].forEach(id =>
+  document.getElementById(id).addEventListener("input", renderTabla));
+["filtro-falla-select", "filtro-estado-ticket", "filtro-fraccion", "filtro-fotos", "filtro-vandalismo"].forEach(id =>
+  document.getElementById(id).addEventListener("change", renderTabla));
+
+function limpiarFiltros(repintar = true) {
+  ["filtro-modulo", "filtro-componentes", "filtro-serial-nuevo", "filtro-accion",
+   "filtro-falla-select", "filtro-estado-ticket", "filtro-fraccion", "filtro-fotos", "filtro-vandalismo"
+  ].forEach(id => { document.getElementById(id).value = ""; });
+  if (repintar) renderTabla();
+}
+document.getElementById("limpiar-filtros-btn").addEventListener("click", () => limpiarFiltros());
 
 async function cargarClientesParaSelect() {
   const select = document.getElementById("nueva-ot-cliente");
@@ -752,6 +860,7 @@ async function cargarComponentesSinTicket(idOt) {
       <td>${c.cliente_original || "—"}</td>
       <td>${c.destino || "—"}</td>
       <td>${c.reparacion || "—"}</td>
+      <td>${c.foto_revision ? `<a href="ver-fotos.html?origen=revision&id=${c.id}" target="_blank" rel="noopener" class="btn-foto-ot">🔧 Revisión</a>` : "—"}</td>
     </tr>
   `).join("");
 }

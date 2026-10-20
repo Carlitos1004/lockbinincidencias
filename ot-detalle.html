@@ -15,6 +15,12 @@
   .componente-retirado-linea { margin-bottom: 6px; }
   .componente-retirado-linea:last-child { margin-bottom: 0; }
   .componente-retirado-detalle { color: var(--gris-700); font-size: 0.82rem; }
+  .btn-foto-ot { display:inline-block; margin:2px 4px 2px 0; padding:3px 8px; border-radius:8px; border:1.5px solid var(--gris-200); background:#fff; font-size:0.78rem; color:var(--verde-oscuro, #1b5e20); text-decoration:none; white-space:nowrap; }
+  .btn-foto-ot:hover { border-color: var(--verde-medio); }
+  .badge-vandalismo { display:inline-block; padding:2px 8px; border-radius:10px; background:#fdecea; color:#b71c1c; font-weight:600; font-size:0.78rem; }
+  .select-vandalismo { font-size:0.8rem; padding:4px 6px; border-radius:8px; border:1.5px solid var(--gris-200); }
+  .select-vandalismo.es-vandalismo { border-color:#b71c1c; background:#fdecea; color:#b71c1c; font-weight:600; }
+  #tabla-ot .fila-filtros th { position: sticky; top: 0; z-index: 1; }
 </style>
 </head>
 <body>
@@ -135,19 +141,21 @@
       <h2>Componentes registrados sin ticket</h2>
       <p style="color:var(--gris-700); font-size:0.85rem; margin-top:-8px;">Agregados directo aquí (uno a uno o por carga rápida), sin un reporte de campo asociado. Su estado se sigue editando desde Revisión de Taller.</p>
       <table class="tabla-revision">
-        <thead><tr><th>Módulo</th><th>Componente</th><th>Serial</th><th>Estado</th><th>Cliente Histórico</th><th>Destino</th><th>Hallazgo</th></tr></thead>
+        <thead><tr><th>Módulo</th><th>Componente</th><th>Serial</th><th>Estado</th><th>Cliente Histórico</th><th>Destino</th><th>Hallazgo</th><th>Fotos</th></tr></thead>
         <tbody id="sin-ticket-tbody"></tbody>
       </table>
     </div>
 
     <button id="guardar-todo-btn" class="btn-primario" style="margin-bottom:10px;">💾 Guardar todo</button>
 
+    <p id="ot-resumen-filtros" class="ot-meta" style="margin:6px 0;"></p>
+    <div class="tabla-garantias-wrap" style="overflow-x:auto;">
     <table class="tabla-revision" id="tabla-ot">
       <thead>
-        <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Componentes retirados / Motivo</th><th>Serial Nuevo</th><th>Foto</th><th>Acción / Comentarios</th><th></th></tr>
+        <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Componentes retirados / Motivo</th><th>Serial Nuevo</th><th>Fotos</th><th>Vandalismo</th><th>Acción / Comentarios</th><th></th></tr>
         <tr class="fila-filtros">
           <th><input type="text" id="filtro-modulo" placeholder="Filtrar..."></th>
-          <th></th>
+          <th><select id="filtro-fraccion"><option value="">Todas</option></select></th>
           <th><select id="filtro-falla-select"><option value="">Todas</option></select></th>
           <th>
             <select id="filtro-estado-ticket">
@@ -156,11 +164,32 @@
               <option value="✅ CERRADO">Cerrado</option>
             </select>
           </th>
-          <th></th><th></th><th></th><th></th><th></th>
+          <th><input type="text" id="filtro-componentes" placeholder="Filtrar..."></th>
+          <th><input type="text" id="filtro-serial-nuevo" placeholder="Filtrar..."></th>
+          <th>
+            <select id="filtro-fotos">
+              <option value="">Todas</option>
+              <option value="con">Con alguna foto</option>
+              <option value="reporte">Con foto de reporte</option>
+              <option value="revision">Con foto de revisión</option>
+              <option value="sin">Sin fotos</option>
+            </select>
+          </th>
+          <th>
+            <select id="filtro-vandalismo">
+              <option value="">Todos</option>
+              <option value="si">🔨 Vandalismo</option>
+              <option value="no">No es vandalismo</option>
+              <option value="pendiente">Sin revisar</option>
+            </select>
+          </th>
+          <th><input type="text" id="filtro-accion" placeholder="Filtrar..."></th>
+          <th><button type="button" id="limpiar-filtros-btn" class="btn-secundario" title="Quitar todos los filtros">✕</button></th>
         </tr>
       </thead>
       <tbody id="ot-tbody"></tbody>
     </table>
+    </div>
   </div>
 </div>
 

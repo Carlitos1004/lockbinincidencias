@@ -16,6 +16,26 @@ async function cargarFotos() {
     return;
   }
 
+  // "revision-ticket": todas las fotos de revisión de los componentes de un ticket
+  if (origen === "revision-ticket") {
+    const { data: comps } = await supabaseClient.from("componentes_retirados").select("id, foto_revision").eq("id_registro", id);
+    const ids = (comps || []).map(c => c.id);
+    const { data: fotosRev, error: errRev } = ids.length
+      ? await supabaseClient.from("fotos_revision").select("url, fecha").in("componente_id", ids).order("fecha", { ascending: true })
+      : { data: [], error: null };
+    if (errRev) { msg.textContent = "❌ " + errRev.message; return; }
+    let lista = fotosRev || [];
+    if (lista.length === 0) lista = (comps || []).filter(c => c.foto_revision).map(c => ({ url: c.foto_revision, fecha: new Date().toISOString() }));
+    if (lista.length === 0) { msg.textContent = "No hay fotos de revisión de este equipo."; return; }
+    msg.textContent = `${lista.length} foto(s) de revisión`;
+    galeria.innerHTML = lista.map(f => `
+      <a href="${f.url}" target="_blank" rel="noopener" class="galeria-foto-item">
+        <img src="${f.url}" alt="Foto" loading="lazy">
+        <span>${new Date(f.fecha).toLocaleString("es-ES")}</span>
+      </a>`).join("");
+    return;
+  }
+
   const tabla = origen === "nota" ? "fotos_nota_equipo" : origen === "revision" ? "fotos_revision" : "fotos_reporte";
   const columnaId = origen === "nota" ? "nota_id" : origen === "revision" ? "componente_id" : "id_registro";
 
