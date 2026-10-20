@@ -843,9 +843,11 @@ document.getElementById("completada-checkbox").addEventListener("change", async 
 
 // --- Mostrar los componentes registrados sin ticket (agregados directo
 // en esta pantalla, uno a uno o por carga rápida) ---
+let sinTicketCargados = [];
+let fotosRevisionPorComponente = {};
+
 async function cargarComponentesSinTicket(idOt) {
   const box = document.getElementById("sin-ticket-box");
-  const tbody = document.getElementById("sin-ticket-tbody");
 
   const { data, error } = await supabaseClient
     .from("componentes_retirados")
@@ -855,12 +857,69 @@ async function cargarComponentesSinTicket(idOt) {
     .order("fecha", { ascending: false });
 
   if (error || !data || data.length === 0) {
+    sinTicketCargados = [];
     box.hidden = true;
     return;
   }
 
+  sinTicketCargados = data;
+  fotosRevisionPorComponente = {};
+  try {
+    const fotos = await consultarEnBloques("fotos_revision", "componente_id", "componente_id", data.map(c => c.id));
+    fotos.forEach(f => { fotosRevisionPorComponente[f.componente_id] = (fotosRevisionPorComponente[f.componente_id] || 0) + 1; });
+  } catch (e) { /* sin tabla de fotos múltiples: se usa foto_revision */ }
+  data.forEach(c => { if (!fotosRevisionPorComponente[c.id] && c.foto_revision) fotosRevisionPorComponente[c.id] = 1; });
+
+  const rellenar = (id, valores) => {
+    const sel = document.getElementById(id);
+    const actual = sel.value;
+    sel.innerHTML = `<option value="">Todos</option>` + [...new Set(valores.filter(Boolean))].sort().map(v => `<option value="${v}">${v}</option>`).join("");
+    sel.value = [...sel.options].some(o => o.value === actual) ? actual : "";
+  };
+  rellenar("sf-componente", data.map(c => c.tipo_componente));
+  rellenar("sf-estado", data.map(c => c.estado));
+  rellenar("sf-cliente", data.map(c => c.cliente_original));
+  rellenar("sf-destino", data.map(c => c.destino));
+
   box.hidden = false;
-  tbody.innerHTML = data.map(c => `
+  renderSinTicket();
+}
+
+function renderSinTicket() {
+  const esManager = window.perfilActual?.rol === "manager";
+  const tb = document.getElementById("sin-ticket-tbody");
+  const val = id => document.getElementById(id).value.trim().toLowerCase();
+  const fm = val("sf-modulo"), fs = val("sf-serial"), fh = val("sf-hallazgo");
+  const fComp = document.getElementById("sf-componente").value, fEst = document.getElementById("sf-estado").value;
+  const fCli = document.getElementById("sf-cliente").value, fDes = document.getElementById("sf-destino").value;
+  const fFotos = document.getElementById("sf-fotos").value, fVand = document.getElementById("sf-vandalismo").value;
+
+  const filas = sinTicketCargados.filter(c => {
+    const nFotos = fotosRevisionPorComponente[c.id] || 0;
+    return (!fm || String(c.m_control || "").toLowerCase().includes(fm)) &&
+      (!fs || String(c.serial_retirado || "").toLowerCase().includes(fs)) &&
+      (!fh || String(c.reparacion || "").toLowerCase().includes(fh)) &&
+      (!fComp || c.tipo_componente === fComp) && (!fEst || c.estado === fEst) &&
+      (!fCli || c.cliente_original === fCli) && (!fDes || c.destino === fDes) &&
+      (!fFotos || (fFotos === "con" ? nFotos > 0 : nFotos === 0)) &&
+      (!fVand || (fVand === "si") === !!c.vandalismo);
+  });
+
+  document.getElementById("sin-ticket-resumen").textContent =
+    `Mostrando ${filas.length} de ${sinTicketCargados.length} componentes — 🔨 ${sinTicketCargados.filter(c => c.vandalismo).length} vandalismo`;
+
+  tb.innerHTML = filas.map(c => {
+    const n = fotosRevisionPorComponente[c.id] || 0;
+    const fotos = n > 0
+      ? `<a href="ver-fotos.html?origen=revision&id=${c.id}" target="_blank" rel="noopener" class="btn-foto-ot" title="Fotos que se tomaron en Revisión de Taller">🔧 Revisión${n > 1 ? " (" + n + ")" : ""}</a>`
+      : "—";
+    const vand = esManager
+      ? `<select class="select-vandalismo ${c.vandalismo ? "es-vandalismo" : ""}" data-comp="${c.id}">
+           <option value="no" ${!c.vandalismo ? "selected" : ""}>No</option>
+           <option value="si" ${c.vandalismo ? "selected" : ""}>🔨 Vandalismo</option>
+         </select>`
+      : (c.vandalismo ? `<span class="badge-vandalismo">🔨 Vandalismo</span>` : "No");
+    return `
     <tr>
       <td>${c.m_control || "—"}</td>
       <td>${c.tipo_componente}</td>
@@ -869,12 +928,32 @@ async function cargarComponentesSinTicket(idOt) {
       <td>${c.cliente_original || "—"}</td>
       <td>${c.destino || "—"}</td>
       <td>${c.reparacion || "—"}</td>
-      <td>${c.foto_revision ? `<a href="ver-fotos.html?origen=revision&id=${c.id}" target="_blank" rel="noopener" class="btn-foto-ot">🔧 Revisión</a>` : "—"}</td>
-    </tr>
-  `).join("");
+      <td>${fotos}</td>
+      <td>${vand}</td>
+      <td></td>
+    </tr>`;
+  }).join("");
+
+  tb.querySelectorAll(".select-vandalismo").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      sel.disabled = true;
+      const nuevo = sel.value === "si";
+      const { error } = await supabaseClient.from("componentes_retirados").update({ vandalismo: nuevo }).eq("id", sel.dataset.comp);
+      sel.disabled = false;
+      if (error) { alert("No se pudo guardar el vandalismo: " + error.message + "\n(¿Corriste el SQL 74?)"); renderSinTicket(); return; }
+      const comp = sinTicketCargados.find(x => x.id === sel.dataset.comp);
+      if (comp) comp.vandalismo = nuevo;
+      renderSinTicket();
+    });
+  });
 }
 
-
+["sf-modulo", "sf-serial", "sf-hallazgo"].forEach(id => document.getElementById(id).addEventListener("input", renderSinTicket));
+["sf-componente", "sf-estado", "sf-cliente", "sf-destino", "sf-fotos", "sf-vandalismo"].forEach(id => document.getElementById(id).addEventListener("change", renderSinTicket));
+document.getElementById("sf-limpiar").addEventListener("click", () => {
+  ["sf-modulo", "sf-serial", "sf-hallazgo", "sf-componente", "sf-estado", "sf-cliente", "sf-destino", "sf-fotos", "sf-vandalismo"].forEach(id => { document.getElementById(id).value = ""; });
+  renderSinTicket();
+});
 
 // --- Traer equipos pendientes de una OT anterior, vinculándolos a esta ---
 document.getElementById("traer-buscar-btn").addEventListener("click", async () => {

@@ -13,6 +13,11 @@
 <link rel="stylesheet" href="styles.css">
 <style>
   .panel-body-ancho { max-width: 98vw; }
+  /* La tabla scrollea dentro de su propia caja: así la barra horizontal queda
+     siempre visible abajo en pantalla y los encabezados/filtros no se pierden */
+  .scroll-x-tabla { overflow: auto; max-width: 100%; max-height: calc(100vh - 70px); }
+  .scroll-x-tabla thead tr:first-child th { position: sticky; top: 0; z-index: 3; background: var(--gris-100, #f3f4f1); }
+  .scroll-x-tabla thead tr.fila-filtros th { position: sticky; top: var(--fila1-h, 34px); z-index: 2; }
 </style>
 </head>
 <body>
@@ -40,7 +45,7 @@
 
   <button id="guardar-todo-btn" class="btn-primario" hidden style="margin-bottom:10px;">💾 Guardar todo</button>
 
-  <div class="tabla-garantias-wrap" id="tabla-revision-wrap">
+  <div class="scroll-x-tabla" id="tabla-revision-wrap">
   <table class="tabla-revision" id="tabla-revision" hidden>
     <thead>
       <tr>

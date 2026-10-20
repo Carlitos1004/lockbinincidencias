@@ -142,10 +142,27 @@
     <div id="sin-ticket-box" hidden>
       <h2>Componentes registrados sin ticket</h2>
       <p style="color:var(--gris-700); font-size:0.85rem; margin-top:-8px;">Agregados directo aquí (uno a uno o por carga rápida), sin un reporte de campo asociado. Su estado se sigue editando desde Revisión de Taller.</p>
-      <table class="tabla-revision">
-        <thead><tr><th>Módulo</th><th>Componente</th><th>Serial</th><th>Estado</th><th>Cliente Histórico</th><th>Destino</th><th>Hallazgo</th><th>Fotos</th></tr></thead>
+      <p id="sin-ticket-resumen" class="ot-meta" style="margin:6px 0;"></p>
+      <div class="scroll-x-tabla">
+      <table class="tabla-revision" id="tabla-sin-ticket">
+        <thead>
+          <tr><th>Módulo</th><th>Componente</th><th>Serial</th><th>Estado</th><th>Cliente Histórico</th><th>Destino</th><th>Hallazgo</th><th>Fotos</th><th>Vandalismo</th><th></th></tr>
+          <tr class="fila-filtros">
+            <th><input type="text" id="sf-modulo" placeholder="Filtrar..."></th>
+            <th><select id="sf-componente"><option value="">Todos</option></select></th>
+            <th><input type="text" id="sf-serial" placeholder="Filtrar..."></th>
+            <th><select id="sf-estado"><option value="">Todos</option></select></th>
+            <th><select id="sf-cliente"><option value="">Todos</option></select></th>
+            <th><select id="sf-destino"><option value="">Todos</option></select></th>
+            <th><input type="text" id="sf-hallazgo" placeholder="Filtrar..."></th>
+            <th><select id="sf-fotos"><option value="">Todas</option><option value="con">Con fotos</option><option value="sin">Sin fotos</option></select></th>
+            <th><select id="sf-vandalismo"><option value="">Todos</option><option value="si">🔨 Vandalismo</option><option value="no">No</option></select></th>
+            <th><button type="button" id="sf-limpiar" class="btn-secundario" title="Quitar todos los filtros">✕</button></th>
+          </tr>
+        </thead>
         <tbody id="sin-ticket-tbody"></tbody>
       </table>
+      </div>
     </div>
 
     <button id="guardar-todo-btn" class="btn-primario" style="margin-bottom:10px;">💾 Guardar todo</button>

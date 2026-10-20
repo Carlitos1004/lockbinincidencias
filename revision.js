@@ -313,6 +313,7 @@ function renderTabla(componentes, mostrarOt = false) {
   }).join("");
 
   prepararFiltrosRevision();
+  setTimeout(ajustarEncabezadoSticky, 0);
 
   tbody.querySelectorAll(".condicion-fisica-desplegable").forEach(detalle => {
     const resumen = detalle.querySelector(".condicion-fisica-resumen");
@@ -772,3 +773,13 @@ document.getElementById("rf-limpiar").addEventListener("click", () => {
 });
 // Si algo cambia dentro de una fila (destino, vandalismo...), se reevalúa
 tbody.addEventListener("change", () => aplicarFiltrosRevision());
+
+// Mide la altura de la 1ª fila de encabezados para que la fila de filtros
+// se quede pegada justo debajo de ella al desplazarse
+function ajustarEncabezadoSticky() {
+  document.querySelectorAll(".scroll-x-tabla").forEach(w => {
+    const tr = w.querySelector("thead tr");
+    if (tr && tr.offsetHeight) w.style.setProperty("--fila1-h", tr.offsetHeight + "px");
+  });
+}
+window.addEventListener("resize", ajustarEncabezadoSticky);
