@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="styles.css">
 <style>
   .panel-body-ancho { max-width: 98vw; }
+  .scroll-x-tabla { overflow-x: auto; max-width: 100%; }
   .componente-retirado-linea { margin-bottom: 6px; }
   .componente-retirado-linea:last-child { margin-bottom: 0; }
   .componente-retirado-detalle { color: var(--gris-700); font-size: 0.82rem; }
@@ -149,8 +150,9 @@
 
     <button id="guardar-todo-btn" class="btn-primario" style="margin-bottom:10px;">💾 Guardar todo</button>
 
+    <p id="ot-sin-tickets-msg" class="ot-meta" hidden>Esta OT no tiene tickets de equipos; solo tiene los componentes registrados arriba.</p>
     <p id="ot-resumen-filtros" class="ot-meta" style="margin:6px 0;"></p>
-    <div class="tabla-garantias-wrap" style="overflow-x:auto;">
+    <div class="scroll-x-tabla" id="tabla-ot-wrap">
     <table class="tabla-revision" id="tabla-ot">
       <thead>
         <tr><th>Módulo</th><th>Fracción</th><th>Falla</th><th>Estado</th><th>Componentes retirados / Motivo</th><th>Serial Nuevo</th><th>Fotos</th><th>Vandalismo</th><th>Acción / Comentarios</th><th></th></tr>

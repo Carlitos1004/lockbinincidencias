@@ -188,6 +188,15 @@ async function buscarOT() {
   await cargarComponentesSinTicket(idOt);
 
   renderTabla();
+
+  // Si la OT no tiene ningún ticket (solo componentes sueltos, por ejemplo),
+  // no tiene sentido mostrar una tabla vacía con sus filtros.
+  const sinTickets = ticketsCargados.length === 0;
+  document.getElementById("tabla-ot-wrap").hidden = sinTickets;
+  document.getElementById("ot-resumen-filtros").hidden = sinTickets;
+  document.getElementById("guardar-todo-btn").hidden = sinTickets || window.perfilActual?.rol !== "manager";
+  document.getElementById("ot-sin-tickets-msg").hidden = !sinTickets;
+
   otContenido.hidden = false;
 }
 
