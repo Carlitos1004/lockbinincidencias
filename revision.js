@@ -441,6 +441,9 @@ async function guardarFila(btn) {
     }
   }
 
+  // Vaciamos el selector: ya se subieron, así un nuevo "Guardar" no las repite
+  fila.querySelector(".input-foto-revision").value = "";
+
   const nuevoEstado = MAPA_DESTINO_A_ESTADO[destino];
 
   // 1. Traemos el componente completo (para tener cliente, m_control, id_ot, serial)
