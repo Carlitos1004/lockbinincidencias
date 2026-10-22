@@ -19,6 +19,8 @@ const ESTADOS_MANUALES = [
 const RESUELTOS = new Set(["Listo (sin cambios)", "Reparado recibido", "Repuesto desde stock", "Entregado"]);
 
 let otsManuales = [];
+let filaHistoricaHtml = "";
+let compsManuales = [];
 let ordenesPorOt = {};   // id_ot -> fila de ordenes_reposicion
 let otActual = null;
 let compsOtActual = [];   // componentes de la orden abierta
@@ -113,11 +115,12 @@ async function cargarOts() {
     const { data: reps } = await supabaseClient.from("equipos_reposicion").select("tipo_registro, estado").eq("orden_id", historica.id);
     const aReponer = (reps || []).filter(r => r.tipo_registro === "REPONER");
     filaHistorica = `<tr class="orep-fila" data-historica="1">
-      <td><strong>${codigoOrden(historica.numero)}</strong></td><td>Histórica (sin OT)</td><td>Varios</td>
+      <td><strong>${codigoOrden(historica.numero)}</strong></td><td>Histórica (sin OT)</td><td>${esc(historica.cliente || "Varios")}</td>
       <td>${(reps || []).length}</td><td>—</td><td>${aReponer.filter(r => r.estado === "Pendiente").length} pendientes</td>
       <td>—</td><td>${aReponer.filter(r => r.estado === "Repuesto").length}</td></tr>`;
   }
-  if (!otsManuales.length) { tbody.innerHTML = filaHistorica || `<tr><td colspan="8">No hay OTs manuales.</td></tr>`; enlazarFilas(tbody); return; }
+  filaHistoricaHtml = filaHistorica;
+  if (!otsManuales.length) { compsManuales = []; renderLista(); return; }
 
   const ids = otsManuales.map(o => o.id_ot);
   const comps = [];
@@ -128,18 +131,43 @@ async function cargarOts() {
     (data || []).forEach(c => comps.push(c));
   }
 
-  tbody.innerHTML = filaHistorica + otsManuales.map(o => {
-    const delOt = comps.filter(c => (c.orden_reposicion_ot || c.id_ot) === o.id_ot);
-    const mcs = agruparPorMc(delOt);
-    const n = e => mcs.filter(m => m.estadoMc === e).length;
-    const orden = ordenesPorOt[o.id_ot];
-    return `<tr class="orep-fila" data-ot="${esc(o.id_ot)}">
-      <td>${orden ? `<strong>${codigoOrden(orden.numero)}</strong>` : '<em>Sin crear</em>'}</td><td>${esc(o.id_ot)}</td><td>${esc(o.cliente || "—")}</td>
-      <td>${mcs.length}</td><td>${n("Incompleto")}</td><td>${n("En proceso")}</td>
-      <td>${n("Listo para entregar")}</td><td>${n("Entregado")}</td></tr>`;
-  }).join("");
+  compsManuales = comps;
+  renderLista();
+}
 
+// Fila de una OT con sus contadores
+function filaOt(o) {
+  const delOt = compsManuales.filter(c => (c.orden_reposicion_ot || c.id_ot) === o.id_ot);
+  const mcs = agruparPorMc(delOt);
+  const n = e => mcs.filter(m => m.estadoMc === e).length;
+  const orden = ordenesPorOt[o.id_ot];
+  return `<tr class="orep-fila" data-ot="${esc(o.id_ot)}">
+    <td>${orden ? `<strong>${codigoOrden(orden.numero)}</strong>` : '<em>Sin crear</em>'}</td><td>${esc(o.id_ot)}</td><td>${esc(o.cliente || "—")}</td>
+    <td>${mcs.length}</td><td>${n("Incompleto")}</td><td>${n("En proceso")}</td>
+    <td>${n("Listo para entregar")}</td><td>${n("Entregado")}</td></tr>`;
+}
+
+// La lista principal solo muestra REP-001 y las OTs que YA tienen orden.
+// Las demás OTs manuales (incluidas las HIST-) se encuentran con el buscador.
+function renderLista() {
+  const tbody = document.getElementById("tbody-ots");
+  const conOrden = otsManuales.filter(o => ordenesPorOt[o.id_ot]);
+  conOrden.sort((a, b) => ordenesPorOt[a.id_ot].numero - ordenesPorOt[b.id_ot].numero);
+  tbody.innerHTML = filaHistoricaHtml + conOrden.map(filaOt).join("");
   enlazarFilas(tbody);
+  renderBusqueda();
+}
+
+function renderBusqueda() {
+  const q = document.getElementById("buscar-ot").value.trim().toLowerCase();
+  const cont = document.getElementById("buscar-ot-resultado");
+  if (q.length < 2) { cont.innerHTML = ""; return; }
+  const coincid = otsManuales.filter(o => !ordenesPorOt[o.id_ot] &&
+    (o.id_ot.toLowerCase().includes(q) || (o.cliente || "").toLowerCase().includes(q))).slice(0, 30);
+  if (!coincid.length) { cont.innerHTML = "<p>Ninguna OT manual sin orden coincide.</p>"; return; }
+  cont.innerHTML = `<table class="tabla-revision orep-lista"><thead><tr><th>Orden</th><th>OT</th><th>Cliente</th><th>Equipos</th><th>Incompletos</th><th>En proceso</th><th>Listos para entregar</th><th>Entregados</th></tr></thead><tbody>` +
+    coincid.map(filaOt).join("") + "</tbody></table>";
+  enlazarFilas(cont);
 }
 
 function enlazarFilas(tbody) {
@@ -334,3 +362,5 @@ document.getElementById("extra-buscar").addEventListener("click", async () => {
     }
   }));
 });
+
+document.getElementById("buscar-ot").addEventListener("input", renderBusqueda);
