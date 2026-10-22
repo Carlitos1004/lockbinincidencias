@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Órdenes de Reposición</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .orep-mc { border:1px solid #d9e2dc; border-radius:10px; margin:14px 0; background:#fff; }
+  .orep-mc-cab { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:10px 14px; background:#f3f7f4; border-radius:10px 10px 0 0; }
+  .orep-mc-cab strong { font-size:1.05em; }
+  .orep-badge { display:inline-block; padding:2px 9px; border-radius:12px; font-size:.82em; font-weight:600; white-space:nowrap; }
+  .orep-ok { background:#dff3e4; color:#1d6b32; }
+  .orep-proc { background:#fff1d6; color:#8a5a00; }
+  .orep-falta { background:#fde3e1; color:#a3261c; }
+  .orep-info { background:#e3edf9; color:#1f4e8c; }
+  .orep-gris { background:#ececec; color:#555; }
+  .orep-mc table { width:100%; border-collapse:collapse; }
+  .orep-mc th, .orep-mc td { padding:6px 10px; border-top:1px solid #e8eee9; text-align:left; font-size:.92em; }
+  .orep-mc input[type=text], .orep-mc select { max-width:190px; }
+  .orep-acciones { padding:8px 14px 12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .orep-lista tr.orep-fila { cursor:pointer; }
+  .orep-lista tr.orep-fila:hover { background:#f3f7f4; }
+  .orep-lista tr.orep-activa { background:#e6f2ea; }
+</style>
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Órdenes de Reposición</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="cierre-control.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Cierre y Control</a>
+
+  <p style="margin-top:20px;">Una orden por OT manual: lo que se le devuelve al cliente, equipo por equipo (4 componentes). Un equipo solo cuenta como completo cuando llegaron y se revisaron los 4. El estado de cada pieza se deduce de la Revisión de Taller (destino, garantía y vandalismo) y lo puedes ajustar a mano.</p>
+
+  <h2 style="margin-top:22px;">Órdenes de reposición</h2>
+  <p class="ot-meta">REP-001 es la reposición histórica (sin OT); se abre en su propia pantalla. De REP-002 en adelante hay una orden por OT manual; si la OT aún no tiene, se crea al abrirla.</p>
+  <div class="scroll-x-tabla" style="max-height:300px;">
+    <table class="tabla-revision orep-lista">
+      <thead><tr><th>Orden</th><th>OT</th><th>Cliente</th><th>Equipos</th><th>Incompletos</th><th>En proceso</th><th>Listos para entregar</th><th>Entregados</th></tr></thead>
+      <tbody id="tbody-ots"><tr><td colspan="8">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div id="detalle" hidden>
+    <h2 id="detalle-titulo" style="margin-top:26px;"></h2>
+    <div id="detalle-resumen" class="resumen-cliente"></div>
+
+    <div class="materiales-controles">
+      <input type="text" id="filtro-mc" placeholder="Filtrar por MC...">
+      <select id="filtro-estado-mc">
+        <option value="">Todos los equipos</option>
+        <option value="Incompleto">Incompletos</option>
+        <option value="En proceso">En proceso</option>
+        <option value="Listo para entregar">Listos para entregar</option>
+        <option value="Entregado">Entregados</option>
+      </select>
+    </div>
+
+    <div id="lista-mc"></div>
+
+    <div id="sin-mc" hidden>
+      <h3 style="margin-top:24px;">Piezas sin MC identificado</h3>
+      <p class="ot-meta">No cuentan para ninguna orden hasta aclarar a qué equipo pertenecen.</p>
+      <ul id="sin-mc-lista"></ul>
+    </div>
+
+    <h3 style="margin-top:28px;">Añadir pieza de otra OT (excepción)</h3>
+    <div class="materiales-controles">
+      <input type="text" id="extra-mc" placeholder="MC de la otra OT (ej. MC2500123)">
+      <button id="extra-buscar" type="button">Buscar</button>
+    </div>
+    <div id="extra-resultado"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="ordenes-reposicion.js"></script>
+</body>
+</html>

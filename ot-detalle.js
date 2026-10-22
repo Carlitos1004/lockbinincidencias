@@ -191,6 +191,9 @@ async function buscarOT() {
   const esManagerActual = window.perfilActual?.rol === "manager";
   cajaCompletada.hidden = !(ot.origen === "libre" && esManagerActual);
   document.getElementById("completada-checkbox").checked = !!ot.completada;
+  const linkRepo = document.getElementById("ot-link-reposicion");
+  linkRepo.hidden = !(ot.origen === "libre" && esManagerActual);
+  linkRepo.href = "ordenes-reposicion.html?ot=" + encodeURIComponent(idOt);
 
   await cargarComponentesSinTicket(idOt);
 
