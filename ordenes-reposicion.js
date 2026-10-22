@@ -38,6 +38,19 @@ const CAMPOS = "id, m_control, tipo_componente, serial_retirado, id_ot, cliente,
   "vandalismo, garantia_cliente, devuelto, devuelto_en, repo_estado, repo_serial_nuevo, " +
   "repo_fecha_entrega, orden_reposicion_ot";
 
+// Supabase devuelve como máximo 1000 filas por consulta: pedimos por páginas
+async function traerComps(filtroOr) {
+  const todas = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabaseClient.from("componentes_retirados").select(CAMPOS)
+      .or(filtroOr).order("id").range(desde, desde + 999);
+    if (error) return { data: null, error };
+    todas.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return { data: todas, error: null };
+}
+
 // ---------- Estado de una casilla ----------
 function estadoCasilla(c) {
   if (c.repo_estado) return c.repo_estado;
@@ -129,12 +142,12 @@ async function cargarOts() {
   filaHistoricaHtml = filaHistorica;
   if (!otsManuales.length) { compsManuales = []; renderLista(); return; }
 
-  const ids = otsManuales.map(o => o.id_ot);
+  // Solo cargamos piezas de las OTs que ya tienen orden (las demás no muestran contadores)
+  const ids = otsManuales.filter(o => ordenesPorOt[o.id_ot]).map(o => o.id_ot);
   const comps = [];
-  for (let i = 0; i < ids.length; i += 60) {
-    const trozo = ids.slice(i, i + 60);
-    const { data } = await supabaseClient.from("componentes_retirados").select(CAMPOS)
-      .or(`id_ot.in.(${trozo.join(",")}),orden_reposicion_ot.in.(${trozo.join(",")})`);
+  for (let i = 0; i < ids.length; i += 20) {
+    const trozo = ids.slice(i, i + 20);
+    const { data } = await traerComps(`id_ot.in.(${trozo.join(",")}),orden_reposicion_ot.in.(${trozo.join(",")})`);
     (data || []).forEach(c => comps.push(c));
   }
 
@@ -148,10 +161,11 @@ function filaOt(o) {
   const mcs = agruparPorMc(delOt);
   const n = e => mcs.filter(m => m.estadoMc === e).length;
   const orden = ordenesPorOt[o.id_ot];
+  const num = v => orden ? v : "—";
   return `<tr class="orep-fila" data-ot="${esc(o.id_ot)}">
     <td>${orden ? `<strong>${codigoOrden(orden.numero)}</strong>` : '<em>Sin crear</em>'}</td><td>${esc(o.id_ot)}</td><td>${esc(o.cliente || "—")}</td>
-    <td>${mcs.length}</td><td>${n("Incompleto")}</td><td>${n("En proceso")}</td>
-    <td>${n("Listo para entregar")}</td><td>${n("Entregado")}</td></tr>`;
+    <td>${num(mcs.length)}</td><td>${num(n("Incompleto"))}</td><td>${num(n("En proceso"))}</td>
+    <td>${num(n("Listo para entregar"))}</td><td>${num(n("Entregado"))}</td></tr>`;
 }
 
 // La lista principal solo muestra REP-001 y las OTs que YA tienen orden.
@@ -208,8 +222,7 @@ async function abrirOt(idOt) {
 }
 
 async function recargarOt() {
-  const { data, error } = await supabaseClient.from("componentes_retirados").select(CAMPOS)
-    .or(`id_ot.eq.${otActual},orden_reposicion_ot.eq.${otActual}`);
+  const { data, error } = await traerComps(`id_ot.eq.${otActual},orden_reposicion_ot.eq.${otActual}`);
   if (error) { document.getElementById("lista-mc").innerHTML = `<p>Error: ${esc(error.message)}</p>`; return; }
   // Fuera: piezas de esta OT que se cuentan en la orden de otra OT
   compsOtActual = (data || []).filter(c => (c.orden_reposicion_ot || c.id_ot) === otActual);
