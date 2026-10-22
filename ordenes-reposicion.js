@@ -65,6 +65,12 @@ function notaCasilla(c) {
   return partes.filter(Boolean).join(" · ");
 }
 
+// "Batería Recargable", "Batería No Recargable", etc. cuentan como la casilla "Batería"
+function tipoCanonico(t) {
+  const l = (t || "").toLowerCase();
+  return l.includes("bater") ? "Batería" : t;
+}
+
 // ---------- Agrupar por MC ----------
 function agruparPorMc(comps) {
   const grupos = {};
@@ -74,8 +80,9 @@ function agruparPorMc(comps) {
   });
   return Object.entries(grupos).map(([mc, lista]) => {
     const casillas = TIPOS.map(t => {
-      const delTipo = lista.filter(c => c.tipo_componente === t);
-      // si por algún motivo hay dos del mismo tipo, usamos el más reciente sin entregar
+      const delTipo = lista.filter(c => tipoCanonico(c.tipo_componente) === t);
+      // si hay dos del mismo tipo (ej. una batería desechada y otra nueva), preferimos la que no se desechó
+      delTipo.sort((a, b) => ((a.destino || "").includes("Desechar") ? 0 : 1) - ((b.destino || "").includes("Desechar") ? 0 : 1));
       return { tipo: t, comp: delTipo.length ? delTipo[delTipo.length - 1] : null };
     });
     const faltan = casillas.filter(x => !x.comp).map(x => x.tipo);
@@ -252,7 +259,7 @@ function htmlMc(m) {
     const extra = c.orden_reposicion_ot
       ? ` <button type="button" class="btn-quitar-extra" data-id="${c.id}" title="Quitar de esta orden">✕ de esta orden</button>` : "";
     return `<tr data-id="${c.id}">
-      <td>${esc(x.tipo)}${c.orden_reposicion_ot ? `<br><small>desde ${esc(c.id_ot)}</small>` : ""}</td>
+      <td>${esc(c.tipo_componente || x.tipo)}${c.orden_reposicion_ot ? `<br><small>desde ${esc(c.id_ot)}</small>` : ""}</td>
       <td>${esc(c.serial_retirado || "—")}</td>
       <td>${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/, ""))}<br><small>${esc(notaCasilla(c))}</small></td>
       <td><span class="orep-badge ${claseEstado(est)}">${esc(est)}</span></td>
