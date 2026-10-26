@@ -1,3 +1,6 @@
+// Carga la navegación compartida (accesos directos más usados + logo a inicio)
+(function () { const s = document.createElement("script"); s.src = "navegacion.js"; document.head.appendChild(s); })();
+
 // =========================================================================
 // SESIÓN GENÉRICA — para páginas que usan varios roles a la vez (como el
 // detalle de OT). Solo exige que haya sesión activa; no redirige por rol.

@@ -1,3 +1,6 @@
+// Carga la navegación compartida (accesos directos más usados + logo a inicio)
+(function () { const s = document.createElement("script"); s.src = "navegacion.js"; document.head.appendChild(s); })();
+
 // =========================================================================
 // Compartido por admin.html / tecnico.html / cliente.html
 // Verifica que haya sesión activa Y que el rol del usuario coincida con
@@ -42,6 +45,7 @@ const PANEL_POR_ROL = {
     return;
   }
 
+  try { sessionStorage.setItem("lb_rol", perfil.rol); } catch (e) {}
   const spanNombre = document.getElementById("nombre-usuario");
   if (spanNombre) spanNombre.textContent = perfil.nombre || session.user.email;
 })();

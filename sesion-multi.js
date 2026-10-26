@@ -1,3 +1,6 @@
+// Carga la navegación compartida (accesos directos más usados + logo a inicio)
+(function () { const s = document.createElement("script"); s.src = "navegacion.js"; document.head.appendChild(s); })();
+
 // =========================================================================
 // SESIÓN MULTI-ROL — para páginas que pueden usar más de un rol (como la
 // Ruta, que ahora usan tanto Operario como Manager). La página debe
