@@ -120,7 +120,25 @@ function agruparPorMc(comps, idOt) {
 }
 
 // ---------- Lista de OTs ----------
+let esManager = false;
+
+async function detectarRol() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) {
+    const { data: perfil } = await supabaseClient.from("perfiles").select("rol").eq("id", session.user.id).single();
+    esManager = perfil?.rol === "manager";
+  }
+  // El operario ve las órdenes y marca entregas; no crea órdenes ni decide excepciones
+  document.getElementById("bloque-buscar").hidden = !esManager;
+  document.getElementById("bloque-extra").hidden = !esManager;
+  if (!esManager) {
+    const volver = document.querySelector(".btn-volver");
+    if (volver) { volver.href = "ruta.html"; volver.innerHTML = '<span class="btn-volver-flecha">←</span> Volver a Ruta'; }
+  }
+}
+
 (async () => {
+  await detectarRol();
   await cargarOts();
   const ot = new URLSearchParams(location.search).get("ot");
   if (ot) abrirOt(ot);
@@ -217,6 +235,7 @@ function enlazarFilas(tbody) {
 // ---------- Detalle de una OT ----------
 async function abrirOt(idOt) {
   if (!ordenesPorOt[idOt]) {
+    if (!esManager) { alert("Esta OT todavía no tiene orden de reposición. Pídele al manager que la cree."); return; }
     if (!confirm(`La OT ${idOt} todavía no tiene orden de reposición. ¿Crearla ahora? Se le asignará el siguiente número.`)) return;
     const { data: { user } } = await supabaseClient.auth.getUser();
     const ot = otsManuales.find(o => o.id_ot === idOt) || {};
@@ -286,12 +305,12 @@ function htmlMc(m) {
       return `<tr class="fila-falt" data-mc="${esc(m.mc)}" data-tipo="${esc(x.tipo)}">
         <td>${esc(x.tipo)}</td><td>—</td><td><small>No llegó</small></td>
         <td>${estF ? `<span class="orep-badge ${claseEstado(estF)}">${esc(estF)}</span>` : '<span class="orep-badge orep-falta">Falta — aclarar con el cliente</span>'}</td>
-        <td><select class="sel-falt">
+        <td><select class="sel-falt" ${esManager ? "" : "disabled"}>
           <option value="">Pendiente de aclarar</option>
           <option value="Se repone desde stock" ${dec === "Se repone desde stock" ? "selected" : ""}>Se repone desde stock</option>
           <option value="Sin reposición" ${dec === "Sin reposición" ? "selected" : ""}>Sin reposición (el cliente lo acepta)</option>
         </select></td>
-        <td><input type="text" class="inp-falt-serial" placeholder="Serial entregado" value="${esc((f && f.serial_nuevo) || "")}"></td></tr>`;
+        <td><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td></tr>`;
     }
     const c = x.comp;
     const est = estadoCasilla(c);
@@ -304,8 +323,8 @@ function htmlMc(m) {
       <td>${esc(c.serial_retirado || "—")}</td>
       <td>${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/, ""))}<br><small>${esc(notaCasilla(c))}</small></td>
       <td><span class="orep-badge ${claseEstado(est)}">${esc(est)}</span></td>
-      <td><select class="sel-estado-manual">${opciones}</select></td>
-      <td><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}">${extra}</td>
+      <td><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
+      <td><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}">${esManager ? extra : ""}</td>
     </tr>`;
   }).join("");
 

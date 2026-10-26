@@ -54,10 +54,12 @@
     </table>
   </div>
 
+  <div id="bloque-buscar">
   <h3 style="margin-top:22px;">Buscar una OT manual</h3>
   <p class="ot-meta">Aquí solo aparecen las OTs con orden creada. Para crear la orden de otra OT manual (incluidas las HIST-), búscala por número o cliente.</p>
   <div class="materiales-controles"><input type="text" id="buscar-ot" placeholder="Ej: OT-020 o nombre del cliente"></div>
   <div id="buscar-ot-resultado"></div>
+  </div>
 
   <div id="detalle" hidden>
     <h2 id="detalle-titulo" style="margin-top:26px;"></h2>
@@ -82,18 +84,20 @@
       <ul id="sin-mc-lista"></ul>
     </div>
 
+    <div id="bloque-extra">
     <h3 style="margin-top:28px;">Añadir pieza de otra OT (excepción)</h3>
     <div class="materiales-controles">
       <input type="text" id="extra-mc" placeholder="MC de la otra OT (ej. MC2500123)">
       <button id="extra-buscar" type="button">Buscar</button>
     </div>
     <div id="extra-resultado"></div>
+    </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script>const ROL_ESPERADO = "manager";</script>
+<script>const ROL_ESPERADO = ["manager", "operario"];</script>
 <script src="sesion.js"></script>
 <script src="ordenes-reposicion.js"></script>
 </body>
