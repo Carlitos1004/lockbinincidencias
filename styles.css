@@ -2128,3 +2128,30 @@ a.tarjeta-resumen:hover {
 .resultado-comunicacion.com-ok { color: #1e7a3c; font-weight: 600; }
 .resultado-comunicacion.com-aviso { color: #9a6b00; font-weight: 600; }
 .resultado-comunicacion.com-mal { color: #c0392b; font-weight: 600; }
+
+/* Dashboard del Manager: icono grande a la izquierda, número y texto a la derecha */
+.resumen-dashboard-grande .tarjeta-resumen {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 16px;
+  align-items: center;
+}
+
+.resumen-dashboard-grande .tarjeta-resumen .tarjeta-resumen-icono {
+  grid-row: 1 / span 2;
+  font-size: 2.6rem;
+  line-height: 1;
+  margin: 0;
+  color: inherit;
+}
+
+.resumen-dashboard-grande .tarjeta-resumen strong {
+  grid-column: 2;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.resumen-dashboard-grande .tarjeta-resumen span:not(.tarjeta-resumen-icono) {
+  grid-column: 2;
+  margin-top: 2px;
+}
