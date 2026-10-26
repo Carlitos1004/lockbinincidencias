@@ -16,11 +16,12 @@ const ESTADOS_MANUALES = [
   "Entregado"
 ];
 // Casillas que ya no bloquean la entrega del equipo
-const RESUELTOS = new Set(["Listo (sin cambios)", "Reparado recibido", "Repuesto desde stock", "Entregado"]);
+const RESUELTOS = new Set(["Listo (sin cambios)", "Reparado recibido", "Repuesto desde stock", "Sin reposición (acordado)", "Entregado"]);
 
 let otsManuales = [];
 let filaHistoricaHtml = "";
 let compsManuales = [];
+let faltantes = [];      // decisiones sobre piezas que no llegaron (tabla reposicion_faltantes)
 let ordenesPorOt = {};   // id_ot -> fila de ordenes_reposicion
 let otActual = null;
 let compsOtActual = [];   // componentes de la orden abierta
@@ -49,6 +50,13 @@ async function traerComps(filtroOr) {
     if (!data || data.length < 1000) break;
   }
   return { data: todas, error: null };
+}
+
+// Estado de una casilla cuya pieza no llegó, según lo acordado con el cliente
+function estadoFalt(f) {
+  if (!f || !f.decision) return null;
+  if (f.entregado) return "Entregado";
+  return f.decision === "Se repone desde stock" ? "Repuesto desde stock" : "Sin reposición (acordado)";
 }
 
 // ---------- Estado de una casilla ----------
@@ -85,7 +93,7 @@ function tipoCanonico(t) {
 }
 
 // ---------- Agrupar por MC ----------
-function agruparPorMc(comps) {
+function agruparPorMc(comps, idOt) {
   const grupos = {};
   comps.forEach(c => {
     if (!c.m_control) return;
@@ -96,10 +104,12 @@ function agruparPorMc(comps) {
       const delTipo = lista.filter(c => tipoCanonico(c.tipo_componente) === t);
       // si hay dos del mismo tipo (ej. una batería desechada y otra nueva), preferimos la que no se desechó
       delTipo.sort((a, b) => ((a.destino || "").includes("Desechar") ? 0 : 1) - ((b.destino || "").includes("Desechar") ? 0 : 1));
-      return { tipo: t, comp: delTipo.length ? delTipo[delTipo.length - 1] : null };
+      const comp = delTipo.length ? delTipo[delTipo.length - 1] : null;
+      const falt = comp ? null : (faltantes.find(f => f.id_ot === idOt && f.m_control === mc && f.tipo_componente === t) || null);
+      return { tipo: t, comp, falt };
     });
-    const faltan = casillas.filter(x => !x.comp).map(x => x.tipo);
-    const estados = casillas.filter(x => x.comp).map(x => estadoCasilla(x.comp));
+    const faltan = casillas.filter(x => !x.comp && !estadoFalt(x.falt)).map(x => x.tipo);
+    const estados = casillas.map(x => x.comp ? estadoCasilla(x.comp) : estadoFalt(x.falt)).filter(Boolean);
     let estadoMc;
     if (faltan.length) estadoMc = "Incompleto";
     else if (estados.every(e => e === "Entregado")) estadoMc = "Entregado";
@@ -151,6 +161,11 @@ async function cargarOts() {
     (data || []).forEach(c => comps.push(c));
   }
 
+  faltantes = [];
+  for (let i = 0; i < ids.length; i += 20) {
+    const { data: fl } = await supabaseClient.from("reposicion_faltantes").select("*").in("id_ot", ids.slice(i, i + 20));
+    (fl || []).forEach(f => faltantes.push(f));
+  }
   compsManuales = comps;
   renderLista();
 }
@@ -158,7 +173,7 @@ async function cargarOts() {
 // Fila de una OT con sus contadores
 function filaOt(o) {
   const delOt = compsManuales.filter(c => (c.orden_reposicion_ot || c.id_ot) === o.id_ot);
-  const mcs = agruparPorMc(delOt);
+  const mcs = agruparPorMc(delOt, o.id_ot);
   const n = e => mcs.filter(m => m.estadoMc === e).length;
   const orden = ordenesPorOt[o.id_ot];
   const num = v => orden ? v : "—";
@@ -224,6 +239,8 @@ async function abrirOt(idOt) {
 async function recargarOt() {
   const { data, error } = await traerComps(`id_ot.eq.${otActual},orden_reposicion_ot.eq.${otActual}`);
   if (error) { document.getElementById("lista-mc").innerHTML = `<p>Error: ${esc(error.message)}</p>`; return; }
+  const { data: fl } = await supabaseClient.from("reposicion_faltantes").select("*").eq("id_ot", otActual);
+  faltantes = faltantes.filter(f => f.id_ot !== otActual).concat(fl || []);
   // Fuera: piezas de esta OT que se cuentan en la orden de otra OT
   compsOtActual = (data || []).filter(c => (c.orden_reposicion_ot || c.id_ot) === otActual);
   clienteOtActual = (otsManuales.find(o => o.id_ot === otActual) || {}).cliente || "";
@@ -231,7 +248,7 @@ async function recargarOt() {
 }
 
 function renderDetalle() {
-  const mcs = agruparPorMc(compsOtActual);
+  const mcs = agruparPorMc(compsOtActual, otActual);
   const n = e => mcs.filter(m => m.estadoMc === e).length;
   document.getElementById("detalle-resumen").innerHTML = `
     <div class="tarjeta-resumen"><strong>${mcs.length}</strong><span>Equipos</span></div>
@@ -263,7 +280,18 @@ function claseMc(e) {
 function htmlMc(m) {
   const filas = m.casillas.map(x => {
     if (!x.comp) {
-      return `<tr><td>${esc(x.tipo)}</td><td colspan="5"><span class="orep-badge orep-falta">Falta — aclarar con el cliente</span></td></tr>`;
+      const f = x.falt;
+      const estF = estadoFalt(f);
+      const dec = f && f.decision;
+      return `<tr class="fila-falt" data-mc="${esc(m.mc)}" data-tipo="${esc(x.tipo)}">
+        <td>${esc(x.tipo)}</td><td>—</td><td><small>No llegó</small></td>
+        <td>${estF ? `<span class="orep-badge ${claseEstado(estF)}">${esc(estF)}</span>` : '<span class="orep-badge orep-falta">Falta — aclarar con el cliente</span>'}</td>
+        <td><select class="sel-falt">
+          <option value="">Pendiente de aclarar</option>
+          <option value="Se repone desde stock" ${dec === "Se repone desde stock" ? "selected" : ""}>Se repone desde stock</option>
+          <option value="Sin reposición" ${dec === "Sin reposición" ? "selected" : ""}>Sin reposición (el cliente lo acepta)</option>
+        </select></td>
+        <td><input type="text" class="inp-falt-serial" placeholder="Serial entregado" value="${esc((f && f.serial_nuevo) || "")}"></td></tr>`;
     }
     const c = x.comp;
     const est = estadoCasilla(c);
@@ -315,6 +343,23 @@ function enlazarEventos() {
       await guardarComp(id, { repo_serial_nuevo: inp.value.trim() || null }, false);
     }));
 
+  const guardarFalt = async (tr) => {
+    const mc = tr.dataset.mc, tipo = tr.dataset.tipo;
+    const decision = tr.querySelector(".sel-falt").value || null;
+    const serial = tr.querySelector(".inp-falt-serial").value.trim() || null;
+    const { error } = await supabaseClient.from("reposicion_faltantes").upsert({
+      id_ot: otActual, m_control: mc, tipo_componente: tipo, decision,
+      serial_nuevo: decision === "Se repone desde stock" ? serial : null,
+      actualizado_en: new Date().toISOString()
+    }, { onConflict: "id_ot,m_control,tipo_componente" });
+    if (error) { alert("No se pudo guardar: " + error.message + "\n(¿Corriste el SQL 78?)"); return; }
+    await recargarOt(); cargarOts();
+  };
+  document.querySelectorAll(".fila-falt .sel-falt").forEach(sel =>
+    sel.addEventListener("change", () => guardarFalt(sel.closest("tr"))));
+  document.querySelectorAll(".fila-falt .inp-falt-serial").forEach(inp =>
+    inp.addEventListener("change", () => guardarFalt(inp.closest("tr"))));
+
   document.querySelectorAll(".btn-entregar").forEach(btn =>
     btn.addEventListener("click", () => entregarEquipo(btn.dataset.mc)));
 
@@ -339,11 +384,19 @@ async function guardarComp(id, cambios, recargar = true) {
 }
 
 async function entregarEquipo(mc) {
-  const grupo = agruparPorMc(compsOtActual).find(m => m.mc === mc);
+  const grupo = agruparPorMc(compsOtActual, otActual).find(m => m.mc === mc);
   if (!grupo || grupo.estadoMc !== "Listo para entregar") return;
   if (!confirm(`¿Marcar ${mc} como entregado al cliente? Se marcarán sus 4 componentes.`)) return;
   const fecha = hoy();
   for (const x of grupo.casillas) {
+    if (!x.comp) {
+      if (x.falt && estadoFalt(x.falt)) {
+        const { error } = await supabaseClient.from("reposicion_faltantes")
+          .update({ entregado: true, fecha_entrega: fecha }).eq("id", x.falt.id);
+        if (error) { alert("No se pudo guardar: " + error.message); break; }
+      }
+      continue;
+    }
     const cambios = { repo_estado: "Entregado", repo_fecha_entrega: fecha };
     // Mantener sincronizado el seguimiento "devuelto" que ya existe
     if ((x.comp.destino || "").includes("Devolver al cliente")) {
