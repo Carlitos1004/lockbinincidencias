@@ -192,7 +192,7 @@ async function buscarOT() {
   cajaCompletada.hidden = !(ot.origen === "libre" && esManagerActual);
   document.getElementById("completada-checkbox").checked = !!ot.completada;
   const linkRepo = document.getElementById("ot-link-reposicion");
-  linkRepo.hidden = !(ot.origen === "libre" && esManagerActual);
+  linkRepo.style.display = (ot.origen === "libre" && esManagerActual) ? "inline-block" : "none";
   linkRepo.href = "ordenes-reposicion.html?ot=" + encodeURIComponent(idOt);
 
   await cargarComponentesSinTicket(idOt);
