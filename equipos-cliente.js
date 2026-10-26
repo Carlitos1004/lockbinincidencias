@@ -81,7 +81,7 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
 async function cargarClientes() {
   const select = document.getElementById("cliente-select");
   try {
-    const todos = await traerTodasLasFilas("equipos", "cliente");
+    const todos = await traerTodasLasFilas("equipos", "cliente, m_control", (q) => q.order("m_control"));
     const clientesUnicos = [...new Set(todos.map(e => e.cliente).filter(Boolean))].sort();
     select.innerHTML = `<option value="">— Selecciona un cliente —</option>` +
       clientesUnicos.map(c => `<option value="${c}">${c}</option>`).join("");

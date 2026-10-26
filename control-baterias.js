@@ -62,11 +62,12 @@ async function cargarDatos() {
     data = await traerTodasLasFilas(
       "componentes_retirados",
       "cliente, m_control, id_ot, fecha, serial_nuevo, serial_retirado, tipo_componente, categoria, reparacion, estado",
-      (q) => q.in("tipo_componente", ["Batería Recargable", "Batería No Recargable"])
+      (q) => q.in("tipo_componente", ["Batería Recargable", "Batería No Recargable"]).order("id")
     );
     equiposData = await traerTodasLasFilas(
       "equipos",
-      "m_control, cliente, serie_bateria, modelo_bateria, fecha_instalacion"
+      "m_control, cliente, serie_bateria, modelo_bateria, fecha_instalacion",
+      (q) => q.order("m_control")
     );
   } catch (err) {
     document.getElementById("tbody-retiradas").innerHTML = `<tr><td colspan="12">Error: ${err.message}</td></tr>`;

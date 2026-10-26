@@ -34,7 +34,7 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
 
 async function cargarRegistro() {
   try {
-    registroData = await traerTodasLasFilas("registro_maestro_equipos", "*", (q) => q.order("actualizado_en", { ascending: false }));
+    registroData = await traerTodasLasFilas("registro_maestro_equipos", "*", (q) => q.order("actualizado_en", { ascending: false }).order("imei"));
   } catch (err) {
     document.getElementById("tbody-registro").innerHTML = `<tr><td colspan="8">Error: ${err.message}</td></tr>`;
     return;

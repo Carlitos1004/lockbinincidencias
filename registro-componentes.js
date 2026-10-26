@@ -50,11 +50,12 @@ async function cargarTodo() {
   let equiposData = [];
   try {
     crudoComponentes = await traerTodasLasFilas("componentes_retirados", "*", (q) =>
-      q.not("serial_retirado", "is", null).neq("serial_retirado", "").order("fecha", { ascending: false })
+      q.not("serial_retirado", "is", null).neq("serial_retirado", "").order("fecha", { ascending: false }).order("id")
     );
     equiposData = await traerTodasLasFilas(
       "equipos",
-      "m_control, cliente, serie_lector, serie_cierre, serie_bateria, fecha_instalacion, actualizado_en"
+      "m_control, cliente, serie_lector, serie_cierre, serie_bateria, fecha_instalacion, actualizado_en",
+      (q) => q.order("m_control")
     );
   } catch (err) {
     document.getElementById("tbody-registro-comp").innerHTML = `<tr><td colspan="8">Error: ${err.message}</td></tr>`;

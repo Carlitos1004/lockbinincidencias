@@ -78,7 +78,7 @@ cargarClientes();
 async function cargarClientes() {
   let data;
   try {
-    data = await traerTodasLasFilas("equipos", "cliente");
+    data = await traerTodasLasFilas("equipos", "cliente", (q) => q.order("m_control"));
   } catch (err) {
     clienteSelect.innerHTML = `<option value="">Error al cargar</option>`;
     return;
@@ -113,7 +113,7 @@ filtrarBtn.addEventListener("click", async () => {
 
   let data;
   try {
-    data = await traerTodasLasFilas("equipos", "*", (q) => cliente !== "TODOS" ? q.eq("cliente", cliente) : q);
+    data = await traerTodasLasFilas("equipos", "*", (q) => (cliente !== "TODOS" ? q.eq("cliente", cliente) : q).order("m_control"));
   } catch (err) {
     filtrarBtn.disabled = false;
     filtrarBtn.textContent = "Filtrar equipos con fallas";

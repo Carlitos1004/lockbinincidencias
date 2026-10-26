@@ -70,7 +70,7 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
 async function cargarEnvios() {
   try {
     enviosData = await traerTodasLasFilas("componentes_retirados", "*", (q) =>
-      q.eq("destino", DESTINO_AMMI).order("fecha", { ascending: false })
+      q.eq("destino", DESTINO_AMMI).order("fecha", { ascending: false }).order("id")
     );
   } catch (err) {
     document.getElementById("tbody-ammi").innerHTML = `<tr><td colspan="12">Error: ${err.message}</td></tr>`;

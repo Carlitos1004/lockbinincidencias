@@ -26,7 +26,7 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
 
 async function cargarDatos() {
   try {
-    sensoresData = await traerTodasLasFilas("sensores", "*", (q) => q.order("fecha_actualizacion", { ascending: false }));
+    sensoresData = await traerTodasLasFilas("sensores", "*", (q) => q.order("fecha_actualizacion", { ascending: false }).order("serial"));
   } catch (err) {
     document.getElementById("tbody-sensores").innerHTML = `<tr><td colspan="7">Error: ${err.message}</td></tr>`;
     return;
@@ -51,7 +51,7 @@ async function cambiarPestana(cual) {
   if (!esEstado && !historialYaCargado) {
     document.getElementById("tbody-historial").innerHTML = `<tr><td colspan="5">Cargando...</td></tr>`;
     try {
-      historialData = await traerTodasLasFilas("historial_sensores", "*", (q) => q.order("fecha", { ascending: false }));
+      historialData = await traerTodasLasFilas("historial_sensores", "*", (q) => q.order("fecha", { ascending: false }).order("id"));
       historialYaCargado = true;
       renderTablaHistorial();
     } catch (err) {
