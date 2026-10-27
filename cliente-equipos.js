@@ -33,10 +33,17 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
   return todas;
 }
 
+// Solo los equipos con Estado de Montaje = Instalado (no Pendiente ni Revisión).
+function esInstalado(eq) {
+  const e = String(eq.estado_montaje || "").toLowerCase();
+  return e.includes("instala") && !e.includes("pendien");
+}
+
 async function cargarEquipos() {
   const tbody = document.getElementById("equipos-cliente-tbody");
   try {
-    equiposCliente = await traerTodasLasFilas("equipos", "*", (q) => q.order("m_control"));
+    const todos = await traerTodasLasFilas("equipos", "*", (q) => q.order("m_control"));
+    equiposCliente = todos.filter(esInstalado);
     renderEquipos();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5">Error: ${err.message}</td></tr>`;

@@ -2,7 +2,7 @@
 // PANEL DEL CLIENTE — página principal
 // Solo el saludo y el resumen rápido (equipos totales / con alarma). El
 // resto vive en sus propias páginas: cliente-equipos.html,
-// cliente-cambios.html, cliente-fallas.html, cliente-historial.html.
+// cliente-cambios.html, cliente-fallas.html.
 // =========================================================================
 
 const MAPA_ALARMAS = {
@@ -36,6 +36,12 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
   return todas;
 }
 
+// Solo los equipos con Estado de Montaje = Instalado (no Pendiente ni Revisión).
+function esInstalado(eq) {
+  const e = String(eq.estado_montaje || "").toLowerCase();
+  return e.includes("instala") && !e.includes("pendien");
+}
+
 async function cargarInicioCliente() {
   const { data: { user } } = await supabaseClient.auth.getUser();
 
@@ -53,12 +59,13 @@ async function cargarInicioCliente() {
   if (spanSaludo) spanSaludo.textContent = perfil?.cliente_nombre || "—";
 
   try {
-    const equiposCliente = await traerTodasLasFilas("equipos", "*", (q) => q.order("m_control"));
+    const todos = await traerTodasLasFilas("equipos", "*", (q) => q.order("m_control"));
+    const equiposCliente = todos.filter(esInstalado);
     const total = equiposCliente.length;
     const conAlarma = equiposCliente.filter(eq => Object.keys(MAPA_ALARMAS).some(col => eq[col])).length;
 
     document.getElementById("resumen-cliente").innerHTML = `
-      <div class="tarjeta-resumen"><strong>${total}</strong><span>Equipos totales</span></div>
+      <div class="tarjeta-resumen"><strong>${total}</strong><span>Equipos instalados</span></div>
       <div class="tarjeta-resumen ${conAlarma > 0 ? 'tarjeta-alerta' : ''}"><strong>${conAlarma}</strong><span>Con alguna alarma activa</span></div>
     `;
   } catch (err) {

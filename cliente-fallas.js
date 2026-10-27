@@ -33,6 +33,12 @@ function mostrarMensaje(el, texto, esError) {
   el.hidden = false;
 }
 
+// Solo los equipos con Estado de Montaje = Instalado (no Pendiente ni Revisión).
+function esInstalado(eq) {
+  const e = String(eq.estado_montaje || "").toLowerCase();
+  return e.includes("instala") && !e.includes("pendien");
+}
+
 async function iniciar() {
   const { data: { user } } = await supabaseClient.auth.getUser();
   const { data: perfil } = await supabaseClient
@@ -43,7 +49,8 @@ async function iniciar() {
   nombreClienteActual = perfil?.cliente_nombre || null;
 
   try {
-    equiposCliente = await traerTodasLasFilas("equipos", "m_control, fraccion", (q) => q.order("m_control"));
+    const todos = await traerTodasLasFilas("equipos", "m_control, fraccion, estado_montaje", (q) => q.order("m_control"));
+    equiposCliente = todos.filter(esInstalado);
     document.getElementById("datalist-equipos-cliente").innerHTML = equiposCliente
       .map(eq => `<option value="${eq.m_control}">${eq.fraccion ? eq.m_control + " — " + eq.fraccion : ""}</option>`)
       .join("");
