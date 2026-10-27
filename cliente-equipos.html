@@ -27,7 +27,24 @@
 
   <div class="materiales-controles" style="margin-top:20px;">
     <input type="text" id="filtro-equipos" placeholder="Buscar por módulo o fracción...">
+    <select id="filtro-fraccion"><option value="">Todas las fracciones</option></select>
+    <select id="filtro-estado"><option value="">Todos los estados</option></select>
+    <select id="filtro-alarma">
+      <option value="">Todas las alarmas</option>
+      <option value="__con">Con alguna alarma</option>
+      <option value="__sin">Sin alarmas</option>
+    </select>
+    <select id="filtro-comunicacion">
+      <option value="">Cualquier comunicación</option>
+      <option value="1">Sin comunicar hace más de 1 día</option>
+      <option value="3">Sin comunicar hace más de 3 días</option>
+      <option value="7">Sin comunicar hace más de 7 días</option>
+      <option value="30">Sin comunicar hace más de 30 días</option>
+      <option value="__nunca">Nunca ha comunicado</option>
+    </select>
+    <button id="filtro-limpiar" type="button">Limpiar filtros</button>
   </div>
+  <p class="ot-meta" id="total-equipos-cliente"></p>
   <table class="tabla-revision" id="tabla-equipos-cliente">
     <thead><tr><th>Módulo</th><th>Fracción</th><th>Estado</th><th>Alarmas activas</th><th>Última comunicación</th></tr></thead>
     <tbody id="equipos-cliente-tbody"><tr><td colspan="5">Cargando...</td></tr></tbody>
