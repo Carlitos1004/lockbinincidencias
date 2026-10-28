@@ -229,7 +229,7 @@ function renderResultados(porOt, infoEquipos = {}) {
       return `
         <div class="resultado-nota-equipo">
           📝 <strong>${n.mc === mc ? "Nota del equipo" : "Nota del componente " + escaparHtml(n.mc)}:</strong> ${escaparHtml(n.nota)}
-          <span class="resultado-sublinea">${new Date(n.fecha).toLocaleDateString("es-ES")}${n.autor ? " · " + escaparHtml(n.autor) : ""}</span>${fotos}
+          <span class="resultado-sublinea">${new Date(n.fecha).toLocaleDateString("es-ES")}${n.autor ? " · " + htmlUsuario(n.autor) : ""}</span>${fotos}
         </div>
       `;
     }).join("");

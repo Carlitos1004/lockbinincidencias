@@ -182,9 +182,10 @@ async function buscarOT() {
     condicionesUnicas.map(c => `<option value="${c}">${c}</option>`).join("");
   limpiarFiltros(false);
 
+  await cargarNombresUsuarios();
   document.getElementById("ot-titulo").textContent = idOt;
   document.getElementById("ot-meta").textContent =
-    `${ot.cliente ? "Cliente: " + ot.cliente + " — " : ""}Creada: ${new Date(ot.fecha).toLocaleString("es-ES")} — por ${ot.creado_por || "—"} — ${ticketsCargados.length} ticket(s)`;
+    `${ot.cliente ? "Cliente: " + ot.cliente + " — " : ""}Creada: ${new Date(ot.fecha).toLocaleString("es-ES")} — por ${nombreUsuario(ot.creado_por)} — ${ticketsCargados.length} ticket(s)`;
   instruccionesTextarea.value = ot.instrucciones || "";
 
   const cajaCompletada = document.getElementById("completada-libre-box");

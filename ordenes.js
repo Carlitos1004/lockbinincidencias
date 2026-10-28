@@ -74,7 +74,7 @@ function renderTabla() {
   let filtradas = otsConDatos;
 
   if (fOt) filtradas = filtradas.filter(r => r.ot.id_ot.toLowerCase().includes(fOt));
-  if (fCreadoPor) filtradas = filtradas.filter(r => (r.ot.creado_por || "").toLowerCase().includes(fCreadoPor));
+  if (fCreadoPor) filtradas = filtradas.filter(r => ((r.ot.creado_por || "") + " " + nombreUsuario(r.ot.creado_por)).toLowerCase().includes(fCreadoPor));
   if (fCliente) filtradas = filtradas.filter(r => r.clientes.some(c => c.toLowerCase().includes(fCliente)));
   if (fOrigen) filtradas = filtradas.filter(r => (r.ot.origen || "normal") === fOrigen);
   if (fEstadoGeneral) filtradas = filtradas.filter(r => r.ot.estado_general === fEstadoGeneral);
@@ -102,7 +102,7 @@ function renderTabla() {
         <td><strong>${r.ot.id_ot}</strong></td>
         <td>${esLibre ? '<span class="origen-etiqueta origen-manual">Manual</span>' : '<span class="origen-etiqueta origen-normal">Campo</span>'}</td>
         <td>${new Date(r.ot.fecha).toLocaleDateString("es-ES")}</td>
-        <td>${r.ot.creado_por || "—"}</td>
+        <td>${htmlUsuario(r.ot.creado_por)}</td>
         <td>${r.clientes.join(", ") || "—"}</td>
         <td>${r.equipos.length}</td>
         <td>${r.abiertos}</td>
@@ -141,3 +141,6 @@ function renderTabla() {
 document.getElementById("filtro-estado").addEventListener("change", renderTabla);
 document.getElementById("filtro-origen").addEventListener("change", renderTabla);
 document.getElementById("filtro-estado-general").addEventListener("change", renderTabla);
+
+// Al terminar de cargar los nombres, repinta para mostrarlos en lugar del correo.
+cargarNombresUsuarios().then(() => { if (otsConDatos.length) renderTabla(); });

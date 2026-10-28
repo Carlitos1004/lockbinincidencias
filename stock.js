@@ -38,6 +38,7 @@ async function cargarStock() {
 }
 
 async function cargarAjustes() {
+  await cargarNombresUsuarios();
   const { data, error } = await supabaseClient
     .from("stock_ajustes")
     .select("*")
@@ -60,7 +61,7 @@ async function cargarAjustes() {
       <td>${a.tipo_componente}</td>
       <td>${a.cantidad > 0 ? "+" : ""}${a.cantidad}</td>
       <td>${a.motivo}</td>
-      <td>${a.creado_por || "—"}</td>
+      <td>${htmlUsuario(a.creado_por)}</td>
       <td><button class="btn-eliminar-ticket btn-borrar-ajuste" data-id="${a.id}" title="Borrar este ajuste">🗑️</button></td>
     </tr>
   `).join("");
