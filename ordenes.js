@@ -31,13 +31,21 @@ async function cargarOTs() {
     return;
   }
 
-  const { data: tickets, error: errorTickets } = await supabaseClient
-    .from("historial_fallas")
-    .select("id_ot, id_ot_relacionada, cliente, m_control, estado");
-
-  if (errorTickets) {
-    tbody.innerHTML = `<tr><td colspan="10">Error: ${errorTickets.message}</td></tr>`;
-    return;
+  // Supabase devuelve como máximo 1000 filas por consulta: se pide por
+  // páginas (con orden único) para que el conteo de tickets por OT sea completo.
+  const tickets = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabaseClient
+      .from("historial_fallas")
+      .select("id_registro, id_ot, id_ot_relacionada, cliente, m_control, estado")
+      .order("id_registro")
+      .range(desde, desde + 999);
+    if (error) {
+      tbody.innerHTML = `<tr><td colspan="10">Error: ${error.message}</td></tr>`;
+      return;
+    }
+    tickets.push(...(data || []));
+    if (!data || data.length < 1000) break;
   }
 
   const ticketsPorOt = {};
