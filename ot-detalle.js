@@ -516,7 +516,7 @@ descargarBtn.addEventListener("click", () => {
   XLSX.writeFile(libro, otActualCargada.id_ot + ".xlsx");
 });
 
-document.getElementById("descargar-plantilla-btn").addEventListener("click", () => {
+document.getElementById("descargar-plantilla-btn").addEventListener("click", async () => {
   if (!otActualCargada) return;
 
   const abiertos = ticketsCargados.filter(t => t.estado === "🚨 ABIERTO");
@@ -525,7 +525,38 @@ document.getElementById("descargar-plantilla-btn").addEventListener("click", () 
     return;
   }
 
-  const encabezados = ["Localidad", "Modulo de control", "Fracción", "Acción", "Comentarios", "Latitud", "Longitud", "Enlace", "Estado"];
+  // Notas e historial de cada equipo, para tener su historia a mano mientras
+  // se habla con el operario. Si algo falla, la plantilla sale igual, sin esas columnas llenas.
+  const mcsPlantilla = [...new Set(abiertos.map(t => t.m_control))];
+  const notasPorMc = {}, histPorMc = {}, vidaPorMc = {};
+  try {
+    const { data: notas } = await supabaseClient
+      .from("notas_equipo").select("mc, nota").in("mc", mcsPlantilla).eq("activa", true);
+    (notas || []).forEach(n => { (notasPorMc[n.mc] = notasPorMc[n.mc] || []).push(n.nota); });
+
+    const { data: hist } = await supabaseClient
+      .from("historial_fallas").select("m_control, falla, accion_calle, comentarios, fecha, id_ot")
+      .in("m_control", mcsPlantilla).neq("id_ot", otActualCargada.id_ot)
+      .order("fecha", { ascending: false });
+    (hist || []).forEach(h => {
+      const lista = (histPorMc[h.m_control] = histPorMc[h.m_control] || []);
+      if (lista.length >= 3) return;
+      const accion = [h.accion_calle, h.comentarios].filter(Boolean).join(" — ") || "sin acción registrada";
+      lista.push(`${new Date(h.fecha).toLocaleDateString("es-ES")} (${h.id_ot}) ${h.falla}: ${accion}`);
+    });
+
+    const { data: vida } = await supabaseClient
+      .from("historial_equipo").select("mc, tipo_evento, fecha")
+      .in("mc", mcsPlantilla).order("fecha", { ascending: false });
+    (vida || []).forEach(v => {
+      const lista = (vidaPorMc[v.mc] = vidaPorMc[v.mc] || []);
+      if (lista.length < 3) lista.push(`${new Date(v.fecha).toLocaleDateString("es-ES")} ${v.tipo_evento}`);
+    });
+  } catch (err) {
+    console.error("No se pudieron cargar notas e historial para la plantilla:", err);
+  }
+
+  const encabezados = ["Localidad", "Modulo de control", "Fracción", "Acción", "Comentarios", "Latitud", "Longitud", "Enlace", "Estado", "Notas del equipo", "Historial anterior", "Vida del equipo"];
   const filas = abiertos.map(t => {
     const lat = t.equipos?.latitud;
     const lng = t.equipos?.longitud;
@@ -542,7 +573,10 @@ document.getElementById("descargar-plantilla-btn").addEventListener("click", () 
       lat || "",
       lng || "",
       (lat && lng) ? `https://maps.google.com/?q=${lat},${lng}` : "",
-      `${t.falla} (${fechaComunicacion})`
+      `${t.falla} (${fechaComunicacion})`,
+      (notasPorMc[t.m_control] || []).join(" | "),
+      (histPorMc[t.m_control] || []).join(" | ") || "Sin historial previo",
+      (vidaPorMc[t.m_control] || []).join(" | ")
     ];
   });
 
@@ -555,6 +589,7 @@ document.getElementById("descargar-plantilla-btn").addEventListener("click", () 
   filasHoja.push(...filas);
 
   const hoja = XLSX.utils.aoa_to_sheet(filasHoja);
+  hoja["!cols"] = [{ wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 30 }, { wch: 24 }, { wch: 10 }, { wch: 10 }, { wch: 28 }, { wch: 28 }, { wch: 40 }, { wch: 70 }, { wch: 40 }];
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Plantilla");
   XLSX.writeFile(libro, `Plantilla_${otActualCargada.id_ot}.xlsx`);
