@@ -219,10 +219,10 @@ filtrarBtn.addEventListener("click", async () => {
       comps.forEach(c => {
         const ot = c.orden_reposicion_ot || c.id_ot;
         if (numeroPorOt[ot] === undefined || entregado(c)) return;
-        const r = repNuevaPorMC[c.m_control] || (repNuevaPorMC[c.m_control] = { numero: numeroPorOt[ot], id_ot: ot, tipos: new Set(), tieneMC: false });
+        const r = repNuevaPorMC[c.m_control] || (repNuevaPorMC[c.m_control] = { numero: numeroPorOt[ot], id_ot: ot, tipos: new Set(), tieneMC: false, estadoMC: "" });
         const tipo = c.tipo_componente || "pieza";
         r.tipos.add(tipo);
-        if (/m[oó]dulo/i.test(tipo)) r.tieneMC = true;
+        if (/m[oó]dulo/i.test(tipo)) { r.tieneMC = true; r.estadoMC = (c.repo_estado || c.destino || "sin destino").replace(/^[^A-Za-zÁÉÍÓÚáéíóúñÑ]+/, "").trim(); }
       });
     }
   } catch (err) {
@@ -242,7 +242,7 @@ filtrarBtn.addEventListener("click", async () => {
         equiposOcultos.push({ eq, motivo: "En reposición REP-" + String((rp.ordenes_reposicion && rp.ordenes_reposicion.numero) || 1).padStart(3, "0") });
       } else if (rn && rn.tieneMC) {
         // Tenemos el módulo de control aquí: el equipo está físicamente con nosotros.
-        equiposOcultos.push({ eq, motivo: "En reposición REP-" + String(rn.numero).padStart(3, "0") + " (" + rn.id_ot + "): tenemos aquí " + [...rn.tipos].join(", ") });
+        equiposOcultos.push({ eq, motivo: "En reposición REP-" + String(rn.numero).padStart(3, "0") + " (" + rn.id_ot + "): tenemos aquí " + [...rn.tipos].join(", ") + " · Módulo de Control: " + rn.estadoMC });
       } else {
         // Si solo tenemos algunas piezas (sin el módulo), el equipo sigue en calle: se queda en la lista.
         visibles.push(eq);
