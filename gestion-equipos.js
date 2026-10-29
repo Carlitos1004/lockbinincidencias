@@ -61,7 +61,6 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
 
 let repNuevaPorMC = {};   // {mc: {numero, id_ot}} — MC con piezas aún sin entregar en una orden REP-002 en adelante
 let equiposOcultos = [];  // [{eq, motivo}] equipos que no entran en la lista por estar en una reposición
-let infoOtsRep = [];      // resumen por OT de reposición: cuántos MC tiene y dónde quedó cada uno
 let ocultosPorReposicion = 0;
 let equiposEncontrados = []; // [{m_control, fraccion, cliente, fallas: [...]}]
 let notasPorMC = {}; // {mc: [nota1, nota2, ...]}
@@ -253,56 +252,12 @@ filtrarBtn.addEventListener("click", async () => {
     ocultosPorReposicion = equiposOcultos.length;
   }
 
-  // Resumen por OT de reposición: de todos sus MC, cuántos se ocultaron,
-  // cuántos siguen en la lista y cuáles no salieron en el filtro.
-  infoOtsRep = [];
-  try {
-    const otsRep = {};
-    Object.values(repNuevaPorMC).forEach(r => { otsRep[r.id_ot] = r.numero; });
-    const ocultosSet = new Set(equiposOcultos.map(o => o.eq.m_control));
-    const visiblesSet = new Set(equiposEncontrados.map(e => e.m_control));
-    for (const ot of Object.keys(otsRep)) {
-      const mcsOt = new Set();
-      for (let desde = 0; ; desde += 1000) {
-        const { data, error } = await supabaseClient
-          .from("componentes_retirados")
-          .select("m_control, id_ot, orden_reposicion_ot")
-          .or(`id_ot.eq.${ot},orden_reposicion_ot.eq.${ot}`)
-          .order("id").range(desde, desde + 999);
-        if (error) throw error;
-        (data || []).forEach(c => { if ((c.orden_reposicion_ot || c.id_ot) === ot && c.m_control) mcsOt.add(c.m_control); });
-        if (!data || data.length < 1000) break;
-      }
-      const lista = [...mcsOt].sort();
-      infoOtsRep.push({ ot, numero: otsRep[ot], mcs: lista });
-    }
-  } catch (err) {
-    console.error("No se pudo calcular el resumen de reposiciones:", err);
-  }
-
   renderTabla();
   renderOcultos();
   resultadoFiltro.hidden = false;
 });
 
-function renderInfoOtsRep() {
-  const cont = document.getElementById("info-ots-rep");
-  if (!infoOtsRep.length) { cont.innerHTML = ""; return; }
-  const ocultosSet = new Set(equiposOcultos.map(o => o.eq.m_control));
-  const visiblesSet = new Set(equiposEncontrados.map(e => e.m_control));
-  cont.innerHTML = infoOtsRep.map(i => {
-    const ocultos = i.mcs.filter(m => ocultosSet.has(m)).length;
-    const visibles = i.mcs.filter(m => visiblesSet.has(m));
-    const fuera = i.mcs.filter(m => !ocultosSet.has(m) && !visiblesSet.has(m));
-    let txt = `<strong>REP-${String(i.numero).padStart(3, "0")} (${i.ot})</strong>: ${i.mcs.length} MC en la orden — ${ocultos} ocultos`;
-    if (visibles.length) txt += `, ${visibles.length} siguen en la lista (${visibles.join(", ")})`;
-    if (fuera.length) txt += `, <span title="No tienen falla detectada, o su estado de montaje no está marcado arriba">${fuera.length} no salieron en el filtro</span> (${fuera.join(", ")})`;
-    return `<div style="margin-bottom:4px;">${txt}.</div>`;
-  }).join("");
-}
-
 function renderOcultos() {
-  renderInfoOtsRep();
   const bloque = document.getElementById("bloque-ocultos");
   const tb = document.getElementById("ocultos-tbody");
   if (equiposOcultos.length === 0) { bloque.hidden = true; return; }
