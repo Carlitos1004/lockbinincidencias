@@ -59,8 +59,11 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
   return todas;
 }
 
+let repNuevaPorMC = {};   // {mc: {numero, id_ot}} — MC con piezas aún sin entregar en una orden REP-002 en adelante
+let ocultosPorReposicion = 0;
 let equiposEncontrados = []; // [{m_control, fraccion, cliente, fallas: [...]}]
 let notasPorMC = {}; // {mc: [nota1, nota2, ...]}
+let reposicionPorMC = {}; // {mc: {...fila de equipos_reposicion + número de orden}}
 let historialPorMC = {}; // {mc: [{falla, accion_calle, comentarios, fecha, id_ot}, ...]} últimas 3
 
 const clienteSelect = document.getElementById("cliente-select");
@@ -171,12 +174,76 @@ filtrarBtn.addEventListener("click", async () => {
     if (historialPorMC[h.m_control].length < 3) historialPorMC[h.m_control].push(h);
   });
 
+  // Reposiciones (REP-001 y siguientes): para que se vea en la lista que el
+  // equipo salió en una reposición y su falla de comunicación es porque aún
+  // no ha llegado al cliente. Si falla la consulta, la lista sigue igual.
+  reposicionPorMC = {};
+  try {
+    const { data: reps, error: errReps } = await supabaseClient
+      .from("equipos_reposicion")
+      .select("mc, tipo_registro, estado, fecha_reposicion, motivo, ordenes_reposicion(numero)")
+      .in("mc", mcsEncontrados);
+    if (errReps) throw errReps;
+    (reps || []).forEach(r => { reposicionPorMC[r.mc] = r; });
+  } catch (err) {
+    console.error("No se pudieron cargar las reposiciones:", err);
+  }
+
+  // Órdenes de reposición nuevas (REP-002 en adelante, por OT manual): un
+  // equipo cuenta como "en reposición" si tiene piezas en una OT con orden y
+  // alguna aún no se ha entregado al cliente.
+  repNuevaPorMC = {};
+  try {
+    const { data: ordenes, error: errOrd } = await supabaseClient
+      .from("ordenes_reposicion").select("numero, id_ot").not("id_ot", "is", null);
+    if (errOrd) throw errOrd;
+    const numeroPorOt = {};
+    (ordenes || []).forEach(o => { numeroPorOt[o.id_ot] = o.numero; });
+
+    if (Object.keys(numeroPorOt).length > 0) {
+      const comps = [];
+      for (let desde = 0; ; desde += 1000) {
+        const { data, error } = await supabaseClient
+          .from("componentes_retirados")
+          .select("m_control, id_ot, orden_reposicion_ot, destino, devuelto, repo_estado")
+          .in("m_control", mcsEncontrados)
+          .order("id").range(desde, desde + 999);
+        if (error) throw error;
+        comps.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      const entregado = c => c.repo_estado
+        ? c.repo_estado === "Entregado"
+        : ((c.destino || "").includes("Devolver al cliente") && !!c.devuelto);
+      comps.forEach(c => {
+        const ot = c.orden_reposicion_ot || c.id_ot;
+        if (numeroPorOt[ot] === undefined || entregado(c)) return;
+        repNuevaPorMC[c.m_control] = { numero: numeroPorOt[ot], id_ot: ot };
+      });
+    }
+  } catch (err) {
+    console.error("No se pudieron cargar las órdenes de reposición nuevas:", err);
+  }
+
+  // Si está marcado, los equipos que están en una reposición (REPONER) no
+  // entran en la lista, para no meterlos por error en la OT.
+  ocultosPorReposicion = 0;
+  if (document.getElementById("ocultar-reposicion")?.checked) {
+    const antes = equiposEncontrados.length;
+    equiposEncontrados = equiposEncontrados.filter(eq => {
+      const rp = reposicionPorMC[eq.m_control];
+      return !((rp && rp.tipo_registro === "REPONER") || repNuevaPorMC[eq.m_control]);
+    });
+    ocultosPorReposicion = antes - equiposEncontrados.length;
+  }
+
   renderTabla();
   resultadoFiltro.hidden = false;
 });
 
 function renderTabla() {
-  totalEncontrados.textContent = `${equiposEncontrados.length} equipos encontrados`;
+  totalEncontrados.textContent = `${equiposEncontrados.length} equipos encontrados` +
+    (ocultosPorReposicion > 0 ? ` (${ocultosPorReposicion} ocultos por estar en reposición)` : "");
   tbody.innerHTML = equiposEncontrados.map((eq, idx) => {
     const notas = notasPorMC[eq.m_control];
     const celdaNota = notas && notas.length > 0
@@ -184,12 +251,28 @@ function renderTabla() {
       : "—";
 
     const historial = historialPorMC[eq.m_control];
-    const celdaHistorial = historial && historial.length > 0
+    const rp = reposicionPorMC[eq.m_control];
+    let etiquetaRepo = "";
+    if (rp) {
+      const numRep = "REP-" + String((rp.ordenes_reposicion && rp.ordenes_reposicion.numero) || 1).padStart(3, "0");
+      let detalle;
+      if (rp.tipo_registro === "NO REPONER") detalle = "no se repone" + (rp.motivo ? " (" + rp.motivo + ")" : "");
+      else if (rp.estado === "Repuesto") detalle = "repuesto" + (rp.fecha_reposicion ? " el " + new Date(rp.fecha_reposicion).toLocaleDateString("es-ES") : "");
+      else detalle = "pendiente de reponer";
+      etiquetaRepo = `<div style="font-size:0.78rem; margin-bottom:4px; color:#1f4e8c; font-weight:600;">🔁 En reposición ${numRep}: ${detalle}</div>`;
+    }
+
+    const rn = repNuevaPorMC[eq.m_control];
+    if (rn) {
+      etiquetaRepo += `<div style="font-size:0.78rem; margin-bottom:4px; color:#1f4e8c; font-weight:600;">🔁 En reposición REP-${String(rn.numero).padStart(3, "0")} (${rn.id_ot}): con piezas aún sin entregar al cliente</div>`;
+    }
+
+    const celdaHistorial = etiquetaRepo + (historial && historial.length > 0
       ? historial.map(h => {
           const accion = [h.accion_calle, h.comentarios].filter(Boolean).join(" — ") || "sin acción registrada";
           return `<div style="font-size:0.78rem; margin-bottom:2px;">📅 ${new Date(h.fecha).toLocaleDateString("es-ES")} (<a href="ot-detalle.html?ot=${h.id_ot}">${h.id_ot}</a>) — ${h.falla}: ${accion}</div>`;
         }).join("")
-      : `<span style="color:var(--gris-700); font-size:0.8rem;">Sin historial previo</span>`;
+      : `<span style="color:var(--gris-700); font-size:0.8rem;">Sin historial previo</span>`);
 
     return `
     <tr class="${notas ? 'fila-alerta' : ''}">
