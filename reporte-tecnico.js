@@ -127,6 +127,7 @@ function refrescarTipoBateria() {
   let deteccion = null;
   if (modeloBateria.toUpperCase().startsWith("BA02")) deteccion = "Batería Recargable";
   else if (modeloBateria.toUpperCase().startsWith("BA01")) deteccion = "Batería No Recargable";
+  else if (modeloBateria.toUpperCase().startsWith("BA03")) deteccion = "Batería PKCELL";
 
   const yaHabiaElegido = document.getElementById("tipo-bateria")?.value;
 
@@ -136,6 +137,7 @@ function refrescarTipoBateria() {
       <option value="">— Elige —</option>
       <option value="Batería Recargable">Batería Recargable</option>
       <option value="Batería No Recargable">Batería No Recargable</option>
+      <option value="Batería PKCELL">Batería PKCELL</option>
     </select>
   `;
   document.getElementById("tipo-bateria").value = yaHabiaElegido || deteccion || "";
@@ -169,7 +171,7 @@ enviarBtn.addEventListener("click", async () => {
   const idOtActiva = otActiva();
   if (!idOtActiva) { mostrarMensajeReporte("⚠️ No hay una OT activa — créala o elígela arriba antes de reportar.", true); return; }
   if (!document.getElementById("tipo-bateria-box").hidden && !document.getElementById("tipo-bateria").value) {
-    mostrarMensajeReporte("⚠️ Elige el tipo de batería (Recargable o No Recargable).", true);
+    mostrarMensajeReporte("⚠️ Elige el tipo de batería (Recargable, No Recargable o PKCELL).", true);
     return;
   }
 

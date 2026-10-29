@@ -321,7 +321,7 @@ async function precargarTicket(idRegistro, btnElegido) {
     .eq("id_registro", idRegistro);
 
   (componentes || []).forEach(c => {
-    const esBateria = c.tipo_componente === "Batería Recargable" || c.tipo_componente === "Batería No Recargable" || c.tipo_componente === "Batería";
+    const esBateria = c.tipo_componente === "Batería Recargable" || c.tipo_componente === "Batería No Recargable" || c.tipo_componente === "Batería PKCELL" || c.tipo_componente === "Batería";
     const codigo = esBateria ? "BA" : Object.keys(MAPA_COMPONENTE).find(k => MAPA_COMPONENTE[k].nombre === c.tipo_componente);
     if (!codigo) return;
 
@@ -394,6 +394,7 @@ async function refrescarTipoBateria() {
   tipoRetiradaDetectado = null;
   if (modeloBateria.toUpperCase().startsWith("BA02")) tipoRetiradaDetectado = "Batería Recargable";
   else if (modeloBateria.toUpperCase().startsWith("BA01")) tipoRetiradaDetectado = "Batería No Recargable";
+  else if (modeloBateria.toUpperCase().startsWith("BA03")) tipoRetiradaDetectado = "Batería PKCELL";
 
   // 2. La que SE INSTALA: primero se busca su serial en Materiales
   // Serializados (si ya la clasificaste ahí) — si no aparece, se busca
@@ -412,7 +413,8 @@ async function refrescarTipoBateria() {
         .maybeSingle();
 
       if (registrado && !registrado.tipo_componente.includes("(pendiente subtipo)")) {
-        if (registrado.tipo_componente.includes("No Recargable")) tipoInstaladaDetectado = "Batería No Recargable";
+        if (registrado.tipo_componente.includes("PKCELL")) tipoInstaladaDetectado = "Batería PKCELL";
+        else if (registrado.tipo_componente.includes("No Recargable")) tipoInstaladaDetectado = "Batería No Recargable";
         else if (registrado.tipo_componente.includes("Recargable")) tipoInstaladaDetectado = "Batería Recargable";
       }
 
@@ -425,6 +427,7 @@ async function refrescarTipoBateria() {
         const modeloNueva = (equipoConEsaBateria?.modelo_bateria || "").toUpperCase();
         if (modeloNueva.startsWith("BA02")) tipoInstaladaDetectado = "Batería Recargable";
         else if (modeloNueva.startsWith("BA01")) tipoInstaladaDetectado = "Batería No Recargable";
+        else if (modeloNueva.startsWith("BA03")) tipoInstaladaDetectado = "Batería PKCELL";
       }
     } catch (e) { /* si falla la búsqueda, simplemente no se detecta y se pregunta */ }
   }
@@ -456,6 +459,7 @@ async function refrescarTipoBateria() {
       <option value="">— Elige —</option>
       <option value="Batería Recargable">Batería Recargable</option>
       <option value="Batería No Recargable">Batería No Recargable</option>
+      <option value="Batería PKCELL">Batería PKCELL</option>
     </select>
   `;
   document.getElementById("modal-tipo-bateria").value = yaHabiaElegido || deteccion || "";
@@ -755,7 +759,7 @@ modalEnviarBtn.addEventListener("click", async () => {
     return;
   }
   if (!document.getElementById("tipo-bateria-box").hidden && !(tipoRetiradaDetectado && tipoInstaladaDetectado) && !document.getElementById("modal-tipo-bateria")?.value) {
-    mostrarMensaje(modalMsg, "⚠️ Elige el tipo de batería (Recargable o No Recargable).", true);
+    mostrarMensaje(modalMsg, "⚠️ Elige el tipo de batería (Recargable, No Recargable o PKCELL).", true);
     return;
   }
   const faltaCategoria = Object.keys(serialesNuevos).some(c => serialesNuevos[c] && !categoriasPorComponente[c]);
@@ -878,7 +882,7 @@ modalEnviarBtn.addEventListener("click", async () => {
   Object.keys(MAPA_COMPONENTE).forEach(codigo => {
     const nombreTipo = codigo === "BA" && tipoRetiradaFinal ? tipoRetiradaFinal : MAPA_COMPONENTE[codigo].nombre;
     const filaExistente = codigo === "BA"
-      ? (yaRegistrados || []).find(c => c.tipo_componente === "Batería Recargable" || c.tipo_componente === "Batería No Recargable" || c.tipo_componente === "Batería")
+      ? (yaRegistrados || []).find(c => c.tipo_componente === "Batería Recargable" || c.tipo_componente === "Batería No Recargable" || c.tipo_componente === "Batería PKCELL" || c.tipo_componente === "Batería")
       : (yaRegistrados || []).find(c => c.tipo_componente === nombreTipo);
     const deseaCambio = codigosCambioReal.includes(codigo);
     const deseaFalta = codigosFaltantes.includes(codigo);

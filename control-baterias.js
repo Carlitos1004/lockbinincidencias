@@ -62,7 +62,7 @@ async function cargarDatos() {
     data = await traerTodasLasFilas(
       "componentes_retirados",
       "cliente, m_control, id_ot, fecha, serial_nuevo, serial_retirado, tipo_componente, categoria, reparacion, estado",
-      (q) => q.in("tipo_componente", ["Batería Recargable", "Batería No Recargable"]).order("id")
+      (q) => q.in("tipo_componente", ["Batería Recargable", "Batería No Recargable", "Batería PKCELL"]).order("id")
     );
     equiposData = await traerTodasLasFilas(
       "equipos",
@@ -158,6 +158,7 @@ async function cargarDatos() {
     const modelo = (eq.modelo_bateria || "").toUpperCase();
     const tipo = modelo.startsWith("BA02") ? "Batería Recargable"
       : modelo.startsWith("BA01") ? "Batería No Recargable"
+      : modelo.startsWith("BA03") ? "Batería PKCELL"
       : "Batería";
 
     const diasEnUso = diasEntre(eq.fecha_instalacion, new Date());

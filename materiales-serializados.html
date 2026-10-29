@@ -36,7 +36,7 @@
 
   <div id="contenido" hidden>
     <h2 style="margin-top:28px;">Escanear seriales (pistola lectora)</h2>
-    <p style="font-size:0.8rem; color:var(--gris-700); margin:0 0 12px;">Haz clic en el cuadro que corresponda y empieza a escanear — cada disparo agrega una línea sola. El tipo (Lector/Cierre/Módulo) se detecta por el prefijo del serial (LE/CE/MC). Las baterías (BA) quedan pendientes de clasificar Recargable/No Recargable, abajo.</p>
+    <p style="font-size:0.8rem; color:var(--gris-700); margin:0 0 12px;">Haz clic en el cuadro que corresponda y empieza a escanear — cada disparo agrega una línea sola. El tipo (Lector/Cierre/Módulo) se detecta por el prefijo del serial (LE/CE/MC). Las baterías (BA) quedan pendientes de clasificar Recargable/No Recargable/PKCELL, abajo.</p>
     <div class="fila-categorias-escaneo">
       <div class="agregar-equipo-box">
         <label><strong>🟢 1ra categoría</strong></label>
@@ -57,7 +57,7 @@
 
     <div id="pendientes-bateria-box" hidden style="margin-top:28px;">
       <h2>🔋 Baterías pendientes de clasificar</h2>
-      <p style="font-size:0.85rem; color:var(--gris-700); margin-top:-8px;">El serial no dice si son Recargables o No Recargables — elige para cada una.</p>
+      <p style="font-size:0.85rem; color:var(--gris-700); margin-top:-8px;">El serial no dice el tipo de batería (Recargable, No Recargable o PKCELL) — elige para cada una.</p>
       <table class="tabla-revision">
         <thead><tr><th>Serial</th><th>Categoría</th><th>Subtipo</th><th></th></tr></thead>
         <tbody id="pendientes-bateria-tbody"></tbody>

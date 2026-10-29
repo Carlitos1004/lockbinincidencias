@@ -146,6 +146,7 @@ function renderPendientesBateria(pendientes) {
           <option value="">— Elige —</option>
           <option value="Batería Recargable">Recargable</option>
           <option value="Batería No Recargable">No Recargable</option>
+          <option value="Batería PKCELL">PKCELL</option>
         </select>
       </td>
       <td><button class="btn-clasificar-bateria btn-primario" data-id="${s.id}">Guardar</button></td>
@@ -156,7 +157,7 @@ function renderPendientesBateria(pendientes) {
     btn.addEventListener("click", async () => {
       const fila = btn.closest("tr");
       const subtipo = fila.querySelector(".input-subtipo-bateria").value;
-      if (!subtipo) { alert("Elige Recargable o No Recargable."); return; }
+      if (!subtipo) { alert("Elige Recargable, No Recargable o PKCELL."); return; }
 
       const categoriaTexto = fila.children[1].textContent.trim();
       const nuevoTipo = `${subtipo} - ${categoriaTexto}`;
@@ -226,7 +227,7 @@ async function registrarLote(filas) {
   const bateriasPendientes = buenas.filter(b => b.tipo_componente.includes("(pendiente subtipo)")).length;
   mostrarMensaje(msg,
     `✅ ${buenas.length} serial(es) registrado(s).` +
-    (bateriasPendientes > 0 ? ` ${bateriasPendientes} batería(s) quedaron pendientes de clasificar Recargable/No Recargable, más abajo.` : "") +
+    (bateriasPendientes > 0 ? ` ${bateriasPendientes} batería(s) quedaron pendientes de clasificar Recargable/No Recargable/PKCELL, más abajo.` : "") +
     (errores.length > 0 ? `<br>⚠️ ${errores.length} línea(s) con error:<br>` + errores.join("<br>") : ""),
     false);
   cargarTabla();
