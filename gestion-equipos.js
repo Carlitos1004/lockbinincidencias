@@ -60,6 +60,7 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
 }
 
 let repNuevaPorMC = {};   // {mc: {numero, id_ot}} — MC con piezas aún sin entregar en una orden REP-002 en adelante
+let equiposOcultos = [];  // [{eq, motivo}] equipos que no entran en la lista por estar en una reposición
 let ocultosPorReposicion = 0;
 let equiposEncontrados = []; // [{m_control, fraccion, cliente, fallas: [...]}]
 let notasPorMC = {}; // {mc: [nota1, nota2, ...]}
@@ -205,7 +206,7 @@ filtrarBtn.addEventListener("click", async () => {
       for (let desde = 0; ; desde += 1000) {
         const { data, error } = await supabaseClient
           .from("componentes_retirados")
-          .select("m_control, id_ot, orden_reposicion_ot, destino, devuelto, repo_estado")
+          .select("m_control, id_ot, orden_reposicion_ot, destino, devuelto, repo_estado, tipo_componente")
           .in("m_control", mcsEncontrados)
           .order("id").range(desde, desde + 999);
         if (error) throw error;
@@ -218,7 +219,10 @@ filtrarBtn.addEventListener("click", async () => {
       comps.forEach(c => {
         const ot = c.orden_reposicion_ot || c.id_ot;
         if (numeroPorOt[ot] === undefined || entregado(c)) return;
-        repNuevaPorMC[c.m_control] = { numero: numeroPorOt[ot], id_ot: ot };
+        const r = repNuevaPorMC[c.m_control] || (repNuevaPorMC[c.m_control] = { numero: numeroPorOt[ot], id_ot: ot, tipos: new Set(), tieneMC: false });
+        const tipo = c.tipo_componente || "pieza";
+        r.tipos.add(tipo);
+        if (/m[oó]dulo/i.test(tipo)) r.tieneMC = true;
       });
     }
   } catch (err) {
@@ -228,17 +232,57 @@ filtrarBtn.addEventListener("click", async () => {
   // Si está marcado, los equipos que están en una reposición (REPONER) no
   // entran en la lista, para no meterlos por error en la OT.
   ocultosPorReposicion = 0;
+  equiposOcultos = [];
   if (document.getElementById("ocultar-reposicion")?.checked) {
-    const antes = equiposEncontrados.length;
-    equiposEncontrados = equiposEncontrados.filter(eq => {
+    const visibles = [];
+    equiposEncontrados.forEach(eq => {
       const rp = reposicionPorMC[eq.m_control];
-      return !((rp && rp.tipo_registro === "REPONER") || repNuevaPorMC[eq.m_control]);
+      const rn = repNuevaPorMC[eq.m_control];
+      if (rp && rp.tipo_registro === "REPONER") {
+        equiposOcultos.push({ eq, motivo: "En reposición REP-" + String((rp.ordenes_reposicion && rp.ordenes_reposicion.numero) || 1).padStart(3, "0") });
+      } else if (rn && rn.tieneMC) {
+        // Tenemos el módulo de control aquí: el equipo está físicamente con nosotros.
+        equiposOcultos.push({ eq, motivo: "En reposición REP-" + String(rn.numero).padStart(3, "0") + " (" + rn.id_ot + "): tenemos aquí " + [...rn.tipos].join(", ") });
+      } else {
+        // Si solo tenemos algunas piezas (sin el módulo), el equipo sigue en calle: se queda en la lista.
+        visibles.push(eq);
+      }
     });
-    ocultosPorReposicion = antes - equiposEncontrados.length;
+    equiposEncontrados = visibles;
+    ocultosPorReposicion = equiposOcultos.length;
   }
 
   renderTabla();
+  renderOcultos();
   resultadoFiltro.hidden = false;
+});
+
+function renderOcultos() {
+  const bloque = document.getElementById("bloque-ocultos");
+  const tb = document.getElementById("ocultos-tbody");
+  if (equiposOcultos.length === 0) { bloque.hidden = true; return; }
+  bloque.hidden = false;
+  document.getElementById("ocultos-resumen").textContent = `Ver los ${equiposOcultos.length} equipos ocultos por estar en reposición`;
+  tb.innerHTML = equiposOcultos.map(o => `
+    <tr>
+      <td>${o.eq.m_control}</td>
+      <td>${o.eq.fallas.join(", ")}</td>
+      <td>${o.motivo}</td>
+      <td><button type="button" class="btn-incluir-oculto" data-mc="${o.eq.m_control}">Incluir en la OT</button></td>
+    </tr>`).join("");
+}
+
+document.getElementById("ocultos-tbody").addEventListener("click", (e) => {
+  const btn = e.target.closest(".btn-incluir-oculto");
+  if (!btn) return;
+  const i = equiposOcultos.findIndex(o => o.eq.m_control === btn.dataset.mc);
+  if (i < 0) return;
+  const [quitado] = equiposOcultos.splice(i, 1);
+  equiposEncontrados.push(quitado.eq);
+  equiposEncontrados.sort((a, b) => a.m_control.localeCompare(b.m_control));
+  ocultosPorReposicion = equiposOcultos.length;
+  renderTabla();
+  renderOcultos();
 });
 
 function renderTabla() {
@@ -264,7 +308,7 @@ function renderTabla() {
 
     const rn = repNuevaPorMC[eq.m_control];
     if (rn) {
-      etiquetaRepo += `<div style="font-size:0.78rem; margin-bottom:4px; color:#1f4e8c; font-weight:600;">🔁 En reposición REP-${String(rn.numero).padStart(3, "0")} (${rn.id_ot}): con piezas aún sin entregar al cliente</div>`;
+      etiquetaRepo += `<div style="font-size:0.78rem; margin-bottom:4px; color:#1f4e8c; font-weight:600;">🔁 En reposición REP-${String(rn.numero).padStart(3, "0")} (${rn.id_ot}): con piezas aún sin entregar al cliente${rn.tieneMC ? "" : " — aquí solo tenemos: " + [...rn.tipos].join(", ") + " (el equipo sigue en calle)"}</div>`;
     }
 
     const celdaHistorial = etiquetaRepo + (historial && historial.length > 0
