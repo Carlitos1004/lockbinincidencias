@@ -452,80 +452,26 @@ verRutaBtn.addEventListener("click", () => {
     actual = siguiente;
   }
 
-  // Los bloques se numeran sobre TODOS los puntos de la OT (estén abiertos o
-  // cerrados), así el número de cada bloque no cambia de un día a otro
-  // aunque se vayan resolviendo fallas. En el mapa solo salen los equipos con
-  // falla abierta de los bloques que elijas.
-  const abiertoPorCoord = {};
-  ticketsCargados.forEach(t => {
-    if (t.estado === "🚨 ABIERTO" && t.equipos && t.equipos.latitud && t.equipos.longitud) {
-      abiertoPorCoord[`${t.equipos.latitud},${t.equipos.longitud}`] = true;
-    }
-  });
-  const conBloque = ordenadosPorCercania.map((p, idx) => ({
-    ...p,
-    bloque: Math.floor(idx / TAMANO_BLOQUE) + 1,
-    abierto: !!abiertoPorCoord[`${p.lat},${p.lng}`]
-  }));
-  const totalBloques = Math.ceil(conBloque.length / TAMANO_BLOQUE);
-  const abiertosTotal = conBloque.filter(p => p.abierto).length;
-  if (abiertosTotal === 0) {
-    alert("No quedan equipos con falla abierta en esta OT.");
-    return;
-  }
-  const pendientesPorBloque = {};
-  conBloque.forEach(p => { if (p.abierto) pendientesPorBloque[p.bloque] = (pendientesPorBloque[p.bloque] || 0) + 1; });
-  const resumenBloques = Object.keys(pendientesPorBloque).map(b => `${b}: ${pendientesPorBloque[b]}`).join("  ·  ");
-
-  const respuesta = prompt(
-    `Hay ${abiertosTotal} equipo(s) con falla abierta, en ${totalBloques} bloques de hasta ${TAMANO_BLOQUE} (ordenados por cercanía a la oficina).\n\n` +
-    `Pendientes por bloque (bloque: equipos):\n${resumenBloques}\n\n` +
-    `¿Qué bloques quieres incluir en el mapa? Ej: 1-5  o  2,4,7\nDéjalo vacío para incluirlos todos.`,
-    ""
-  );
-  if (respuesta === null) return; // canceló
-
-  let seleccion = null; // null = todos
-  if (respuesta.trim() !== "") {
-    seleccion = new Set();
-    respuesta.split(",").forEach(parte => {
-      const m = parte.trim().match(/^(\d+)\s*-\s*(\d+)$/);
-      if (m) { for (let n = Number(m[1]); n <= Number(m[2]); n++) seleccion.add(n); }
-      else if (/^\d+$/.test(parte.trim())) seleccion.add(Number(parte.trim()));
-    });
-    if (seleccion.size === 0) {
-      alert("No entendí los bloques. Escribe, por ejemplo: 1-5  o  2,4,7");
-      return;
-    }
-  }
-
-  const aIncluir = conBloque.filter(p => p.abierto && (!seleccion || seleccion.has(p.bloque)));
-  if (aIncluir.length === 0) {
-    alert("No hay equipos con falla abierta en esos bloques.");
-    return;
-  }
-
   // CSV para importar en Google My Maps (mymaps.google.com) — ahí sí
   // aparece el nombre real (el MC) en cada pin dentro del mapa. La
   // columna Bloque sirve además para colorear por grupo en My Maps
   // ("Estilo" → "Agrupar lugares por columna" → Bloque).
   const encabezado = "Name,Latitude,Longitude,Bloque";
-  const filas = aIncluir.map(p => `${p.mc},${p.lat},${p.lng},Bloque ${p.bloque}`);
+  const filas = ordenadosPorCercania.map((p, idx) => `${p.mc},${p.lat},${p.lng},Bloque ${Math.floor(idx / TAMANO_BLOQUE) + 1}`);
   const csv = [encabezado, ...filas].join("\n");
 
-  const sufijo = seleccion ? "_bloques-" + respuesta.trim().replace(/\s+/g, "").replace(/,/g, "_") : "";
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const enlaceDescarga = document.createElement("a");
   enlaceDescarga.href = URL.createObjectURL(blob);
-  enlaceDescarga.download = `Ruta_${otActualCargada.id_ot}${sufijo}_MyMaps.csv`;
+  enlaceDescarga.download = `Ruta_${otActualCargada.id_ot}_MyMaps.csv`;
   enlaceDescarga.click();
 
+  const totalBloques = Math.ceil(ordenadosPorCercania.length / TAMANO_BLOQUE);
   alert(
-    `Se descargó el archivo con ${aIncluir.length} equipo(s) con falla abierta` +
-    (seleccion ? ` (bloques ${respuesta.trim()})` : ` (todos los bloques)`) + `.\n\n` +
+    `Se descargó el archivo con ${ordenadosPorCercania.length} equipo(s), agrupados en ${totalBloques} bloques de hasta 10.\n\n` +
     `Para verlo con nombres en el mapa:\n` +
     `1. Entra a mymaps.google.com\n` +
-    `2. Crea un mapa nuevo (uno por día o por zona)\n` +
+    `2. Crea un mapa nuevo (o abre uno existente)\n` +
     `3. "Importar" → sube este archivo CSV\n` +
     `4. Comparte el enlace del mapa con el operario`
   );
