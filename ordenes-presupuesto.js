@@ -25,6 +25,9 @@ function claseEstado(e) {
 
 // Solo lo que está marcado como vandalismo (casilla de la pieza en Revisión de Taller / columna Vandalismo del ticket)
 const esVandPieza = c => c.vandalismo === true;
+// Tickets: la columna Vandalismo de la OT, o la casilla "Vandalismo/robo" del reporte de Ruta
+// (esa casilla deja escrito "Vandalismo/robo" en la acción del ticket). Si en la OT se puso "No", se descarta.
+const FILTRO_TICKET_VAND = "vandalismo.eq.true,and(vandalismo.is.null,accion_calle.ilike.*Vandalismo/robo*)";
 
 // Supabase devuelve como máximo 1000 filas por consulta
 async function traerTodo(construir) {
@@ -89,7 +92,7 @@ async function cargarClientes() {
   const sel = document.getElementById("nueva-cliente");
   const { data, error } = await traerTodo(() => supabaseClient.from("componentes_retirados").select("id, cliente").eq("vandalismo", true).order("id"));
   if (error) { sel.innerHTML = `<option value="">Error: ${esc(error.message)}</option>`; return; }
-  const { data: tk } = await traerTodo(() => supabaseClient.from("historial_fallas").select("id_registro, cliente").eq("vandalismo", true).order("id_registro"));
+  const { data: tk } = await traerTodo(() => supabaseClient.from("historial_fallas").select("id_registro, cliente").or(FILTRO_TICKET_VAND).order("id_registro"));
   const clientes = [...new Set([...(data || []), ...(tk || [])]
     .flatMap(c => String(c.cliente || "").split(" / ")).map(x => x.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   sel.innerHTML = '<option value="">Elige cliente...</option>' + clientes.map(c => `<option>${esc(c)}</option>`).join("");
@@ -234,7 +237,7 @@ async function cargarDisponibles() {
   if (error) { tb.innerHTML = `<tr><td colspan="6">Error: ${esc(error.message)}</td></tr>`; return; }
   // Tickets marcados como vandalismo en la OT (sin pieza concreta): entran como "Equipo completo"
   const { data: tks } = await traerTodo(() => supabaseClient.from("historial_fallas")
-    .select("id_registro, m_control, id_ot, falla").eq("vandalismo", true).eq("cliente", o.cliente).order("id_registro"));
+    .select("id_registro, m_control, id_ot, falla").or(FILTRO_TICKET_VAND).eq("cliente", o.cliente).order("id_registro"));
   const { data: usadas } = await traerTodo(() => supabaseClient.from("presupuesto_lineas").select("id, componente_id").not("componente_id", "is", null).order("id"));
   const usadasSet = new Set((usadas || []).map(l => String(l.componente_id)));
   const piezasVand = (data || []).filter(esVandPieza);
