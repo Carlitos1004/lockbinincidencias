@@ -28,7 +28,7 @@ const MAPA_ALARMAS = {
 // de verdad en el mapa.
 function obtenerAccionPorDefecto(falla) {
   const f = falla.toLowerCase();
-  if (f.includes("comunica")) return "Pasar tarjeta ACTIVACIÓN. Si no comunica, desconectar y reconectar batería.";
+  if (f.includes("comunica")) return "Pasar tarjeta RESET. Si no comunica, desconectar y reconectar batería.";
   if (f.includes("servo")) return "Revisar cierre. Evaluar cambio de CIERRE si persiste.";
   if (f.includes("vuelco") || f.includes("incendio")) return "⚠️ Tomar fotos obligatorio. Evaluar cambio de equipo por daños.";
   if (f.includes("bater")) return "Revisar batería. Probar con recargable o evaluar cambio.";
@@ -239,10 +239,12 @@ filtrarBtn.addEventListener("click", async () => {
       const rp = reposicionPorMC[eq.m_control];
       const rn = repNuevaPorMC[eq.m_control];
       if (rp && rp.tipo_registro === "REPONER") {
-        equiposOcultos.push({ eq, motivo: "En reposición REP-" + String((rp.ordenes_reposicion && rp.ordenes_reposicion.numero) || 1).padStart(3, "0") });
+        equiposOcultos.push({ eq, grupo: "REP-" + String((rp.ordenes_reposicion && rp.ordenes_reposicion.numero) || 1).padStart(3, "0"),
+          motivo: "En reposición REP-" + String((rp.ordenes_reposicion && rp.ordenes_reposicion.numero) || 1).padStart(3, "0") + " (" + (rp.estado === "Repuesto" ? "repuesto" : "pendiente") + ")" +
+            (rn ? " · también tiene piezas en REP-" + String(rn.numero).padStart(3, "0") + " (" + rn.id_ot + ")" : "") });
       } else if (rn && rn.tieneMC) {
         // Tenemos el módulo de control aquí: el equipo está físicamente con nosotros.
-        equiposOcultos.push({ eq, motivo: "En reposición REP-" + String(rn.numero).padStart(3, "0") + " (" + rn.id_ot + "): tenemos aquí " + [...rn.tipos].join(", ") + " · Módulo de Control: " + rn.estadoMC });
+        equiposOcultos.push({ eq, grupo: "REP-" + String(rn.numero).padStart(3, "0"), motivo: "En reposición REP-" + String(rn.numero).padStart(3, "0") + " (" + rn.id_ot + "): tenemos aquí " + [...rn.tipos].join(", ") + " · Módulo de Control: " + rn.estadoMC });
       } else {
         // Si solo tenemos algunas piezas (sin el módulo), el equipo sigue en calle: se queda en la lista.
         visibles.push(eq);
@@ -262,7 +264,9 @@ function renderOcultos() {
   const tb = document.getElementById("ocultos-tbody");
   if (equiposOcultos.length === 0) { bloque.hidden = true; return; }
   bloque.hidden = false;
-  document.getElementById("ocultos-resumen").textContent = `Ver los ${equiposOcultos.length} equipos ocultos por estar en reposición`;
+  document.getElementById("ocultos-resumen").textContent = `Ver los ${equiposOcultos.length} equipos ocultos por estar en reposición (` +
+    Object.entries(equiposOcultos.reduce((a, o) => { a[o.grupo] = (a[o.grupo] || 0) + 1; return a; }, {}))
+      .sort().map(([g, n]) => `${g}: ${n}`).join(" · ") + ")";
   tb.innerHTML = equiposOcultos.map(o => `
     <tr>
       <td>${o.eq.m_control}</td>
