@@ -65,6 +65,7 @@ let ocultosPorReposicion = 0;
 let equiposEncontrados = []; // [{m_control, fraccion, cliente, fallas: [...]}]
 let notasPorMC = {}; // {mc: [nota1, nota2, ...]}
 let reposicionPorMC = {}; // {mc: {...fila de equipos_reposicion + número de orden}}
+let presupuestoPorMC = {}; // {mc: [{numero, oferta, estado, aprobada, tipo}]} órdenes de presupuesto (vandalismo) aún sin reponer
 let historialPorMC = {}; // {mc: [{falla, accion_calle, comentarios, fecha, id_ot}, ...]} últimas 3
 
 const clienteSelect = document.getElementById("cliente-select");
@@ -229,6 +230,25 @@ filtrarBtn.addEventListener("click", async () => {
     console.error("No se pudieron cargar las órdenes de reposición nuevas:", err);
   }
 
+  // Órdenes de presupuesto (vandalismo): qué piezas tiene cada equipo en
+  // una oferta aún sin reponer. Las aprobadas por el cliente se llevan en la OT.
+  presupuestoPorMC = {};
+  try {
+    const { data: lins, error: errPre } = await supabaseClient
+      .from("presupuesto_lineas")
+      .select("m_control, tipo_componente, aprobada, ordenes_presupuesto(numero, numero_oferta, estado)")
+      .order("id");
+    if (errPre) throw errPre;
+    (lins || []).forEach(l => {
+      const o = l.ordenes_presupuesto;
+      if (!o || o.estado === "Equipos repuestos") return;
+      (presupuestoPorMC[l.m_control] = presupuestoPorMC[l.m_control] || []).push(
+        { numero: o.numero, oferta: o.numero_oferta, estado: o.estado, aprobada: l.aprobada, tipo: l.tipo_componente });
+    });
+  } catch (err) {
+    console.error("No se pudieron cargar las órdenes de presupuesto:", err);
+  }
+
   // Si está marcado, los equipos que están en una reposición (REPONER) no
   // entran en la lista, para no meterlos por error en la OT.
   ocultosPorReposicion = 0;
@@ -238,7 +258,10 @@ filtrarBtn.addEventListener("click", async () => {
     equiposEncontrados.forEach(eq => {
       const rp = reposicionPorMC[eq.m_control];
       const rn = repNuevaPorMC[eq.m_control];
-      if (rp && rp.tipo_registro === "REPONER") {
+      if (tienePresupuestoAprobado(eq.m_control)) {
+        // El cliente aceptó pagar piezas de este equipo: va en la OT aunque esté en reposición.
+        visibles.push(eq);
+      } else if (rp && rp.tipo_registro === "REPONER") {
         equiposOcultos.push({ eq, grupo: "REP-" + String((rp.ordenes_reposicion && rp.ordenes_reposicion.numero) || 1).padStart(3, "0"),
           motivo: "En reposición REP-" + String((rp.ordenes_reposicion && rp.ordenes_reposicion.numero) || 1).padStart(3, "0") + " (" + (rp.estado === "Repuesto" ? "repuesto" : "pendiente") + ")" +
             (rn ? " · también tiene piezas en REP-" + String(rn.numero).padStart(3, "0") + " (" + rn.id_ot + ")" : "") });
@@ -258,6 +281,26 @@ filtrarBtn.addEventListener("click", async () => {
   renderOcultos();
   resultadoFiltro.hidden = false;
 });
+
+// Piezas del equipo que el cliente aceptó pagar (orden de presupuesto aprobada, aún sin reponer)
+function tienePresupuestoAprobado(mc) {
+  return (presupuestoPorMC[mc] || []).some(l => l.estado === "Presupuesto aprobado" && l.aprobada === true);
+}
+
+function etiquetaPresupuesto(mc) {
+  const ls = presupuestoPorMC[mc];
+  if (!ls || !ls.length) return "";
+  const porOrden = {};
+  ls.forEach(l => { (porOrden[l.numero] = porOrden[l.numero] || []).push(l); });
+  return Object.entries(porOrden).map(([num, items]) => {
+    const l0 = items[0];
+    const cod = "PRE-" + String(num).padStart(3, "0");
+    const partes = items.map(l => (l.tipo || "pieza") + (l.aprobada === true ? " ✅" : l.aprobada === false ? " ❌" : " ⏳")).join(", ");
+    const aprobado = l0.estado === "Presupuesto aprobado" && items.some(l => l.aprobada === true);
+    const color = aprobado ? "#1d6b32" : "#8a5a00";
+    return `<div style="font-size:0.78rem; margin-bottom:4px; color:${color}; font-weight:600;">💰 ${cod}${l0.oferta ? " (oferta " + l0.oferta + ")" : ""} — ${l0.estado}: ${partes}${aprobado ? " → llevar en la OT" : ""}</div>`;
+  }).join("");
+}
 
 function renderOcultos() {
   const bloque = document.getElementById("bloque-ocultos");
@@ -314,6 +357,8 @@ function renderTabla() {
     if (rn) {
       etiquetaRepo += `<div style="font-size:0.78rem; margin-bottom:4px; color:#1f4e8c; font-weight:600;">🔁 En reposición REP-${String(rn.numero).padStart(3, "0")} (${rn.id_ot}): con piezas aún sin entregar al cliente${rn.tieneMC ? "" : " — aquí solo tenemos: " + [...rn.tipos].join(", ") + " (el equipo sigue en calle)"}</div>`;
     }
+
+    etiquetaRepo += etiquetaPresupuesto(eq.m_control);
 
     const celdaHistorial = etiquetaRepo + (historial && historial.length > 0
       ? historial.map(h => {

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Órdenes de Presupuesto</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .orep-badge { display:inline-block; padding:2px 9px; border-radius:12px; font-size:.82em; font-weight:600; white-space:nowrap; }
+  .orep-ok { background:#dff3e4; color:#1d6b32; }
+  .orep-proc { background:#fff1d6; color:#8a5a00; }
+  .orep-falta { background:#fde3e1; color:#a3261c; }
+  .orep-info { background:#e3edf9; color:#1f4e8c; }
+  .orep-gris { background:#ececec; color:#555; }
+  .orep-lista tr.orep-fila { cursor:pointer; }
+  .orep-lista tr.orep-fila:hover { background:#f3f7f4; }
+  .orep-lista tr.orep-activa { background:#e6f2ea; }
+  .pre-form { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:10px 0; }
+  .pre-form label { display:flex; flex-direction:column; font-size:.85em; font-weight:600; gap:4px; }
+  .pre-caja { border:1px solid #d9e2dc; border-radius:10px; padding:12px 14px; margin:14px 0; background:#fff; }
+  .pre-tabla { width:100%; border-collapse:collapse; }
+  .pre-tabla th, .pre-tabla td { padding:6px 10px; border-top:1px solid #e8eee9; text-align:left; font-size:.92em; }
+</style>
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Órdenes de Presupuesto</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="cierre-control.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Cierre y Control</a>
+
+  <p style="margin-top:20px;">Seguimiento de las piezas con vandalismo / daño externo que se presupuestan al cliente. El presupuesto lo hace otro departamento: aquí se asocia el <strong>número de oferta</strong> a una orden y se anota qué piezas aceptó pagar el cliente, para llevarlas en la OT.</p>
+
+  <h2 style="margin-top:22px;">Órdenes de presupuesto</h2>
+  <div class="materiales-controles">
+    <select id="filtro-estado-pre">
+      <option value="">Todos los estados</option>
+      <option>Borrador</option>
+      <option>Presupuesto enviado</option>
+      <option>Presupuesto aprobado</option>
+      <option>Presupuesto rechazado</option>
+      <option>Equipos repuestos</option>
+    </select>
+    <input type="text" id="filtro-texto-pre" placeholder="Buscar por oferta, PRE-, cliente o MC...">
+  </div>
+  <div class="scroll-x-tabla" style="max-height:320px;">
+    <table class="tabla-revision orep-lista">
+      <thead><tr><th>Orden</th><th>Nº oferta</th><th>Cliente</th><th>Estado</th><th>Piezas</th><th>Aprobadas</th><th>Equipos (MC)</th><th>Enviado</th><th>Aprobado</th><th>Repuesto</th></tr></thead>
+      <tbody id="tbody-pre"><tr><td colspan="10">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="pre-caja" id="bloque-nueva">
+    <h3 style="margin-top:0;">Nueva orden de presupuesto</h3>
+    <div class="pre-form">
+      <label>Cliente
+        <select id="nueva-cliente"><option value="">Cargando clientes...</option></select>
+      </label>
+      <label>Nº de oferta
+        <input type="text" id="nueva-oferta" placeholder="Ej: OF-2026-123">
+      </label>
+      <button type="button" id="nueva-crear" class="btn-primario">Crear orden</button>
+    </div>
+    <p class="ot-meta">Se crea vacía (Borrador); después eliges las piezas vandalizadas que entran en la oferta. Solo aparecen clientes con piezas marcadas como vandalismo en Revisión de Taller.</p>
+  </div>
+
+  <div id="detalle" hidden>
+    <h2 id="detalle-titulo" style="margin-top:26px;"></h2>
+    <div id="detalle-resumen" class="resumen-cliente"></div>
+
+    <div class="pre-caja">
+      <div class="pre-form">
+        <label>Nº de oferta <input type="text" id="det-oferta"></label>
+        <label>Estado
+          <select id="det-estado">
+            <option>Borrador</option>
+            <option>Presupuesto enviado</option>
+            <option>Presupuesto aprobado</option>
+            <option>Presupuesto rechazado</option>
+            <option>Equipos repuestos</option>
+          </select>
+        </label>
+        <label>Notas <input type="text" id="det-notas" style="min-width:260px;" placeholder="Opcional"></label>
+      </div>
+      <p class="ot-meta" id="det-fechas"></p>
+    </div>
+
+    <h3>Piezas de la orden</h3>
+    <div class="scroll-x-tabla" style="max-height:none;">
+      <table class="pre-tabla">
+        <thead><tr><th>MC</th><th>Componente</th><th>Serial</th><th>OT de origen</th><th>El cliente…</th><th></th></tr></thead>
+        <tbody id="tbody-lineas"></tbody>
+      </table>
+    </div>
+
+    <h3 style="margin-top:22px;">Añadir piezas vandalizadas de este cliente</h3>
+    <p class="ot-meta">Piezas marcadas como vandalismo que aún no están en ninguna orden de presupuesto.</p>
+    <div class="materiales-controles">
+      <input type="text" id="disp-filtro" placeholder="Filtrar por MC...">
+      <button type="button" id="disp-todas">Marcar todas</button>
+      <button type="button" id="disp-anadir" class="btn-primario">Añadir seleccionadas</button>
+    </div>
+    <div class="scroll-x-tabla" style="max-height:340px;">
+      <table class="pre-tabla">
+        <thead><tr><th></th><th>MC</th><th>Componente</th><th>Serial</th><th>OT</th><th>Destino</th></tr></thead>
+        <tbody id="tbody-disp"></tbody>
+      </table>
+    </div>
+
+    <h3 style="margin-top:22px;">Añadir una pieza a mano</h3>
+    <div class="pre-form">
+      <label>MC <input type="text" id="man-mc" placeholder="MC2500123"></label>
+      <label>Componente
+        <select id="man-tipo"><option>Módulo de Control</option><option>Lector Electrónico</option><option>Cierre Electrónico</option><option>Batería</option><option>Equipo completo</option></select>
+      </label>
+      <button type="button" id="man-anadir">Añadir</button>
+    </div>
+
+    <div style="margin-top:24px;">
+      <button type="button" id="det-eliminar" class="btn-secundario" style="color:#a3261c;">🗑 Eliminar esta orden</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="nombres-usuarios.js"></script>
+<script src="ordenes-presupuesto.js"></script>
+</body>
+</html>
