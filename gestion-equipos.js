@@ -446,7 +446,11 @@ generarBtn.addEventListener("click", async () => {
 
   const { error: errorOt } = await supabaseClient
     .from("ordenes_trabajo")
-    .insert({ id_ot: nuevoIdOt, creado_por: user.email });
+    .insert({
+      id_ot: nuevoIdOt, creado_por: user.email,
+      // Cliente de la OT: el de sus equipos (si hay varios, se unen) — así sale en el buscador de OTs
+      cliente: [...new Set(todosLosEquipos.map(e => e.cliente).filter(Boolean))].join(" / ") || null
+    });
 
   if (errorOt) {
     mostrarMensaje(generarMsg, "❌ Error al crear la OT: " + errorOt.message, true);

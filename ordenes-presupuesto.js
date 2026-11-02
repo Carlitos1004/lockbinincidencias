@@ -23,6 +23,13 @@ function claseEstado(e) {
            "Presupuesto rechazado": "orep-falta", "Equipos repuestos": "orep-info" }[e] || "orep-gris";
 }
 
+// Cualquier mención de vandalismo / daño externo en los textos de una pieza
+const reVand = /vandal|da[ñn]o externo|mal uso|golpe intencion/i;
+const textoPieza = c => [c.destino, c.reparacion, ...(c.causa_falla || []), ...(c.condicion_fisica || [])].filter(Boolean).join(" ");
+const esVandPieza = c => c.vandalismo === true || reVand.test(textoPieza(c));
+// Tickets: marcados como vandalismo, o (si no se han descartado) con la palabra en falla / acción / comentarios
+const FILTRO_TICKET_VAND = "vandalismo.eq.true,and(vandalismo.is.null,or(falla.ilike.*vandal*,falla.ilike.*daño externo*,accion_calle.ilike.*vandal*,comentarios.ilike.*vandal*))";
+
 // Supabase devuelve como máximo 1000 filas por consulta
 async function traerTodo(construir) {
   const todas = [];
@@ -86,8 +93,11 @@ async function cargarClientes() {
   const sel = document.getElementById("nueva-cliente");
   const { data, error } = await traerTodo(() => supabaseClient.from("componentes_retirados").select("id, cliente").eq("vandalismo", true).order("id"));
   if (error) { sel.innerHTML = `<option value="">Error: ${esc(error.message)}</option>`; return; }
-  const { data: tk } = await traerTodo(() => supabaseClient.from("historial_fallas").select("id_registro, cliente").eq("vandalismo", true).order("id_registro"));
-  const clientes = [...new Set([...(data || []), ...(tk || [])].map(c => c.cliente).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const { data: tk } = await traerTodo(() => supabaseClient.from("historial_fallas").select("id_registro, cliente").or(FILTRO_TICKET_VAND).order("id_registro"));
+  // También los clientes de las OTs, por si el vandalismo solo está escrito en los textos de las piezas
+  const { data: otsC } = await traerTodo(() => supabaseClient.from("ordenes_trabajo").select("id_ot, cliente").order("id_ot"));
+  const clientes = [...new Set([...(data || []), ...(tk || []), ...(otsC || [])]
+    .flatMap(c => String(c.cliente || "").split(" / ")).map(x => x.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   sel.innerHTML = '<option value="">Elige cliente...</option>' + clientes.map(c => `<option>${esc(c)}</option>`).join("");
 }
 
@@ -226,21 +236,22 @@ async function cargarDisponibles() {
   const tb = document.getElementById("tbody-disp");
   tb.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
   const { data, error } = await traerTodo(() => supabaseClient.from("componentes_retirados")
-    .select("id, m_control, tipo_componente, serial_retirado, id_ot, destino").eq("vandalismo", true).eq("cliente", o.cliente).order("id"));
+    .select("id, m_control, tipo_componente, serial_retirado, id_ot, destino, vandalismo, reparacion, causa_falla, condicion_fisica").eq("cliente", o.cliente).order("id"));
   if (error) { tb.innerHTML = `<tr><td colspan="6">Error: ${esc(error.message)}</td></tr>`; return; }
   // Tickets marcados como vandalismo en la OT (sin pieza concreta): entran como "Equipo completo"
   const { data: tks } = await traerTodo(() => supabaseClient.from("historial_fallas")
-    .select("id_registro, m_control, id_ot, falla").eq("vandalismo", true).eq("cliente", o.cliente).order("id_registro"));
+    .select("id_registro, m_control, id_ot, falla").or(FILTRO_TICKET_VAND).eq("cliente", o.cliente).order("id_registro"));
   const { data: usadas } = await traerTodo(() => supabaseClient.from("presupuesto_lineas").select("id, componente_id").not("componente_id", "is", null).order("id"));
   const usadasSet = new Set((usadas || []).map(l => String(l.componente_id)));
-  const mcConPieza = new Set((data || []).map(c => c.m_control));
+  const piezasVand = (data || []).filter(esVandPieza);
+  const mcConPieza = new Set(piezasVand.map(c => c.m_control));
   const delTicket = [];
   (tks || []).forEach(t => {
     const clave = "T" + t.id_registro;
     if (!t.m_control || usadasSet.has(clave) || mcConPieza.has(t.m_control)) return;
     delTicket.push({ id: clave, m_control: t.m_control, tipo_componente: "Equipo completo", serial_retirado: null, id_ot: t.id_ot, destino: "Ticket vandalismo: " + (t.falla || "") });
   });
-  disponibles = (data || []).filter(c => !usadasSet.has(String(c.id)) && c.m_control).concat(delTicket)
+  disponibles = piezasVand.filter(c => !usadasSet.has(String(c.id)) && c.m_control).concat(delTicket)
     .sort((a, b) => a.m_control.localeCompare(b.m_control));
   renderDisponibles();
 }
