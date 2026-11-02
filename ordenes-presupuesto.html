@@ -106,15 +106,16 @@
     </div>
 
     <h3 style="margin-top:22px;">Añadir piezas vandalizadas de este cliente</h3>
-    <p class="ot-meta">Piezas marcadas como vandalismo que aún no están en ninguna orden de presupuesto.</p>
+    <p class="ot-meta" id="disp-contador"></p>
     <div class="materiales-controles">
       <input type="text" id="disp-filtro" placeholder="Filtrar por MC...">
+      <label style="display:flex;align-items:center;gap:6px;font-size:.9em;"><input type="checkbox" id="disp-todos-clientes"> Mostrar todos los clientes</label>
       <button type="button" id="disp-todas">Marcar todas</button>
       <button type="button" id="disp-anadir" class="btn-primario">Añadir seleccionadas</button>
     </div>
     <div style="max-height:340px; overflow:auto; border:1px solid #e8eee9; border-radius:8px;">
       <table class="pre-tabla">
-        <thead><tr><th></th><th>MC</th><th>Componente</th><th>Serial</th><th>OT</th><th>Destino</th></tr></thead>
+        <thead><tr><th></th><th>MC</th><th>Componente</th><th>Serial</th><th>OT</th><th>Cliente</th><th>Destino</th><th></th></tr></thead>
         <tbody id="tbody-disp"></tbody>
       </table>
     </div>

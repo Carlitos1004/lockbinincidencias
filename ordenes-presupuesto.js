@@ -229,40 +229,52 @@ document.getElementById("det-eliminar").addEventListener("click", async () => {
 
 // ---------- Añadir piezas ----------
 async function cargarDisponibles() {
-  const o = ordenes.find(x => x.id === ordenActual);
   const tb = document.getElementById("tbody-disp");
-  tb.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+  tb.innerHTML = '<tr><td colspan="8">Cargando...</td></tr>';
+  // Se traen TODAS las piezas/tickets con vandalismo (de cualquier cliente) y luego se filtra en pantalla,
+  // para poder ver qué queda fuera y por qué.
   const { data, error } = await traerTodo(() => supabaseClient.from("componentes_retirados")
-    .select("id, m_control, tipo_componente, serial_retirado, id_ot, destino, vandalismo, reparacion, causa_falla, condicion_fisica").eq("cliente", o.cliente).order("id"));
-  if (error) { tb.innerHTML = `<tr><td colspan="6">Error: ${esc(error.message)}</td></tr>`; return; }
-  // Tickets marcados como vandalismo en la OT (sin pieza concreta): entran como "Equipo completo"
+    .select("id, m_control, tipo_componente, serial_retirado, id_ot, cliente, cliente_original, destino, vandalismo").eq("vandalismo", true).order("id"));
+  if (error) { tb.innerHTML = `<tr><td colspan="8">Error: ${esc(error.message)}</td></tr>`; return; }
   const { data: tks } = await traerTodo(() => supabaseClient.from("historial_fallas")
-    .select("id_registro, m_control, id_ot, falla").or(FILTRO_TICKET_VAND).eq("cliente", o.cliente).order("id_registro"));
-  const { data: usadas } = await traerTodo(() => supabaseClient.from("presupuesto_lineas").select("id, componente_id").not("componente_id", "is", null).order("id"));
-  const usadasSet = new Set((usadas || []).map(l => String(l.componente_id)));
-  const piezasVand = (data || []).filter(esVandPieza);
+    .select("id_registro, m_control, id_ot, falla, cliente").or(FILTRO_TICKET_VAND).order("id_registro"));
+  const { data: usadas } = await traerTodo(() => supabaseClient.from("presupuesto_lineas")
+    .select("id, componente_id, orden_id, ordenes_presupuesto(numero)").not("componente_id", "is", null).order("id"));
+  const usadaEn = {};
+  (usadas || []).forEach(l => { usadaEn[String(l.componente_id)] = l.ordenes_presupuesto ? codigo(l.ordenes_presupuesto.numero) : "otra orden"; });
+  const piezasVand = (data || []).filter(esVandPieza).filter(c => c.m_control);
   const mcConPieza = new Set(piezasVand.map(c => c.m_control));
-  const delTicket = [];
+  const lista = piezasVand.map(c => ({ ...c, cliente_ef: c.cliente || c.cliente_original || "", clave: String(c.id) }));
   (tks || []).forEach(t => {
-    const clave = "T" + t.id_registro;
-    if (!t.m_control || usadasSet.has(clave) || mcConPieza.has(t.m_control)) return;
-    delTicket.push({ id: clave, m_control: t.m_control, tipo_componente: "Equipo completo", serial_retirado: null, id_ot: t.id_ot, destino: "Ticket vandalismo: " + (t.falla || "") });
+    if (!t.m_control || mcConPieza.has(t.m_control)) return;
+    lista.push({ id: "T" + t.id_registro, clave: "T" + t.id_registro, m_control: t.m_control, tipo_componente: "Equipo completo",
+      serial_retirado: null, id_ot: t.id_ot, cliente_ef: t.cliente || "", cliente_original: null, destino: "Ticket vandalismo: " + (t.falla || "") });
   });
-  disponibles = piezasVand.filter(c => !usadasSet.has(String(c.id)) && c.m_control).concat(delTicket)
-    .sort((a, b) => a.m_control.localeCompare(b.m_control));
+  lista.forEach(c => { c.usadaEn = usadaEn[c.clave] || null; });
+  disponibles = lista.sort((a, b) => a.m_control.localeCompare(b.m_control));
   renderDisponibles();
 }
 
 function renderDisponibles() {
+  const o = ordenes.find(x => x.id === ordenActual);
   const f = document.getElementById("disp-filtro").value.trim().toLowerCase();
-  const vis = disponibles.filter(c => !f || c.m_control.toLowerCase().includes(f));
+  const todos = document.getElementById("disp-todos-clientes").checked;
+  const delCliente = c => !o || [c.cliente_ef, c.cliente_original].filter(Boolean).some(x => x === o.cliente || (o.cliente || "").split(" / ").includes(x));
+  const base = disponibles.filter(c => todos || delCliente(c));
+  const vis = base.filter(c => !f || c.m_control.toLowerCase().includes(f));
+  const libres = base.filter(c => !c.usadaEn).length;
+  document.getElementById("disp-contador").textContent =
+    `${libres} libres de ${base.length} con vandalismo${todos ? " (todos los clientes)" : ` de ${o ? o.cliente : "este cliente"}`} · ${disponibles.length} en total en la base`;
   document.getElementById("tbody-disp").innerHTML = vis.length ? vis.map(c => `
-    <tr><td><input type="checkbox" class="chk-disp" data-id="${c.id}"></td><td>${esc(c.m_control)}</td>
+    <tr ${c.usadaEn ? 'style="opacity:.55;"' : ""}><td><input type="checkbox" class="chk-disp" data-id="${c.id}" ${c.usadaEn ? "disabled" : ""}></td><td>${esc(c.m_control)}</td>
     <td>${esc(c.tipo_componente || "—")}</td><td>${esc(c.serial_retirado || "—")}</td><td>${esc(c.id_ot || "—")}</td>
-    <td>${esc((c.destino || "—").replace(/^[✓❌🚨]\s*/u, ""))}</td></tr>`).join("")
-    : '<tr><td colspan="6">No hay piezas vandalizadas libres de este cliente.</td></tr>';
+    <td>${esc(c.cliente_ef || "—")}</td>
+    <td>${esc((c.destino || "—").replace(/^[✓❌🚨]\s*/u, ""))}</td>
+    <td>${c.usadaEn ? `<strong>Ya en ${esc(c.usadaEn)}</strong>` : ""}</td></tr>`).join("")
+    : '<tr><td colspan="8">No hay piezas con vandalismo que coincidan.</td></tr>';
 }
 document.getElementById("disp-filtro").addEventListener("input", renderDisponibles);
+document.getElementById("disp-todos-clientes").addEventListener("change", renderDisponibles);
 document.getElementById("disp-todas").addEventListener("click", () =>
   document.querySelectorAll(".chk-disp").forEach(c => { c.checked = true; }));
 
@@ -276,7 +288,7 @@ async function insertarLineas(filas) {
 document.getElementById("disp-anadir").addEventListener("click", async () => {
   const ids = [...document.querySelectorAll(".chk-disp:checked")].map(c => c.dataset.id);
   if (!ids.length) { alert("Marca al menos una pieza."); return; }
-  const filas = disponibles.filter(c => ids.includes(String(c.id))).map(c => ({
+  const filas = disponibles.filter(c => ids.includes(String(c.id)) && !c.usadaEn).map(c => ({
     orden_id: ordenActual, m_control: c.m_control, tipo_componente: c.tipo_componente,
     serial: c.serial_retirado, id_ot: c.id_ot, componente_id: String(c.id), aprobada: null }));
   if (await insertarLineas(filas)) cargarDisponibles();
