@@ -86,7 +86,8 @@ async function cargarClientes() {
   const sel = document.getElementById("nueva-cliente");
   const { data, error } = await traerTodo(() => supabaseClient.from("componentes_retirados").select("id, cliente").eq("vandalismo", true).order("id"));
   if (error) { sel.innerHTML = `<option value="">Error: ${esc(error.message)}</option>`; return; }
-  const clientes = [...new Set((data || []).map(c => c.cliente).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const { data: tk } = await traerTodo(() => supabaseClient.from("historial_fallas").select("id_registro, cliente").eq("vandalismo", true).order("id_registro"));
+  const clientes = [...new Set([...(data || []), ...(tk || [])].map(c => c.cliente).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   sel.innerHTML = '<option value="">Elige cliente...</option>' + clientes.map(c => `<option>${esc(c)}</option>`).join("");
 }
 
@@ -196,7 +197,7 @@ document.getElementById("det-estado").addEventListener("change", async e => {
   if (nuevo === "Equipos repuestos") {
     const aprob = ls.filter(l => l.aprobada === true);
     if (!aprob.length) { alert("No hay piezas aprobadas en esta orden."); e.target.value = o.estado; return; }
-    const conComp = aprob.filter(l => l.componente_id);
+    const conComp = aprob.filter(l => l.componente_id && !String(l.componente_id).startsWith("T"));
     if (!confirm(`Se marcará la orden como repuesta (${aprob.length} pieza(s) aprobadas).\n` +
       (conComp.length ? `Además, ${conComp.length} pieza(s) pasarán a "Repuesto desde stock" en la Orden de reposición. ¿Continuar?` : "¿Continuar?"))) { e.target.value = o.estado; return; }
     cambios.fecha_repuesto = hoy();
@@ -227,9 +228,19 @@ async function cargarDisponibles() {
   const { data, error } = await traerTodo(() => supabaseClient.from("componentes_retirados")
     .select("id, m_control, tipo_componente, serial_retirado, id_ot, destino").eq("vandalismo", true).eq("cliente", o.cliente).order("id"));
   if (error) { tb.innerHTML = `<tr><td colspan="6">Error: ${esc(error.message)}</td></tr>`; return; }
+  // Tickets marcados como vandalismo en la OT (sin pieza concreta): entran como "Equipo completo"
+  const { data: tks } = await traerTodo(() => supabaseClient.from("historial_fallas")
+    .select("id_registro, m_control, id_ot, falla").eq("vandalismo", true).eq("cliente", o.cliente).order("id_registro"));
   const { data: usadas } = await traerTodo(() => supabaseClient.from("presupuesto_lineas").select("id, componente_id").not("componente_id", "is", null).order("id"));
   const usadasSet = new Set((usadas || []).map(l => String(l.componente_id)));
-  disponibles = (data || []).filter(c => !usadasSet.has(String(c.id)) && c.m_control)
+  const mcConPieza = new Set((data || []).map(c => c.m_control));
+  const delTicket = [];
+  (tks || []).forEach(t => {
+    const clave = "T" + t.id_registro;
+    if (!t.m_control || usadasSet.has(clave) || mcConPieza.has(t.m_control)) return;
+    delTicket.push({ id: clave, m_control: t.m_control, tipo_componente: "Equipo completo", serial_retirado: null, id_ot: t.id_ot, destino: "Ticket vandalismo: " + (t.falla || "") });
+  });
+  disponibles = (data || []).filter(c => !usadasSet.has(String(c.id)) && c.m_control).concat(delTicket)
     .sort((a, b) => a.m_control.localeCompare(b.m_control));
   renderDisponibles();
 }
