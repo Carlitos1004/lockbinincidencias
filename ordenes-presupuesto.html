@@ -98,7 +98,7 @@
     </div>
 
     <h3>Piezas de la orden</h3>
-    <div class="scroll-x-tabla" style="max-height:none;">
+    <div style="overflow-x:auto;">
       <table class="pre-tabla">
         <thead><tr><th>MC</th><th>Componente</th><th>Serial</th><th>OT de origen</th><th>El cliente…</th><th></th></tr></thead>
         <tbody id="tbody-lineas"></tbody>
@@ -112,7 +112,7 @@
       <button type="button" id="disp-todas">Marcar todas</button>
       <button type="button" id="disp-anadir" class="btn-primario">Añadir seleccionadas</button>
     </div>
-    <div class="scroll-x-tabla" style="max-height:340px;">
+    <div style="max-height:340px; overflow:auto; border:1px solid #e8eee9; border-radius:8px;">
       <table class="pre-tabla">
         <thead><tr><th></th><th>MC</th><th>Componente</th><th>Serial</th><th>OT</th><th>Destino</th></tr></thead>
         <tbody id="tbody-disp"></tbody>
