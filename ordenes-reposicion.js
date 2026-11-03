@@ -506,11 +506,13 @@ function htmlMc(m) {
     return `<span class="orep-badge orep-info">🔁 Recibe la batería OK ${esc(serial)} de ${esc(e.m_control)}</span>` +
       (serial && !esBat ? ` <button type="button" class="btn-usar-bok" data-mc="${esc(m.mc)}" data-serial="${esc(serial)}">Usar como serial a entregar</button>` : "");
   }).join(" ");
+  const otsOrigen = [...new Set(m.casillas.map(x => x.comp && x.comp.id_ot).filter(Boolean))].sort();
   const fEnt = fechasEntrega[m.mc];
   const fEntTxt = fEnt ? new Date(fEnt + "T00:00:00").toLocaleDateString("es-ES") : "sin fecha de entrega";
   return `<div class="orep-mc">
     <div class="orep-mc-cab">
       <strong>${esc(m.mc)}</strong>
+      ${otsOrigen.length ? `<span class="orep-badge orep-gris" title="OT de la que vienen las piezas">📍 ${esc(otsOrigen.join(" · "))}</span>` : ""}
       <span class="orep-badge ${claseMc(m.estadoMc)}">${esc(m.estadoMc)}</span>
       ${esBat ? '<span class="orep-badge orep-info">🔋 Solo batería</span>' : ""}
       ${eqc.bateria_ok ? `<span class="orep-badge orep-ok">🔁 Batería OK: se usa en ${esc(eqc.bateria_ok_destino || "otro equipo")} · este equipo recibe una nueva</span>` : ""}
