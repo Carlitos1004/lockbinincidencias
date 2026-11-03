@@ -45,6 +45,15 @@ const CAMPOS = "id, m_control, tipo_componente, serial_retirado, id_ot, cliente,
   "vandalismo, garantia_cliente, devuelto, devuelto_en, repo_estado, repo_serial_nuevo, " +
   "repo_fecha_entrega, orden_reposicion_ot, repo_nota, cliente_original, repo_lista, repo_categoria";
 
+// Un "MC" que no tiene forma de MC (p. ej. "NO ENCONTRADO", "desconocido") significa que la pieza no tiene equipo identificado
+const esMcValido = v => /^MC\d+$/i.test(String(v || "").trim());
+function normalizarMc(lista) {
+  (lista || []).forEach(c => {
+    if (c.m_control && !esMcValido(c.m_control)) { c.m_control_original = c.m_control; c.m_control = null; }
+  });
+  return lista;
+}
+
 // Supabase devuelve como máximo 1000 filas por consulta: pedimos por páginas
 async function traerComps(filtroOr) {
   const todas = [];
@@ -55,6 +64,7 @@ async function traerComps(filtroOr) {
     todas.push(...(data || []));
     if (!data || data.length < 1000) break;
   }
+  normalizarMc(todas);
   return { data: todas, error: null };
 }
 
@@ -954,6 +964,7 @@ async function procesarPegado(nombre, texto, tipo, activar, msg) {
       const { data } = await supabaseClient.from("componentes_retirados").select(CAMPOS).in("serial_retirado", serialesBA.slice(i, i + 100));
       (data || []).forEach(c => piezasBA.push(c));
     }
+    normalizarMc(piezasBA);
     for (const ba of serialesBA) {
       const c = piezasBA.find(x => x.serial_retirado === ba && !entregadaC(x)) || piezasBA.find(x => x.serial_retirado === ba);
       if (!c) { batNoEncontradas.push(ba); continue; }
@@ -972,6 +983,7 @@ async function procesarPegado(nombre, texto, tipo, activar, msg) {
       const { data } = await supabaseClient.from("componentes_retirados").select(CAMPOS).in("m_control", fuera.slice(i, i + 100));
       (data || []).forEach(c => pendientes.push(c));
     }
+    normalizarMc(pendientes);
     const porMc = {};
     pendientes.filter(c => !entregadaC(c)).forEach(c => { (porMc[c.m_control] = porMc[c.m_control] || []).push(c.id); });
     for (const mc of fuera) {
