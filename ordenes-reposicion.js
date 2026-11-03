@@ -86,6 +86,11 @@ function estadoCasilla(c) {
   if (c.repo_estado) return c.repo_estado;
   // Por defecto todo se repone desde stock, salvo lo que está bien o ya entregado
   const auto = estadoAutomatico(c);
+  // Batería en buen estado de un equipo en lista "solo batería" (o cuya batería OK se reutiliza en otro): igualmente se entrega una nueva
+  if (auto === "Listo (sin cambios)" && c.m_control && tipoCanonico(c.tipo_componente) === "Batería") {
+    const eq = equiposCompletos[c.m_control];
+    if (eq && (eq.tipo_reposicion === "Batería" || eq.bateria_ok)) return "Repuesto desde stock";
+  }
   return (auto === "Listo (sin cambios)" || auto === "Entregado") ? auto : "Repuesto desde stock";
 }
 function estadoAutomatico(c) {
