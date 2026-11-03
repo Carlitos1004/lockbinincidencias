@@ -423,15 +423,12 @@ document.getElementById("disp-anadir").addEventListener("click", async () => {
 });
 
 document.getElementById("man-anadir").addEventListener("click", async () => {
-  const mc = document.getElementById("man-mc").value.trim().toUpperCase();
-  if (!/^MC\d+$/.test(mc)) { alert("Escribe un MC válido, por ejemplo MC2500123."); return; }
+  const mcs = [...new Set(document.getElementById("man-mc").value.toUpperCase().match(/MC\d+/g) || [])];
+  if (!mcs.length) { alert("Escribe o pega al menos un MC válido, por ejemplo MC2500123."); return; }
   const tipo = document.getElementById("man-tipo").value;
-  if (await insertarLineas([{ orden_id: ordenActual, m_control: mc, tipo_componente: tipo, aprobada: null, alcance: tipo === "Equipo completo" ? "Equipo completo" : "Pieza" }]))
+  const ya = new Set((lineasPorOrden[ordenActual] || []).map(l => l.m_control + "|" + l.tipo_componente));
+  const nuevos = mcs.filter(mc => !ya.has(mc + "|" + tipo));
+  if (!nuevos.length) { alert("Todos esos MC ya están en la orden con ese componente."); return; }
+  if (await insertarLineas(nuevos.map(mc => ({ orden_id: ordenActual, m_control: mc, tipo_componente: tipo, aprobada: null, alcance: tipo === "Equipo completo" ? "Equipo completo" : "Pieza" }))))
     document.getElementById("man-mc").value = "";
-});
-
-document.getElementById("det-cerrar-btn").addEventListener("click", async () => {
-  const o = ordenes.find(x => x.id === ordenActual);
-  if (!o || !confirm(`Todas las piezas aprobadas de ${codigo(o.numero)} ya están repuestas. ¿Marcar la orden como "Equipos repuestos"?`)) return;
-  if (await guardarOrden({ estado: "Equipos repuestos", fecha_repuesto: hoy() })) { pintarDetalle(); renderLista(); }
 });
