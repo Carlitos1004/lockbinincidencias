@@ -278,7 +278,7 @@ function renderLista() {
   const tbody = document.getElementById("tbody-ots");
   const conOrden = otsManuales.filter(o => ordenesPorOt[o.id_ot] && (esManager || ordenesPorOt[o.id_ot].lista_activa));
   conOrden.sort((a, b) => ordenesPorOt[a.id_ot].numero - ordenesPorOt[b.id_ot].numero);
-  tbody.innerHTML = (esManager ? filaHistoricaHtml : "") + (conOrden.length || esManager ? conOrden.map(filaOt).join("") : '<tr><td colspan="8">No hay ninguna lista de reposición activa por ahora.</td></tr>');
+  tbody.innerHTML = filaHistoricaHtml + (conOrden.length || esManager ? conOrden.map(filaOt).join("") : '<tr><td colspan="8">No hay ninguna lista de reposición activa por ahora.</td></tr>');
   enlazarFilas(tbody);
   renderBusqueda();
 }
@@ -486,8 +486,7 @@ function htmlMc(m) {
           <option value="Se repone desde stock" ${dec === "Se repone desde stock" ? "selected" : ""}>Se repone desde stock</option>
           <option value="Sin reposición" ${dec === "Sin reposición" ? "selected" : ""}>Sin reposición (el cliente lo acepta)</option>
         </select></td>
-        <td data-label="Serial a entregar"><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td>
-        <td data-label="Nota"><input type="text" class="inp-falt-nota" placeholder="Nota" value="${esc((f && f.nota) || "")}"></td></tr>`;
+        <td data-label="Serial a entregar"><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td></tr>`;
     }
     const c = x.comp;
     const est = estadoCasilla(c);
@@ -503,8 +502,7 @@ function htmlMc(m) {
       <td data-label="Destino">${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}<br><small>${esc(notaCasilla(c))}</small></td>
       <td data-label="Estado"><span class="orep-badge ${claseEstado(est)}">${esc(etiquetaEstado(c, est))}</span></td>
       <td data-label="Ajuste manual"><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
-      <td data-label="Serial a entregar"><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" ${dis} value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c, dis)}${esManager ? extra : ""}</td>
-      <td data-label="Nota"><input type="text" class="inp-nota" placeholder="Nota" ${dis} value="${esc(c.repo_nota || "")}"></td>
+      <td data-label="Serial a entregar"><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" ${dis} value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c, dis)}${esManager && c.repo_serial_nuevo && est === "Repuesto desde stock" ? ` <button type="button" class="btn-ok-pieza" data-id="${c.id}">✅ Dar OK</button>` : ""}${esManager ? extra : ""}</td>
     </tr>`;
   }).join("");
 
@@ -524,6 +522,8 @@ function htmlMc(m) {
     return `<span class="orep-badge orep-info">🔁 Recibe la batería OK ${esc(serial)} de ${esc(e.m_control)}</span>` +
       (serial && !esBat ? ` <button type="button" class="btn-usar-bok" data-mc="${esc(m.mc)}" data-serial="${esc(serial)}">Usar como serial a entregar</button>` : "");
   }).join(" ");
+  const nPorOk = esManager ? m.casillas.filter(x => x.comp && x.comp.repo_serial_nuevo && estadoCasilla(x.comp) === "Repuesto desde stock").length : 0;
+  const botonOkTodo = nPorOk > 1 ? `<button type="button" class="btn-ok-equipo" data-mc="${esc(m.mc)}">✅ Dar OK a las ${nPorOk} piezas serializadas</button>` : "";
   const aCambiar = m.casillas.map(x => {
     if (x.comp) return necesitaCambio(x.comp, estadoCasilla(x.comp)) ? (x.comp.tipo_componente || x.tipo) : null;
     return x.falt && x.falt.decision === "Se repone desde stock" ? x.tipo : null;
@@ -553,11 +553,11 @@ function htmlMc(m) {
     </div>` : "") : `<div class="orep-mc-sub">
       <label style="display:flex;align-items:center;gap:6px;">
         <input type="checkbox" class="chk-eqc" data-mc="${esc(m.mc)}" ${eqc.cambio_completo ? "checked" : ""} ${esManager ? "" : "disabled"}> 🔄 Se cambia el equipo completo</label>
-      <input type="text" class="inp-eqc-nota" data-mc="${esc(m.mc)}" placeholder="Nota del equipo" value="${esc(eqc.nota || "")}" ${esManager ? "" : "disabled"}>
-      ${chipCambiar}
+      <input type="text" class="inp-eqc-nota" data-mc="${esc(m.mc)}" placeholder="Nota general del equipo (faltantes, observaciones…)" value="${esc(eqc.nota || "")}">
+      ${chipCambiar}${botonOkTodo}
     </div>`}
     <div class="scroll-x-tabla" style="max-height:none;"><table>
-      <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th><th>Nota</th></tr></thead>
+      <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th></tr></thead>
       <tbody>${filas}</tbody></table></div>
     <div class="orep-acciones">${botonEntrega}</div>
   </div>`;
@@ -591,7 +591,8 @@ function enlazarEventos() {
     const mc = tr.dataset.mc, tipo = tr.dataset.tipo;
     const decision = tr.querySelector(".sel-falt").value || null;
     const serial = tr.querySelector(".inp-falt-serial").value.trim() || null;
-    const nota = tr.querySelector(".inp-falt-nota").value.trim() || null;
+    const notaEl = tr.querySelector(".inp-falt-nota");
+    const nota = notaEl ? (notaEl.value.trim() || null) : undefined; // sin campo: se conserva la nota existente
     const { error } = await supabaseClient.from("reposicion_faltantes").upsert({
       id_ot: otActual, m_control: mc, tipo_componente: tipo, decision,
       serial_nuevo: decision === "Se repone desde stock" ? serial : null, nota,
@@ -636,6 +637,18 @@ function enlazarEventos() {
   };
   document.querySelectorAll(".chk-eqc").forEach(c => c.addEventListener("change", () => guardarEqc(c.dataset.mc)));
   document.querySelectorAll(".inp-eqc-nota").forEach(i => i.addEventListener("change", () => guardarEqc(i.dataset.mc)));
+
+  document.querySelectorAll(".btn-ok-pieza").forEach(btn =>
+    btn.addEventListener("click", async () => {
+      if (await guardarComp(btn.dataset.id, { repo_estado: "Listo para entregar" }, true)) cargarOts();
+    }));
+  document.querySelectorAll(".btn-ok-equipo").forEach(btn =>
+    btn.addEventListener("click", async () => {
+      const grupo = agruparPorMc(compsOtActual, otActual).find(m => m.mc === btn.dataset.mc);
+      const ids = (grupo ? grupo.casillas : []).filter(x => x.comp && x.comp.repo_serial_nuevo && estadoCasilla(x.comp) === "Repuesto desde stock").map(x => x.comp.id);
+      for (const id of ids) { if (!(await guardarComp(id, { repo_estado: "Listo para entregar" }, false))) return; }
+      await recargarOt(); cargarOts();
+    }));
 
   document.querySelectorAll(".btn-entregar").forEach(btn =>
     btn.addEventListener("click", () => entregarEquipo(btn.dataset.mc)));
