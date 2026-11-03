@@ -419,11 +419,6 @@ function renderDetalle() {
     ? htmlLista
     : `<p>${sinListaActiva ? "No hay nada que reponer por ahora." : "Ningún elemento coincide."}</p>`;
 
-  const sinMc = compsOtActual.filter(c => !c.m_control);
-  document.getElementById("sin-mc").hidden = sinMc.length === 0;
-  document.getElementById("sin-mc-lista").innerHTML = sinMc.map(c =>
-    `<li>${esc(c.tipo_componente)} — serial ${esc(c.serial_retirado || "—")} (${esc(estadoCasilla(c))})</li>`).join("");
-
   enlazarEventos();
   if (esManager) { renderListas(); renderBok(); }
 }
