@@ -74,6 +74,17 @@
         <option value="Listo para entregar">Listos para entregar</option>
         <option value="Entregado">Entregados</option>
       </select>
+      <select id="filtro-categoria">
+        <option value="">Todas las categorías</option>
+        <option>Equipo OK</option>
+        <option>Garantía (AMMI)</option>
+        <option>Presupuesto</option>
+        <option>Presupuesto aprobado</option>
+        <option>Vandalismo sin presupuesto</option>
+        <option>Por reponer de stock</option>
+        <option>Con piezas faltantes</option>
+        <option>Cambio de equipo completo</option>
+      </select>
     </div>
 
     <div id="lista-mc"></div>
@@ -82,6 +93,27 @@
       <h3 style="margin-top:24px;">Piezas sin MC identificado</h3>
       <p class="ot-meta">No cuentan para ninguna orden hasta aclarar a qué equipo pertenecen.</p>
       <ul id="sin-mc-lista"></ul>
+    </div>
+
+    <div id="bloque-lote">
+    <h3 style="margin-top:28px;">Añadir piezas de otras OT (por lotes)</h3>
+    <p class="ot-meta">Piezas aún pendientes de entregar del mismo cliente en otras OT (incluidas las históricas). Se quedan en su OT original y se cuentan en esta orden.</p>
+    <div class="materiales-controles"><button type="button" id="lote-cargar" class="btn-primario">Ver piezas pendientes del cliente</button></div>
+    <div id="lote-filtros" hidden>
+      <div class="materiales-controles">
+        <select id="lote-filtro-ot"></select>
+        <select id="lote-filtro-cat">
+          <option value="">Todas las categorías</option>
+          <option>Equipo OK</option><option>Garantía (AMMI)</option><option>Presupuesto</option>
+          <option>Vandalismo sin presupuesto</option><option>Por reponer de stock</option><option>Sin clasificar</option>
+        </select>
+        <input type="text" id="lote-filtro-mc" placeholder="Filtrar por MC...">
+        <button type="button" id="lote-marcar">Marcar todas las visibles</button>
+        <button type="button" id="lote-anadir" class="btn-primario">Añadir seleccionadas</button>
+      </div>
+      <p class="ot-meta" id="lote-contador"></p>
+    </div>
+    <div id="lote-resultado"></div>
     </div>
 
     <div id="bloque-extra">

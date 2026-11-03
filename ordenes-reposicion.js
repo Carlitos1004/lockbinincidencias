@@ -26,6 +26,8 @@ let ordenesPorOt = {};   // id_ot -> fila de ordenes_reposicion
 let otActual = null;
 let compsOtActual = [];   // componentes de la orden abierta
 let clienteOtActual = "";
+let equiposCompletos = {}; // mc -> fila de reposicion_equipos (cambio de equipo completo + nota)
+let presPorComp = {};      // componente_id -> {numero, oferta, estado, aprobada}
 
 function esc(t) {
   const d = document.createElement("div");
@@ -37,7 +39,7 @@ function codigoOrden(numero) { return "REP-" + String(numero).padStart(3, "0"); 
 
 const CAMPOS = "id, m_control, tipo_componente, serial_retirado, id_ot, cliente, estado, destino, " +
   "vandalismo, garantia_cliente, devuelto, devuelto_en, repo_estado, repo_serial_nuevo, " +
-  "repo_fecha_entrega, orden_reposicion_ot";
+  "repo_fecha_entrega, orden_reposicion_ot, repo_nota, cliente_original";
 
 // Supabase devuelve como máximo 1000 filas por consulta: pedimos por páginas
 async function traerComps(filtroOr) {
@@ -79,8 +81,20 @@ function claseEstado(e) {
   return "orep-proc";
 }
 
+function categoriaCasilla(c) {
+  const d = c.destino || "";
+  if (presPorComp[String(c.id)]) return "Presupuesto";
+  if (d.includes("Devolver al cliente")) return "Equipo OK";
+  if (d === DESTINO_AMMI) return (c.vandalismo || c.garantia_cliente === "NO") ? "Vandalismo sin presupuesto" : "Garantía (AMMI)";
+  if (d.includes("Stock") || d.includes("Desechar")) return "Por reponer de stock";
+  return "Sin clasificar";
+}
+
 function notaCasilla(c) {
   const partes = [];
+  const pre = presPorComp[String(c.id)];
+  if (pre) partes.push("💰 PRE-" + String(pre.numero).padStart(3, "0") + (pre.oferta ? " (" + pre.oferta + ")" : "") + ": " +
+    (pre.aprobada === true ? "aprobada" : pre.aprobada === false ? "rechazada" : "pendiente") + " · " + pre.estado);
   if (c.vandalismo) partes.push("🔨 vandalismo");
   if (c.destino === DESTINO_AMMI) partes.push(c.garantia_cliente === "NO" ? "sin garantía" : (c.garantia_cliente === "SI" ? "con garantía" : ""));
   return partes.filter(Boolean).join(" · ");
@@ -131,6 +145,7 @@ async function detectarRol() {
   // El operario ve las órdenes y marca entregas; no crea órdenes ni decide excepciones
   document.getElementById("bloque-buscar").hidden = !esManager;
   document.getElementById("bloque-extra").hidden = !esManager;
+  document.getElementById("bloque-lote").hidden = !esManager;
   if (!esManager) {
     const volver = document.querySelector(".btn-volver");
     if (volver) { volver.href = "ruta.html"; volver.innerHTML = '<span class="btn-volver-flecha">←</span> Volver a Ruta'; }
@@ -263,6 +278,20 @@ async function recargarOt() {
   // Fuera: piezas de esta OT que se cuentan en la orden de otra OT
   compsOtActual = (data || []).filter(c => (c.orden_reposicion_ot || c.id_ot) === otActual);
   clienteOtActual = (otsManuales.find(o => o.id_ot === otActual) || {}).cliente || "";
+  equiposCompletos = {};
+  try {
+    const { data: eqs } = await supabaseClient.from("reposicion_equipos").select("*").eq("id_ot", otActual);
+    (eqs || []).forEach(e => { equiposCompletos[e.m_control] = e; });
+  } catch (err) { console.error(err); }
+  presPorComp = {};
+  try {
+    const ids = [...new Set(compsOtActual.map(c => String(c.id)))];
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data: pl } = await supabaseClient.from("presupuesto_lineas")
+        .select("componente_id, aprobada, ordenes_presupuesto(numero, numero_oferta, estado)").in("componente_id", ids.slice(i, i + 100));
+      (pl || []).forEach(l => { if (l.ordenes_presupuesto) presPorComp[String(l.componente_id)] = { numero: l.ordenes_presupuesto.numero, oferta: l.ordenes_presupuesto.numero_oferta, estado: l.ordenes_presupuesto.estado, aprobada: l.aprobada }; });
+    }
+  } catch (err) { console.error(err); }
   renderDetalle();
 }
 
@@ -278,7 +307,15 @@ function renderDetalle() {
 
   const fMc = document.getElementById("filtro-mc").value.trim().toLowerCase();
   const fEst = document.getElementById("filtro-estado-mc").value;
-  const visibles = mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc)) && (!fEst || m.estadoMc === fEst));
+  const fCat = document.getElementById("filtro-categoria").value;
+  const cumpleCat = m => {
+    if (!fCat) return true;
+    if (fCat === "Con piezas faltantes") return m.faltan.length > 0 || m.casillas.some(x => !x.comp && x.falt);
+    if (fCat === "Cambio de equipo completo") return !!(equiposCompletos[m.mc] && equiposCompletos[m.mc].cambio_completo);
+    if (fCat === "Presupuesto aprobado") return m.casillas.some(x => x.comp && presPorComp[String(x.comp.id)] && presPorComp[String(x.comp.id)].aprobada === true);
+    return m.casillas.some(x => x.comp && categoriaCasilla(x.comp) === fCat);
+  };
+  const visibles = mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc)) && (!fEst || m.estadoMc === fEst) && cumpleCat(m));
 
   document.getElementById("lista-mc").innerHTML = visibles.length
     ? visibles.map(htmlMc).join("")
@@ -310,7 +347,8 @@ function htmlMc(m) {
           <option value="Se repone desde stock" ${dec === "Se repone desde stock" ? "selected" : ""}>Se repone desde stock</option>
           <option value="Sin reposición" ${dec === "Sin reposición" ? "selected" : ""}>Sin reposición (el cliente lo acepta)</option>
         </select></td>
-        <td><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td></tr>`;
+        <td><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td>
+        <td><input type="text" class="inp-falt-nota" placeholder="Nota" value="${esc((f && f.nota) || "")}"></td></tr>`;
     }
     const c = x.comp;
     const est = estadoCasilla(c);
@@ -325,6 +363,7 @@ function htmlMc(m) {
       <td><span class="orep-badge ${claseEstado(est)}">${esc(est)}</span></td>
       <td><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
       <td><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}">${esManager ? extra : ""}</td>
+      <td><input type="text" class="inp-nota" placeholder="Nota" value="${esc(c.repo_nota || "")}"></td>
     </tr>`;
   }).join("");
 
@@ -333,12 +372,18 @@ function htmlMc(m) {
     ? `<button type="button" class="btn-entregar" data-mc="${esc(m.mc)}">📦 Marcar equipo entregado</button>` : "";
   const detalleFaltan = m.faltan.length ? ` · faltan: ${esc(m.faltan.join(", "))}` : "";
 
+  const eqc = equiposCompletos[m.mc] || {};
+  const bloqueEqc = `<label class="orep-eqc" style="display:flex;align-items:center;gap:6px;font-size:.88em;">
+      <input type="checkbox" class="chk-eqc" data-mc="${esc(m.mc)}" ${eqc.cambio_completo ? "checked" : ""} ${esManager ? "" : "disabled"}> 🔄 Se cambia el equipo completo</label>
+      <input type="text" class="inp-eqc-nota" data-mc="${esc(m.mc)}" placeholder="Nota del equipo" value="${esc(eqc.nota || "")}" style="min-width:200px;" ${esManager ? "" : "disabled"}>`;
   return `<div class="orep-mc">
     <div class="orep-mc-cab"><strong>${esc(m.mc)}</strong>
       <span class="orep-badge ${claseMc(m.estadoMc)}">${esc(m.estadoMc)}</span>
-      <span>${esc(m.cliente || "")}${detalleFaltan}${fechaEnt ? ` · entregado el ${esc(fechaEnt)}` : ""}</span></div>
+      ${eqc.cambio_completo ? '<span class="orep-badge orep-info">🔄 Equipo completo</span>' : ""}
+      <span>${esc(m.cliente || "")}${detalleFaltan}${fechaEnt ? ` · entregado el ${esc(fechaEnt)}` : ""}</span>
+      <span style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${bloqueEqc}</span></div>
     <div class="scroll-x-tabla" style="max-height:none;"><table>
-      <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th></tr></thead>
+      <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th><th>Nota</th></tr></thead>
       <tbody>${filas}</tbody></table></div>
     <div class="orep-acciones">${botonEntrega}</div>
   </div>`;
@@ -366,9 +411,10 @@ function enlazarEventos() {
     const mc = tr.dataset.mc, tipo = tr.dataset.tipo;
     const decision = tr.querySelector(".sel-falt").value || null;
     const serial = tr.querySelector(".inp-falt-serial").value.trim() || null;
+    const nota = tr.querySelector(".inp-falt-nota").value.trim() || null;
     const { error } = await supabaseClient.from("reposicion_faltantes").upsert({
       id_ot: otActual, m_control: mc, tipo_componente: tipo, decision,
-      serial_nuevo: decision === "Se repone desde stock" ? serial : null,
+      serial_nuevo: decision === "Se repone desde stock" ? serial : null, nota,
       actualizado_en: new Date().toISOString()
     }, { onConflict: "id_ot,m_control,tipo_componente" });
     if (error) { alert("No se pudo guardar: " + error.message + "\n(¿Corriste el SQL 78?)"); return; }
@@ -376,8 +422,28 @@ function enlazarEventos() {
   };
   document.querySelectorAll(".fila-falt .sel-falt").forEach(sel =>
     sel.addEventListener("change", () => guardarFalt(sel.closest("tr"))));
+  document.querySelectorAll(".fila-falt .inp-falt-nota").forEach(inp =>
+    inp.addEventListener("change", () => guardarFalt(inp.closest("tr"))));
   document.querySelectorAll(".fila-falt .inp-falt-serial").forEach(inp =>
     inp.addEventListener("change", () => guardarFalt(inp.closest("tr"))));
+
+  document.querySelectorAll(".inp-nota").forEach(inp =>
+    inp.addEventListener("change", async () => {
+      await guardarComp(inp.closest("tr").dataset.id, { repo_nota: inp.value.trim() || null }, false);
+    }));
+
+  const guardarEqc = async (mc) => {
+    const chk = document.querySelector(`.chk-eqc[data-mc="${mc}"]`);
+    const nota = document.querySelector(`.inp-eqc-nota[data-mc="${mc}"]`).value.trim() || null;
+    const { error } = await supabaseClient.from("reposicion_equipos").upsert({
+      id_ot: otActual, m_control: mc, cambio_completo: chk.checked, nota, actualizado_en: new Date().toISOString()
+    }, { onConflict: "id_ot,m_control" });
+    if (error) { alert("No se pudo guardar: " + error.message + "\n(¿Corriste el SQL 86?)"); return; }
+    equiposCompletos[mc] = { id_ot: otActual, m_control: mc, cambio_completo: chk.checked, nota };
+    renderDetalle();
+  };
+  document.querySelectorAll(".chk-eqc").forEach(c => c.addEventListener("change", () => guardarEqc(c.dataset.mc)));
+  document.querySelectorAll(".inp-eqc-nota").forEach(i => i.addEventListener("change", () => guardarEqc(i.dataset.mc)));
 
   document.querySelectorAll(".btn-entregar").forEach(btn =>
     btn.addEventListener("click", () => entregarEquipo(btn.dataset.mc)));
@@ -432,6 +498,7 @@ async function entregarEquipo(mc) {
 // ---------- Excepción: añadir pieza de otra OT ----------
 document.getElementById("filtro-mc").addEventListener("input", () => otActual && renderDetalle());
 document.getElementById("filtro-estado-mc").addEventListener("change", () => otActual && renderDetalle());
+document.getElementById("filtro-categoria").addEventListener("change", () => otActual && renderDetalle());
 
 document.getElementById("extra-buscar").addEventListener("click", async () => {
   const mc = document.getElementById("extra-mc").value.trim().toUpperCase();
@@ -456,3 +523,53 @@ document.getElementById("extra-buscar").addEventListener("click", async () => {
 });
 
 document.getElementById("buscar-ot").addEventListener("input", renderBusqueda);
+
+// ---------- Añadir por lotes piezas de otras OT del mismo cliente ----------
+let loteCandidatas = [];
+
+document.getElementById("lote-cargar").addEventListener("click", async () => {
+  const cont = document.getElementById("lote-resultado");
+  const cli = clienteOtActual;
+  if (!cli) { cont.innerHTML = "<p>Esta OT no tiene cliente asignado. Corre el SQL 85 o usa la búsqueda por MC.</p>"; return; }
+  cont.innerHTML = "<p>Cargando piezas de " + esc(cli) + "...</p>";
+  const { data, error } = await traerComps(`cliente.eq."${cli}",cliente_original.eq."${cli}"`);
+  if (error) { cont.innerHTML = `<p>Error: ${esc(error.message)}</p>`; return; }
+  const entregada = c => c.repo_estado === "Entregado" || ((c.destino || "").includes("Devolver al cliente") && !!c.devuelto);
+  loteCandidatas = (data || []).filter(c => c.m_control && (c.orden_reposicion_ot || c.id_ot) !== otActual && !entregada(c));
+  const ots = [...new Set(loteCandidatas.map(c => c.orden_reposicion_ot || c.id_ot || "—"))].sort();
+  document.getElementById("lote-filtro-ot").innerHTML = '<option value="">Todas las OT</option>' + ots.map(o => `<option>${esc(o)}</option>`).join("");
+  document.getElementById("lote-filtros").hidden = false;
+  renderLote();
+});
+
+function renderLote() {
+  const cont = document.getElementById("lote-resultado");
+  const fOt = document.getElementById("lote-filtro-ot").value;
+  const fCat = document.getElementById("lote-filtro-cat").value;
+  const fMc = document.getElementById("lote-filtro-mc").value.trim().toLowerCase();
+  const vis = loteCandidatas.filter(c => (!fOt || (c.orden_reposicion_ot || c.id_ot || "—") === fOt) &&
+    (!fCat || categoriaCasilla(c) === fCat) && (!fMc || c.m_control.toLowerCase().includes(fMc)))
+    .sort((a, b) => a.m_control.localeCompare(b.m_control));
+  document.getElementById("lote-contador").textContent = `${vis.length} piezas pendientes de ${clienteOtActual} en otras OT (${loteCandidatas.length} en total)`;
+  if (!vis.length) { cont.innerHTML = "<p>Ninguna pieza coincide.</p>"; return; }
+  cont.innerHTML = `<div style="max-height:360px;overflow:auto;border:1px solid #e8eee9;border-radius:8px;"><table class="tabla-revision"><thead><tr><th></th><th>MC</th><th>Componente</th><th>Serial</th><th>OT</th><th>Categoría</th><th>Destino</th></tr></thead><tbody>` +
+    vis.map(c => `<tr><td><input type="checkbox" class="chk-lote" data-id="${c.id}"></td><td>${esc(c.m_control)}</td><td>${esc(c.tipo_componente || "—")}</td>
+      <td>${esc(c.serial_retirado || "—")}</td><td>${esc(c.orden_reposicion_ot || c.id_ot || "—")}</td>
+      <td>${esc(categoriaCasilla(c))}</td><td>${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}</td></tr>`).join("") + "</tbody></table></div>";
+}
+["lote-filtro-ot", "lote-filtro-cat"].forEach(id => document.getElementById(id).addEventListener("change", renderLote));
+document.getElementById("lote-filtro-mc").addEventListener("input", renderLote);
+document.getElementById("lote-marcar").addEventListener("click", () =>
+  document.querySelectorAll(".chk-lote").forEach(c => { c.checked = true; }));
+document.getElementById("lote-anadir").addEventListener("click", async () => {
+  const ids = [...document.querySelectorAll(".chk-lote:checked")].map(c => c.dataset.id);
+  if (!ids.length) { alert("Marca al menos una pieza."); return; }
+  if (!confirm(`¿Añadir ${ids.length} pieza(s) a la orden de ${otActual}? Se quedan en su OT original y se cuentan aquí.`)) return;
+  for (let i = 0; i < ids.length; i += 100) {
+    const { error } = await supabaseClient.from("componentes_retirados").update({ orden_reposicion_ot: otActual }).in("id", ids.slice(i, i + 100));
+    if (error) { alert("No se pudo añadir: " + error.message); return; }
+  }
+  document.getElementById("lote-resultado").innerHTML = `<p>✅ ${ids.length} pieza(s) añadidas a esta orden.</p>`;
+  loteCandidatas = loteCandidatas.filter(c => !ids.includes(String(c.id)));
+  await recargarOt(); cargarOts();
+});

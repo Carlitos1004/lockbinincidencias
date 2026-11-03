@@ -63,7 +63,7 @@ async function cargarInfoReposicion() {
     if (!desde) return;
     const coincide = cambios.filter(c => c.m_control === l.m_control && String(c.id) !== String(l.componente_id) &&
       fechaOt[c.id_ot] && fechaOt[c.id_ot] >= desde &&
-      (l.tipo_componente === "Equipo completo" || canonTipo(c.tipo_componente) === canonTipo(l.tipo_componente)));
+      (l.tipo_componente === "Equipo completo" || l.alcance === "Equipo completo" || canonTipo(c.tipo_componente) === canonTipo(l.tipo_componente)));
     if (coincide.length) detectadoPorLinea[l.id] = { serial: coincide.map(c => c.serial_nuevo).join(", "), ot: coincide[0].id_ot };
   });
 
@@ -86,6 +86,13 @@ async function sincronizarReposicion(orden) {
       if (!r.error) ids.forEach(id => { compInfo[id] = Object.assign(compInfo[id] || {}, { repo_estado: valor }); });
     }) : null;
   };
+  // Líneas con alcance "Equipo completo": se anota en la Orden de reposición de su OT (sin pisar lo que ya haya)
+  const completos = ls.filter(l => l.aprobada === true && l.alcance === "Equipo completo" && l.id_ot);
+  if (completos.length) {
+    const cod = "PRE-" + String(orden.numero).padStart(3, "0");
+    const filas = [...new Map(completos.map(l => [l.id_ot + "|" + l.m_control, { id_ot: l.id_ot, m_control: l.m_control, cambio_completo: true, nota: "Presupuesto " + cod + (orden.numero_oferta ? " (" + orden.numero_oferta + ")" : "") }])).values()];
+    await supabaseClient.from("reposicion_equipos").upsert(filas, { onConflict: "id_ot,m_control", ignoreDuplicates: true });
+  }
   await Promise.all([poner("Presupuesto aprobado", l => l.aprobada === true), poner("Presupuesto rechazado", l => l.aprobada === false)].filter(Boolean));
 }
 
@@ -233,7 +240,11 @@ function pintarDetalle() {
   const sorted = [...ls].sort((a, b) => a.m_control.localeCompare(b.m_control) || (a.tipo_componente || "").localeCompare(b.tipo_componente || ""));
   document.getElementById("tbody-lineas").innerHTML = sorted.length ? sorted.map(l => `
     <tr data-id="${l.id}">
-      <td>${esc(l.m_control)}</td><td>${esc(l.tipo_componente || "—")}</td><td>${esc(l.serial || "—")}</td>
+      <td>${esc(l.m_control)}</td><td>${esc(l.tipo_componente || "—")}</td>
+      <td><select class="sel-alcance">
+        <option value="Pieza" ${l.alcance !== "Equipo completo" ? "selected" : ""}>Solo la pieza</option>
+        <option value="Equipo completo" ${l.alcance === "Equipo completo" ? "selected" : ""}>🔄 Equipo completo</option>
+      </select></td><td>${esc(l.serial || "—")}</td>
       <td>${l.id_ot ? `<a href="ot-detalle.html?ot=${encodeURIComponent(l.id_ot)}">${esc(l.id_ot)}</a>` : "—"}</td>
       <td><select class="sel-aprob">
         <option value="" ${l.aprobada === null ? "selected" : ""}>Pendiente de respuesta</option>
@@ -242,7 +253,7 @@ function pintarDetalle() {
       </select></td>
       <td>${celdaReposicion(l)}</td>
       <td><button type="button" class="btn-quitar-lin" title="Quitar de la orden">✕</button></td>
-    </tr>`).join("") : '<tr><td colspan="7">La orden está vacía. Añade piezas abajo.</td></tr>';
+    </tr>`).join("") : '<tr><td colspan="8">La orden está vacía. Añade piezas abajo.</td></tr>';
 
   document.querySelectorAll(".sel-aprob").forEach(sel => sel.addEventListener("change", async () => {
     const v = sel.value === "si" ? true : sel.value === "no" ? false : null;
@@ -250,6 +261,15 @@ function pintarDetalle() {
     const { error } = await supabaseClient.from("presupuesto_lineas").update({ aprobada: v }).eq("id", id);
     if (error) { alert("No se pudo guardar: " + error.message); return; }
     const l = (lineasPorOrden[ordenActual] || []).find(x => x.id === id); if (l) l.aprobada = v;
+    await cargarInfoReposicion();
+    await sincronizarReposicion(ordenes.find(x => x.id === ordenActual));
+    pintarDetalle(); renderLista();
+  }));
+  document.querySelectorAll(".sel-alcance").forEach(sel => sel.addEventListener("change", async () => {
+    const id = sel.closest("tr").dataset.id;
+    const { error } = await supabaseClient.from("presupuesto_lineas").update({ alcance: sel.value }).eq("id", id);
+    if (error) { alert("No se pudo guardar: " + error.message + "\n(¿Corriste el SQL 86?)"); return; }
+    const l = (lineasPorOrden[ordenActual] || []).find(x => x.id === id); if (l) l.alcance = sel.value;
     await cargarInfoReposicion();
     await sincronizarReposicion(ordenes.find(x => x.id === ordenActual));
     pintarDetalle(); renderLista();
@@ -397,7 +417,8 @@ document.getElementById("disp-anadir").addEventListener("click", async () => {
   if (!ids.length) { alert("Marca al menos una pieza."); return; }
   const filas = disponibles.filter(c => ids.includes(String(c.id)) && !c.usadaEn).map(c => ({
     orden_id: ordenActual, m_control: c.m_control, tipo_componente: c.tipo_componente,
-    serial: c.serial_retirado, id_ot: c.id_ot, componente_id: String(c.id), aprobada: null }));
+    serial: c.serial_retirado, id_ot: c.id_ot, componente_id: String(c.id), aprobada: null,
+    alcance: c.tipo_componente === "Equipo completo" ? "Equipo completo" : "Pieza" }));
   if (await insertarLineas(filas)) cargarDisponibles();
 });
 
@@ -405,7 +426,7 @@ document.getElementById("man-anadir").addEventListener("click", async () => {
   const mc = document.getElementById("man-mc").value.trim().toUpperCase();
   if (!/^MC\d+$/.test(mc)) { alert("Escribe un MC válido, por ejemplo MC2500123."); return; }
   const tipo = document.getElementById("man-tipo").value;
-  if (await insertarLineas([{ orden_id: ordenActual, m_control: mc, tipo_componente: tipo, aprobada: null }]))
+  if (await insertarLineas([{ orden_id: ordenActual, m_control: mc, tipo_componente: tipo, aprobada: null, alcance: tipo === "Equipo completo" ? "Equipo completo" : "Pieza" }]))
     document.getElementById("man-mc").value = "";
 });
 
