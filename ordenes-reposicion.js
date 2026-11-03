@@ -321,6 +321,7 @@ async function recargarOt() {
       (eq || []).forEach(e => { if (e.fecha_instalacion) fechasEntrega[e.m_control] = e.fecha_instalacion; });
     }
   } catch (err) { console.error("No se pudieron cargar las fechas de entrega:", err); }
+  try { await cargarSerialesBok(); } catch (err) { console.error(err); }
   presPorComp = {};
   try {
     const ids = [...new Set(compsOtActual.map(c => String(c.id)))];
@@ -407,7 +408,7 @@ function renderDetalle() {
     `<li>${esc(c.tipo_componente)} — serial ${esc(c.serial_retirado || "—")} (${esc(estadoCasilla(c))})</li>`).join("");
 
   enlazarEventos();
-  if (esManager) renderListas();
+  if (esManager) { renderListas(); renderBok(); }
 }
 
 function claseMc(e) {
@@ -489,9 +490,9 @@ function htmlMc(m) {
   // Batería OK de otro equipo que se instala en este
   const recibeDe = Object.values(equiposCompletos).filter(e => e.bateria_ok && e.bateria_ok_destino === m.mc);
   const bloqueRecibe = recibeDe.map(e => {
-    const b = bateriaDe(e.m_control);
-    return `<span class="orep-badge orep-info">🔁 Recibe la batería OK ${esc(b ? b.serial_retirado : "")} de ${esc(e.m_control)}</span>` +
-      (b && !esBat ? ` <button type="button" class="btn-usar-bok" data-mc="${esc(m.mc)}" data-serial="${esc(b.serial_retirado || "")}">Usar como serial a entregar</button>` : "");
+    const serial = serialBok(e.m_control);
+    return `<span class="orep-badge orep-info">🔁 Recibe la batería OK ${esc(serial)} de ${esc(e.m_control)}</span>` +
+      (serial && !esBat ? ` <button type="button" class="btn-usar-bok" data-mc="${esc(m.mc)}" data-serial="${esc(serial)}">Usar como serial a entregar</button>` : "");
   }).join(" ");
   const fEnt = fechasEntrega[m.mc];
   const fEntTxt = fEnt ? new Date(fEnt + "T00:00:00").toLocaleDateString("es-ES") : "sin fecha de entrega";
@@ -761,20 +762,56 @@ document.addEventListener("click", async (e) => {
 });
 
 // ---------- Batería OK reutilizable ----------
-async function guardarBok(mc) {
-  const chk = document.querySelector(`.chk-bok[data-mc="${mc}"]`);
-  const dest = (document.querySelector(`.inp-bok-dest[data-mc="${mc}"]`).value.toUpperCase().match(/MC\d+/) || [null])[0];
+async function guardarBok(mc, cont) {
+  const chk = cont.querySelector(".chk-bok");
+  const dest = ((cont.querySelector(".inp-bok-dest") || {}).value || "").toUpperCase().match(/MC\d+/);
+  const destino = chk.checked && dest ? dest[0] : null;
   const { error } = await supabaseClient.from("reposicion_equipos").upsert({
-    id_ot: otActual, m_control: mc, bateria_ok: chk.checked, bateria_ok_destino: chk.checked ? dest : null, actualizado_en: new Date().toISOString()
+    id_ot: otActual, m_control: mc, bateria_ok: chk.checked, bateria_ok_destino: destino, actualizado_en: new Date().toISOString()
   }, { onConflict: "id_ot,m_control" });
   if (error) { alert("No se pudo guardar: " + error.message + "\n(¿Corriste el SQL 89?)"); return; }
-  equiposCompletos[mc] = Object.assign({}, equiposCompletos[mc], { id_ot: otActual, m_control: mc, bateria_ok: chk.checked, bateria_ok_destino: chk.checked ? dest : null });
+  equiposCompletos[mc] = Object.assign({}, equiposCompletos[mc], { id_ot: otActual, m_control: mc, bateria_ok: chk.checked, bateria_ok_destino: destino });
+  await cargarSerialesBok();
   renderDetalle();
 }
 document.addEventListener("change", e => {
-  const c = e.target.closest && e.target.closest(".chk-bok, .inp-bok-dest");
-  if (c) guardarBok(c.dataset.mc);
+  const el = e.target.closest && e.target.closest(".chk-bok, .inp-bok-dest");
+  if (!el) return;
+  const cont = el.closest("tr, .orep-mc-sub");
+  if (cont) guardarBok(el.dataset.mc, cont);
 });
+
+// Serial de la batería OK de cada equipo marcado (puede estar en otra OT: solo se lee, no se mueve)
+let bokSerial = {};
+async function cargarSerialesBok() {
+  bokSerial = {};
+  const mcs = Object.values(equiposCompletos).filter(e => e.bateria_ok).map(e => e.m_control);
+  for (let i = 0; i < mcs.length; i += 100) {
+    const { data } = await supabaseClient.from("componentes_retirados")
+      .select("m_control, tipo_componente, serial_retirado, repo_estado, destino, devuelto").in("m_control", mcs.slice(i, i + 100));
+    (data || []).filter(c => /bater/i.test(c.tipo_componente || "") && c.serial_retirado).forEach(c => {
+      if (!bokSerial[c.m_control] || c.repo_estado !== "Entregado") bokSerial[c.m_control] = c.serial_retirado;
+    });
+  }
+}
+const serialBok = mc => { const b = bateriaDe(mc); return (b && b.serial_retirado) || bokSerial[mc] || ""; };
+
+// Tabla de baterías OK reutilizables (pestaña Listas)
+function renderBok() {
+  const tb = document.getElementById("tbody-bok");
+  if (!tb) return;
+  const owners = Object.values(equiposCompletos).filter(e => e.bateria_ok).sort((a, b) => a.m_control.localeCompare(b.m_control));
+  // Posibles destinos: equipos de la orden que llevan batería por reponer
+  const posibles = agruparPorMc(compsOtActual, otActual).filter(m => tipoRep(m.mc) !== "Batería").map(m => m.mc).sort();
+  document.getElementById("bok-destinos").innerHTML = posibles.map(m => `<option value="${esc(m)}">`).join("");
+  tb.innerHTML = owners.length ? owners.map(e => `<tr data-mc="${esc(e.m_control)}">
+      <td><input type="checkbox" class="chk-bok" data-mc="${esc(e.m_control)}" checked title="Quitar la marca"></td>
+      <td>${esc(e.m_control)}</td>
+      <td>${esc(serialBok(e.m_control) || "—")}</td>
+      <td><input type="text" class="inp-bok-dest" data-mc="${esc(e.m_control)}" list="bok-destinos" placeholder="MC al que va" value="${esc(e.bateria_ok_destino || "")}" style="width:150px;"></td>
+      <td>${e.bateria_ok_destino ? "✅ asignada" : '<span class="orep-badge orep-proc">Sin destino</span>'}</td></tr>`).join("")
+    : '<tr><td colspan="5">Aún no hay baterías OK marcadas. Pega abajo los MC de los equipos cuya batería está OK.</td></tr>';
+}
 
 // Usar la batería OK de otro equipo como serial a entregar de este
 document.addEventListener("click", async (e) => {
@@ -807,7 +844,8 @@ document.getElementById("lista-bok-aplicar").addEventListener("click", async () 
   const filas = mcs.map(mc => ({ id_ot: otActual, m_control: mc, bateria_ok: true, actualizado_en: new Date().toISOString() }));
   const { error } = await supabaseClient.from("reposicion_equipos").upsert(filas, { onConflict: "id_ot,m_control" });
   if (error) { msg.textContent = "❌ " + error.message + " (¿SQL 89?)"; return; }
-  msg.textContent = `✅ ${mcs.length} equipos marcados con batería OK reutilizable. Indica en cada uno, en la pestaña Baterías, el MC al que va.`;
+  msg.textContent = `✅ ${mcs.length} equipos marcados con batería OK reutilizable. Indica abajo, en la tabla, el MC al que va cada una.`;
+  document.getElementById("lista-bok").value = "";
   await recargarOt();
 });
 

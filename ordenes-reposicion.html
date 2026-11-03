@@ -157,12 +157,19 @@
       </div>
       <p class="ot-meta" id="lista-msg" style="margin-top:8px;"></p>
 
-      <details style="margin-top:12px;">
-        <summary style="cursor:pointer;font-weight:600;">🔁 Baterías OK que se reutilizan en otros equipos</summary>
-        <p class="ot-meta">Pega los MC de los equipos cuya batería está OK: esa batería se usa en otro equipo y a ellos se les repone una nueva. Después, en la pestaña Baterías, indica a qué MC va cada una.</p>
-        <textarea id="lista-bok" rows="2" style="width:100%;max-width:520px;" placeholder="MC2500785&#10;MC2500283"></textarea>
-        <div class="materiales-controles"><button type="button" id="lista-bok-aplicar">Marcar como batería OK reutilizable</button></div>
-      </details>
+      <div style="margin-top:18px;border-top:2px solid #d9e2dc;padding-top:12px;">
+        <h3 style="margin:0 0 4px;">🔁 Baterías OK que se reutilizan en otros equipos</h3>
+        <p class="ot-meta">Equipos cuya batería actual está OK: esa batería se instala en otro equipo y a ellos se les repone una nueva. Pega los MC de esos equipos, aunque no estén en una lista, y luego indica en la tabla a qué MC va cada batería.</p>
+        <div class="scroll-x-tabla" style="max-height:none;">
+          <table class="tabla-revision">
+            <thead><tr><th></th><th>Equipo (recibe batería nueva)</th><th>Batería OK</th><th>Va al equipo</th><th>Estado</th></tr></thead>
+            <tbody id="tbody-bok"></tbody>
+          </table>
+        </div>
+        <datalist id="bok-destinos"></datalist>
+        <textarea id="lista-bok" rows="2" style="width:100%;max-width:520px;margin-top:8px;" placeholder="MC2500785&#10;MC2500283"></textarea>
+        <div class="materiales-controles"><button type="button" id="lista-bok-aplicar" class="btn-primario">Añadir a la tabla</button></div>
+      </div>
     </div>
     </div>
 
