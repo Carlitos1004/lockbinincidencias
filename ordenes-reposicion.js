@@ -435,8 +435,83 @@ function renderDetalle() {
     ? htmlLista
     : `<p>${sinListaActiva ? "No hay nada que reponer por ahora." : "Ningún elemento coincide."}</p>`;
 
+  ctxResumen = { nombre: sinListaActiva ? "" : nombreMostrado, equipos: sinListaActiva ? [] : mcsLista, sinMc: sinMcBat };
+  const btnRes = document.getElementById("btn-resumen-comp");
+  if (btnRes) btnRes.onclick = abrirResumenComponentes;
+
   enlazarEventos();
   if (esManager) { renderListas(); renderBok(); }
+}
+
+// ---------- Resumen de componentes (ventana de informe) ----------
+let ctxResumen = { nombre: "", equipos: [], sinMc: [] };
+
+// Una pieza cuenta como "a reponer / repuesta" salvo que esté bien, rechazada o reparada
+function cuentaComoReposicion(c, est) {
+  if (["Listo (sin cambios)", "Sin reposición (acordado)", "Presupuesto rechazado", "Reparado recibido"].includes(est)) return false;
+  if (est === "Entregado") return !!c.repo_serial_nuevo || !!c.repo_estado;
+  return true;
+}
+
+function calcularResumenComponentes() {
+  const filas = {};
+  const fila = tipo => (filas[tipo] = filas[tipo] || { total: 0, pend: 0, serial: 0, listo: 0, entregado: 0, c1: 0, c2: 0, sinCat: 0 });
+  const sumar = (tipo, est, serial, cat) => {
+    const f = fila(tipo);
+    f.total++;
+    if (est === "Entregado") f.entregado++;
+    else if (est === "Listo para entregar") f.listo++;
+    else if (serial) f.serial++;
+    else f.pend++;
+    if (cat === 1) f.c1++; else if (cat === 2) f.c2++; else f.sinCat++;
+  };
+  let equiposCompletos_n = 0;
+  ctxResumen.equipos.forEach(m => {
+    if (equiposCompletos[m.mc] && equiposCompletos[m.mc].cambio_completo) equiposCompletos_n++;
+    m.casillas.forEach(x => {
+      if (x.comp) {
+        const est = estadoCasilla(x.comp);
+        if (cuentaComoReposicion(x.comp, est)) sumar(tipoCanonico(x.comp.tipo_componente || x.tipo), est, x.comp.repo_serial_nuevo, x.comp.repo_categoria);
+      } else if (x.falt && x.falt.decision === "Se repone desde stock") {
+        sumar(x.tipo, estadoFalt(x.falt), x.falt.serial_nuevo, null);
+      }
+    });
+  });
+  ctxResumen.sinMc.forEach(c => {
+    const est = estadoCasilla(c);
+    if (cuentaComoReposicion(c, est)) sumar("Batería", est, c.repo_serial_nuevo, c.repo_categoria);
+  });
+  const orden = [...TIPOS, ...Object.keys(filas).filter(t => !TIPOS.includes(t))];
+  return { filas, orden: orden.filter(t => filas[t]), equiposCompletos_n };
+}
+
+function abrirResumenComponentes() {
+  const r = calcularResumenComponentes();
+  const tot = { total: 0, pend: 0, serial: 0, listo: 0, entregado: 0, c1: 0, c2: 0, sinCat: 0 };
+  r.orden.forEach(t => Object.keys(tot).forEach(k => { tot[k] += r.filas[t][k]; }));
+  const cab = ["Componente", "A reponer", "Pendientes", "Serializados (pend. OK)", "Listos", "Entregados", "1ª cat.", "2ª cat.", "Sin categoría"];
+  const lin = (t, f) => [t, f.total, f.pend, f.serial, f.listo, f.entregado, f.c1, f.c2, f.sinCat];
+  const datos = r.orden.map(t => lin(t, r.filas[t])).concat([lin("TOTAL", tot)]);
+  const cuerpo = datos.map((d, i) => `<tr class="${i === datos.length - 1 ? "res-total" : ""}">` +
+    d.map((v, j) => `<td ${j ? "" : ""}>${j ? v : esc(v)}</td>`).join("") + "</tr>").join("");
+  const textoPlano = [cab, ...datos].map(f => f.join("\t")).join("\n");
+  document.getElementById("modal-resumen")?.remove();
+  const m = document.createElement("div");
+  m.id = "modal-resumen";
+  m.className = "modal-resumen";
+  m.innerHTML = `<div class="modal-resumen-caja">
+    <div class="modal-resumen-cab"><h3>📊 Resumen de componentes</h3><button type="button" class="modal-x" aria-label="Cerrar">✕</button></div>
+    <p class="modal-sub">${esc(ctxResumen.nombre || "—")} · ${ctxResumen.equipos.length} equipos${ctxResumen.sinMc.length ? " y " + ctxResumen.sinMc.length + " baterías sin MC" : ""}${r.equiposCompletos_n ? " · " + r.equiposCompletos_n + " con cambio de equipo completo" : ""}</p>
+    ${r.orden.length ? `<div class="scroll-x-tabla" style="max-height:none;"><table class="tabla-resumen-comp"><thead><tr>${cab.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${cuerpo}</tbody></table></div>` : "<p>No hay componentes por reponer en esta lista.</p>"}
+    <p class="modal-nota">«A reponer» incluye lo pendiente, lo serializado a la espera de OK, lo listo y lo ya entregado. No cuenta lo que está «Listo (sin cambios)», rechazado o reparado. La categoría es la que se elige en «Serial a entregar».</p>
+    <div class="modal-acciones"><button type="button" class="modal-copiar">📋 Copiar tabla</button><button type="button" class="modal-cerrar">Cerrar</button></div>
+  </div>`;
+  document.body.appendChild(m);
+  const cerrar = () => m.remove();
+  m.addEventListener("click", e => { if (e.target === m || e.target.closest(".modal-x, .modal-cerrar")) cerrar(); });
+  m.querySelector(".modal-copiar").addEventListener("click", async e => {
+    try { await navigator.clipboard.writeText(textoPlano); e.target.textContent = "✅ Copiado"; } catch { e.target.textContent = "No se pudo copiar"; }
+  });
 }
 
 function claseMc(e) {

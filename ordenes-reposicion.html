@@ -20,6 +20,21 @@
   .orep-proc { background:#fff1d6; color:#8a5a00; }
   .orep-falta { background:#fde3e1; color:#a3261c; }
   .orep-reponer { background:#ff8c00; color:#fff; }
+  .btn-resumen-comp { background:var(--verde-medio, #4c8c2b); color:#fff; border:0; border-radius:10px; padding:9px 16px; font-weight:600; cursor:pointer; }
+  .modal-resumen { position:fixed; inset:0; background:rgba(20,30,22,.5); z-index:1000; display:flex; align-items:center; justify-content:center; padding:14px; }
+  .modal-resumen-caja { background:#fff; border-radius:14px; max-width:860px; width:100%; max-height:90vh; overflow:auto; padding:18px 20px; box-shadow:0 12px 40px rgba(0,0,0,.25); }
+  .modal-resumen-cab { display:flex; justify-content:space-between; align-items:center; }
+  .modal-resumen-cab h3 { margin:0; }
+  .modal-x { background:none; border:0; font-size:1.3em; cursor:pointer; color:#666; }
+  .modal-sub { color:#555; margin:6px 0 12px; }
+  .modal-nota { color:#777; font-size:.84em; margin-top:12px; }
+  .modal-acciones { display:flex; gap:10px; justify-content:flex-end; margin-top:12px; }
+  .modal-acciones button { border:0; border-radius:10px; padding:8px 14px; font-weight:600; cursor:pointer; background:var(--gris-200, #e3e8e4); }
+  .modal-acciones .modal-copiar { background:var(--verde-medio, #4c8c2b); color:#fff; }
+  .tabla-resumen-comp { width:100%; border-collapse:collapse; font-size:.92em; }
+  .tabla-resumen-comp th, .tabla-resumen-comp td { padding:7px 10px; border-top:1px solid #e8eee9; text-align:center; }
+  .tabla-resumen-comp th:first-child, .tabla-resumen-comp td:first-child { text-align:left; font-weight:600; }
+  .tabla-resumen-comp tr.res-total td { background:#f3f7f4; font-weight:700; }
   .orep-mc input[type=text], .orep-mc-sub input[type=text] { padding:7px 10px; border:1.5px solid var(--gris-200, #d5ddd6); border-radius:10px; font:inherit; font-size:.9em; background:#fff; color:inherit; }
   .orep-mc input[type=text]:focus { outline:none; border-color:var(--verde-medio, #4c8c2b); box-shadow:0 0 0 3px rgba(76,140,43,.15); }
   .orep-mc input[type=text]::placeholder { color:#9aa59d; }
@@ -106,6 +121,7 @@
   <div id="detalle" hidden>
     <h2 id="detalle-titulo" style="margin-top:26px;"></h2>
     <div id="detalle-resumen" class="resumen-cliente"></div>
+    <div style="margin:10px 0;"><button type="button" id="btn-resumen-comp" class="btn-resumen-comp">📊 Resumen de componentes</button></div>
 
     <div id="orep-tabs" class="orep-tabs">
       <button type="button" data-tab="equipos" class="orep-tab-activa">📦 Equipos</button>
