@@ -9,13 +9,18 @@ const TIPOS = ["Módulo de Control", "Lector Electrónico", "Cierre Electrónico
 const DESTINO_AMMI = "❌ Equipo dañado - Enviar a AMMI";
 
 const ESTADOS_MANUALES = [
+  "Repuesto desde stock",
   "Listo para entregar",
   "Presupuesto aprobado",
   "Presupuesto rechazado",
   "Reparado recibido",
-  "Repuesto desde stock",
   "Entregado"
 ];
+// "Repuesto desde stock" se guarda así en la base de datos, pero se muestra como "Reponer desde Stock"
+const nombreEstado = e => e === "Repuesto desde stock" ? "Reponer desde Stock" : e;
+// Piezas que el operario sí debe tocar: las que hay que reponer, o que ya llevan serial nuevo
+const ESTADOS_A_CAMBIAR = new Set(["Repuesto desde stock", "Por reponer de stock", "Presupuesto aprobado"]);
+const necesitaCambio = (c, est) => ESTADOS_A_CAMBIAR.has(est) || !!c.repo_serial_nuevo;
 // Casillas que ya no bloquean la entrega del equipo
 const RESUELTOS = new Set(["Listo para entregar", "Listo (sin cambios)", "Reparado recibido", "Sin reposición (acordado)", "Entregado"]);
 
@@ -92,10 +97,10 @@ function estadoCasilla(c) {
 // "Repuesto desde stock" + categoría: p. ej. "Repuesto desde stock · 2ª cat."
 const etiquetaEstado = (c, est) => {
   if (est === "Repuesto desde stock" && c && c.repo_serial_nuevo) est = "Serializado · pendiente de OK";
-  else if (est === "Repuesto desde stock") est = "Por reponer de stock";
+  else if (est === "Repuesto desde stock" || est === "Por reponer de stock") est = "Reponer desde Stock";
   return est + (c && c.repo_categoria ? " · " + c.repo_categoria + "ª cat." : "");
 };
-const selCategoria = c => `<select class="sel-cat" title="Categoría de la pieza que se entrega">
+const selCategoria = (c, dis = "") => `<select class="sel-cat" ${dis} title="Categoría de la pieza que se entrega">
     <option value="">Categoría…</option>
     <option value="1" ${c.repo_categoria === 1 ? "selected" : ""}>1ª categoría</option>
     <option value="2" ${c.repo_categoria === 2 ? "selected" : ""}>2ª categoría</option></select>`;
@@ -103,7 +108,8 @@ const selCategoria = c => `<select class="sel-cat" title="Categoría de la pieza
 function claseEstado(e) {
   if (e === "Entregado") return "orep-info";
   if (RESUELTOS.has(e)) return "orep-ok";
-  if (e === "Por reponer de stock" || e === "Presupuesto rechazado" || e === "Revisar destino") return "orep-falta";
+  if (e === "Repuesto desde stock" || e === "Por reponer de stock") return "orep-reponer";
+  if (e === "Presupuesto rechazado" || e === "Revisar destino") return "orep-falta";
   return "orep-proc";
 }
 
@@ -439,7 +445,7 @@ function bateriaDe(mc) { return compsOtActual.find(c => c.m_control === mc && ti
 function htmlBateriaSinMc(c) {
   const est = estadoCasilla(c);
   const opciones = ['<option value="">Automático</option>']
-    .concat(ESTADOS_MANUALES.map(e => `<option value="${e}" ${c.repo_estado === e ? "selected" : ""}>${e}</option>`)).join("");
+    .concat(ESTADOS_MANUALES.map(e => `<option value="${e}" ${c.repo_estado === e ? "selected" : ""}>${nombreEstado(e)}</option>`)).join("");
   const boton = est !== "Entregado" ? `<button type="button" class="btn-bat-entregada-id" data-id="${c.id}">🔋 Marcar batería entregada</button>` : "";
   return `<div class="orep-mc">
     <div class="orep-mc-cab"><strong>Sin MC</strong>
@@ -475,23 +481,25 @@ function htmlMc(m) {
           <option value="Se repone desde stock" ${dec === "Se repone desde stock" ? "selected" : ""}>Se repone desde stock</option>
           <option value="Sin reposición" ${dec === "Sin reposición" ? "selected" : ""}>Sin reposición (el cliente lo acepta)</option>
         </select></td>
-        <td data-label="Serial a entregar"><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td>
+        <td data-label="Serial a entregar"><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager || dec === "Se repone desde stock" ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td>
         <td data-label="Nota"><input type="text" class="inp-falt-nota" placeholder="Nota" value="${esc((f && f.nota) || "")}"></td></tr>`;
     }
     const c = x.comp;
     const est = estadoCasilla(c);
     const opciones = ['<option value="">Automático</option>']
-      .concat(ESTADOS_MANUALES.map(e => `<option value="${e}" ${c.repo_estado === e ? "selected" : ""}>${e}</option>`)).join("");
+      .concat(ESTADOS_MANUALES.map(e => `<option value="${e}" ${c.repo_estado === e ? "selected" : ""}>${nombreEstado(e)}</option>`)).join("");
     const extra = c.orden_reposicion_ot
       ? ` <button type="button" class="btn-quitar-extra" data-id="${c.id}" title="Quitar de esta orden">✕ de esta orden</button>` : "";
-    return `<tr data-id="${c.id}">
-      <td data-label="Componente">${esc(c.tipo_componente || x.tipo)}${c.orden_reposicion_ot ? `<br><small>desde ${esc(c.id_ot)}</small>` : ""}</td>
+    const bloq = !necesitaCambio(c, est);
+    const dis = bloq && !esManager ? "disabled" : "";
+    return `<tr data-id="${c.id}" class="${bloq ? "fila-bloq" : ""}">
+      <td data-label="Componente">${esc(c.tipo_componente || x.tipo)}${bloq ? ' <small>(sin cambio)</small>' : ""}${c.orden_reposicion_ot ? `<br><small>desde ${esc(c.id_ot)}</small>` : ""}</td>
       <td data-label="Serial retirado">${esc(c.serial_retirado || "—")}</td>
       <td data-label="Destino">${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}<br><small>${esc(notaCasilla(c))}</small></td>
       <td data-label="Estado"><span class="orep-badge ${claseEstado(est)}">${esc(etiquetaEstado(c, est))}</span></td>
       <td data-label="Ajuste manual"><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
-      <td data-label="Serial a entregar"><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c)}${esManager ? extra : ""}</td>
-      <td data-label="Nota"><input type="text" class="inp-nota" placeholder="Nota" value="${esc(c.repo_nota || "")}"></td>
+      <td data-label="Serial a entregar"><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" ${dis} value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c, dis)}${esManager ? extra : ""}</td>
+      <td data-label="Nota"><input type="text" class="inp-nota" placeholder="Nota" ${dis} value="${esc(c.repo_nota || "")}"></td>
     </tr>`;
   }).join("");
 
@@ -511,6 +519,13 @@ function htmlMc(m) {
     return `<span class="orep-badge orep-info">🔁 Recibe la batería OK ${esc(serial)} de ${esc(e.m_control)}</span>` +
       (serial && !esBat ? ` <button type="button" class="btn-usar-bok" data-mc="${esc(m.mc)}" data-serial="${esc(serial)}">Usar como serial a entregar</button>` : "");
   }).join(" ");
+  const aCambiar = m.casillas.map(x => {
+    if (x.comp) return necesitaCambio(x.comp, estadoCasilla(x.comp)) ? (x.comp.tipo_componente || x.tipo) : null;
+    return x.falt && x.falt.decision === "Se repone desde stock" ? x.tipo : null;
+  }).filter(Boolean);
+  const chipCambiar = aCambiar.length
+    ? `<span class="orep-chip-cambiar">🔧 Cambiar: ${esc(aCambiar.join(", "))}</span>`
+    : '<span class="orep-chip-nada">Nada que cambiar</span>';
   const otsOrigen = [...new Set(m.casillas.map(x => x.comp && x.comp.id_ot).filter(Boolean))].sort();
   const fEnt = fechasEntrega[m.mc];
   const fEntTxt = fEnt ? new Date(fEnt + "T00:00:00").toLocaleDateString("es-ES") : "sin fecha de entrega";
@@ -523,6 +538,7 @@ function htmlMc(m) {
       ${eqc.bateria_ok ? `<span class="orep-badge orep-ok">🔁 Batería OK: se usa en ${esc(eqc.bateria_ok_destino || "otro equipo")} · este equipo recibe una nueva</span>` : ""}
       ${bloqueRecibe}
       ${eqc.cambio_completo && !esBat ? '<span class="orep-badge orep-info">🔄 Equipo completo</span>' : ""}
+      ${esBat ? chipCambiar : ""}
       ${eqc.lista ? `<span class="orep-badge orep-gris">📋 ${esc(eqc.lista)}</span>` : ""}
       <span>${esc(m.cliente || "")}${detalleFaltan}${fechaEnt ? ` · entregado el ${esc(fechaEnt)}` : ""}</span>
       <span class="orep-fecha-ent" title="Fecha de entrega del equipo al cliente">📅 ${esc(fEntTxt)}</span></div>
@@ -533,6 +549,7 @@ function htmlMc(m) {
       <label style="display:flex;align-items:center;gap:6px;">
         <input type="checkbox" class="chk-eqc" data-mc="${esc(m.mc)}" ${eqc.cambio_completo ? "checked" : ""} ${esManager ? "" : "disabled"}> 🔄 Se cambia el equipo completo</label>
       <input type="text" class="inp-eqc-nota" data-mc="${esc(m.mc)}" placeholder="Nota del equipo" value="${esc(eqc.nota || "")}" ${esManager ? "" : "disabled"}>
+      ${chipCambiar}
     </div>`}
     <div class="scroll-x-tabla" style="max-height:none;"><table>
       <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th><th>Nota</th></tr></thead>
