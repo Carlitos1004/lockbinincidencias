@@ -33,6 +33,7 @@
   .orep-tabs { display:flex; gap:6px; flex-wrap:wrap; border-bottom:2px solid #d9e2dc; margin:14px 0; }
   .orep-tabs button { background:none; border:none; padding:9px 16px; font-weight:600; cursor:pointer; border-radius:8px 8px 0 0; color:#555; }
   .orep-tabs button.orep-tab-activa { background:#e6f2ea; color:#1d6b32; border-bottom:3px solid #6aa820; }
+  .orep-seccion { margin:22px 0 4px; padding-bottom:4px; border-bottom:2px solid #d9e2dc; }
   .orep-lista tr.orep-fila { cursor:pointer; }
   .orep-lista tr.orep-fila:hover { background:#f3f7f4; }
   .orep-lista tr.orep-activa { background:#e6f2ea; }
@@ -91,6 +92,11 @@
         <option value="Entregado">Entregados</option>
       </select>
       <select id="filtro-lista" class="solo-manager"></select>
+      <select id="filtro-tipo" class="solo-manager">
+        <option value="">Todos los tipos de reposición</option>
+        <option value="Piezas">Piezas / equipos</option>
+        <option value="Batería">Solo batería</option>
+      </select>
       <select id="orden-mc" class="solo-manager">
         <option value="fecha">Ordenar por fecha de entrega (antiguas primero)</option>
         <option value="mc">Ordenar por MC</option>
@@ -129,9 +135,14 @@
       </div>
       <div class="materiales-controles">
         <input type="text" id="lista-nombre" placeholder="Nombre de la lista (ej. Semana 45)">
+        <select id="lista-tipo">
+          <option value="Piezas">Tipo: piezas / equipos</option>
+          <option value="Batería">Tipo: solo batería</option>
+        </select>
+        <button type="button" id="lista-aplicar-tipo">Aplicar solo el tipo a los marcados</button>
         <button type="button" id="lista-anadir-marcados">Añadir marcados a esta lista</button>
       </div>
-      <p class="ot-meta" style="margin-top:10px;">O pega aquí los MC (uno por línea o separados por comas). Los que tengan piezas pendientes en otras OT se añaden solos a esta orden:</p>
+      <p class="ot-meta" style="margin-top:10px;">O pega aquí los MC (uno por línea o separados por comas); se les aplica el tipo elegido arriba. Los que tengan piezas pendientes en otras OT se añaden solos a esta orden:</p>
       <textarea id="lista-mcs" rows="4" style="width:100%;max-width:520px;" placeholder="MC2500123&#10;MC2500456, MC2500789"></textarea>
       <div class="materiales-controles">
         <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="lista-activa-chk" checked> Dejarla como lista activa</label>

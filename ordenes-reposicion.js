@@ -108,6 +108,22 @@ function tipoCanonico(t) {
   return l.includes("bater") ? "Batería" : t;
 }
 
+// ---------- Tipo de reposición: piezas/equipo vs solo batería ----------
+const tipoRep = mc => (equiposCompletos[mc] && equiposCompletos[mc].tipo_reposicion === "Batería") ? "Batería" : "Piezas";
+
+// En una reposición de solo batería, el equipo solo cuenta con la casilla de la batería
+function aplicarTipoBateria(m) {
+  if (tipoRep(m.mc) !== "Batería") return;
+  m.casillas = m.casillas.filter(x => x.tipo === "Batería");
+  const x = m.casillas[0];
+  const est = x ? (x.comp ? estadoCasilla(x.comp) : estadoFalt(x.falt)) : null;
+  m.faltan = (!est) ? ["Batería"] : [];
+  if (m.faltan.length) m.estadoMc = "Incompleto";
+  else if (est === "Entregado") m.estadoMc = "Entregado";
+  else if (RESUELTOS.has(est)) m.estadoMc = "Listo para entregar";
+  else m.estadoMc = "En proceso";
+}
+
 // ---------- Agrupar por MC ----------
 function agruparPorMc(comps, idOt) {
   const grupos = {};
@@ -317,6 +333,7 @@ async function recargarOt() {
 
 function renderDetalle() {
   const mcs = agruparPorMc(compsOtActual, otActual);
+  mcs.forEach(aplicarTipoBateria);
   const activa = (ordenesPorOt[otActual] || {}).lista_activa || "";
   // El operario solo ve la lista activa: no puede cambiarla ni ver el resto de la orden
   if (!esManager) listaSel = activa;
@@ -339,6 +356,8 @@ function renderDetalle() {
     if (fCat === "Presupuesto aprobado") return m.casillas.some(x => x.comp && presPorComp[String(x.comp.id)] && presPorComp[String(x.comp.id)].aprobada === true);
     return m.casillas.some(x => x.comp && categoriaCasilla(x.comp) === fCat);
   };
+  const fTipo = document.getElementById("filtro-tipo").value;
+  const cumpleTipo = m => !fTipo || tipoRep(m.mc) === fTipo;
   const cumpleLista = m => !listaSel || (listaSel === "__sin" ? !(equiposCompletos[m.mc] && equiposCompletos[m.mc].lista) : (equiposCompletos[m.mc] && equiposCompletos[m.mc].lista) === listaSel);
   // Tarjetas: cuentan solo los equipos de la lista mostrada
   const mcsLista = sinListaActiva ? [] : mcs.filter(cumpleLista);
@@ -352,8 +371,8 @@ function renderDetalle() {
   const nombreMostrado = listaSel === "__sin" ? "Equipos sin lista" : listaSel ? "📋 " + listaSel + (listaSel === activa ? " ★ activa" : "") : "Todos los equipos de la orden";
   document.getElementById("lista-banner").innerHTML = sinListaActiva
     ? "Esta orden todavía no tiene una lista de reposición activa."
-    : `Mostrando: <strong>${esc(nombreMostrado)}</strong> · ${mcsLista.length} equipos` + (esManager && activa && listaSel !== activa ? ` · <em>la lista activa para el operario es "${esc(activa)}"</em>` : "");
-  const visibles = sinListaActiva ? [] : mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc)) && (!fEst || m.estadoMc === fEst) && cumpleCat(m) && cumpleLista(m));
+    : `Mostrando: <strong>${esc(nombreMostrado)}</strong> · ${mcsLista.length} equipos (${mcsLista.filter(m => tipoRep(m.mc) !== "Batería").length} de piezas/equipo · ${mcsLista.filter(m => tipoRep(m.mc) === "Batería").length} solo batería)` + (esManager && activa && listaSel !== activa ? ` · <em>la lista activa para el operario es "${esc(activa)}"</em>` : "");
+  const visibles = sinListaActiva ? [] : mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc)) && (!fEst || m.estadoMc === fEst) && cumpleCat(m) && cumpleLista(m) && cumpleTipo(m));
   // Orden: por fecha de entrega al cliente, de la más antigua a la más reciente (sin fecha, al final)
   const modoOrden = document.getElementById("orden-mc").value;
   if (modoOrden === "fecha") {
@@ -363,8 +382,11 @@ function renderDetalle() {
     });
   }
 
+  const delTipoPiezas = visibles.filter(m => tipoRep(m.mc) !== "Batería");
+  const delTipoBat = visibles.filter(m => tipoRep(m.mc) === "Batería");
+  const seccion = (titulo, arr) => arr.length ? `<h3 class="orep-seccion">${titulo} (${arr.length})</h3>` + arr.map(htmlMc).join("") : "";
   document.getElementById("lista-mc").innerHTML = visibles.length
-    ? visibles.map(htmlMc).join("")
+    ? seccion("📦 Reposición de piezas / equipos", delTipoPiezas) + seccion("🔋 Reposición de solo batería", delTipoBat)
     : `<p>${sinListaActiva ? "No hay nada que reponer por ahora." : "Ningún equipo coincide."}</p>`;
 
   const sinMc = compsOtActual.filter(c => !c.m_control);
@@ -414,8 +436,11 @@ function htmlMc(m) {
   }).join("");
 
   const fechaEnt = m.casillas.map(x => x.comp && x.comp.repo_fecha_entrega).filter(Boolean)[0];
-  const botonEntrega = m.estadoMc === "Listo para entregar"
-    ? `<button type="button" class="btn-entregar" data-mc="${esc(m.mc)}">📦 Marcar equipo entregado</button>` : "";
+  const esBat = tipoRep(m.mc) === "Batería";
+  const botonEntrega = esBat
+    ? (m.estadoMc !== "Entregado" ? `<button type="button" class="btn-bat-entregada" data-mc="${esc(m.mc)}">🔋 Marcar batería entregada</button>` : "")
+    : (m.estadoMc === "Listo para entregar"
+      ? `<button type="button" class="btn-entregar" data-mc="${esc(m.mc)}">📦 Marcar equipo entregado</button>` : "");
   const detalleFaltan = m.faltan.length ? ` · faltan: ${esc(m.faltan.join(", "))}` : "";
 
   const eqc = equiposCompletos[m.mc] || {};
@@ -426,15 +451,16 @@ function htmlMc(m) {
       ${esManager ? `<input type="checkbox" class="chk-sel-mc" data-mc="${esc(m.mc)}" title="Marcar para añadir a una lista">` : ""}
       <strong>${esc(m.mc)}</strong>
       <span class="orep-badge ${claseMc(m.estadoMc)}">${esc(m.estadoMc)}</span>
-      ${eqc.cambio_completo ? '<span class="orep-badge orep-info">🔄 Equipo completo</span>' : ""}
+      ${esBat ? '<span class="orep-badge orep-info">🔋 Solo batería</span>' : ""}
+      ${eqc.cambio_completo && !esBat ? '<span class="orep-badge orep-info">🔄 Equipo completo</span>' : ""}
       ${eqc.lista ? `<span class="orep-badge orep-gris">📋 ${esc(eqc.lista)}</span>` : ""}
       <span>${esc(m.cliente || "")}${detalleFaltan}${fechaEnt ? ` · entregado el ${esc(fechaEnt)}` : ""}</span>
       <span class="orep-fecha-ent" title="Fecha de entrega del equipo al cliente">📅 ${esc(fEntTxt)}</span></div>
-    <div class="orep-mc-sub">
+    ${esBat ? "" : `<div class="orep-mc-sub">
       <label style="display:flex;align-items:center;gap:6px;">
         <input type="checkbox" class="chk-eqc" data-mc="${esc(m.mc)}" ${eqc.cambio_completo ? "checked" : ""} ${esManager ? "" : "disabled"}> 🔄 Se cambia el equipo completo</label>
       <input type="text" class="inp-eqc-nota" data-mc="${esc(m.mc)}" placeholder="Nota del equipo" value="${esc(eqc.nota || "")}" ${esManager ? "" : "disabled"}>
-    </div>
+    </div>`}
     <div class="scroll-x-tabla" style="max-height:none;"><table>
       <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th><th>Nota</th></tr></thead>
       <tbody>${filas}</tbody></table></div>
@@ -523,6 +549,7 @@ async function guardarComp(id, cambios, recargar = true) {
 
 async function entregarEquipo(mc) {
   const grupo = agruparPorMc(compsOtActual, otActual).find(m => m.mc === mc);
+  if (grupo) aplicarTipoBateria(grupo);
   if (!grupo || grupo.estadoMc !== "Listo para entregar") return;
   if (!confirm(`¿Marcar ${mc} como entregado al cliente? Se marcarán sus 4 componentes.`)) return;
   const fecha = hoy();
@@ -552,6 +579,7 @@ async function entregarEquipo(mc) {
 document.getElementById("filtro-mc").addEventListener("input", () => otActual && renderDetalle());
 document.getElementById("filtro-estado-mc").addEventListener("change", () => otActual && renderDetalle());
 document.getElementById("filtro-categoria").addEventListener("change", () => otActual && renderDetalle());
+document.getElementById("filtro-tipo").addEventListener("change", () => otActual && renderDetalle());
 document.getElementById("orden-mc").addEventListener("change", () => otActual && renderDetalle());
 document.getElementById("filtro-lista").addEventListener("change", e => { listaSel = e.target.value; if (otActual) renderDetalle(); });
 
@@ -632,11 +660,15 @@ document.getElementById("lote-anadir").addEventListener("click", async () => {
 // ---------- Listas de reposición (lo que se repone ahora) ----------
 const entregadaC = c => c.repo_estado === "Entregado" || ((c.destino || "").includes("Devolver al cliente") && !!c.devuelto);
 
-async function guardarListaEquipos(mcs, lista) {
-  const filas = mcs.map(mc => ({ id_ot: otActual, m_control: mc, lista, actualizado_en: new Date().toISOString() }));
+async function guardarListaEquipos(mcs, lista, tipo) {
+  const filas = mcs.map(mc => {
+    const f = { id_ot: otActual, m_control: mc, lista, actualizado_en: new Date().toISOString() };
+    if (tipo) f.tipo_reposicion = tipo;
+    return f;
+  });
   for (let i = 0; i < filas.length; i += 200) {
     const { error } = await supabaseClient.from("reposicion_equipos").upsert(filas.slice(i, i + 200), { onConflict: "id_ot,m_control" });
-    if (error) { alert("No se pudo guardar la lista: " + error.message + "\n(¿Corriste el SQL 87?)"); return false; }
+    if (error) { alert("No se pudo guardar la lista: " + error.message + "\n(¿Corriste los SQL 87 y 88?)"); return false; }
   }
   return true;
 }
@@ -675,7 +707,8 @@ document.getElementById("lista-crear").addEventListener("click", async () => {
     }
   }
   const listables = mcs.filter(m => !sinPiezas.includes(m));
-  if (!(await guardarListaEquipos(listables, nombre))) { msg.textContent = ""; return; }
+  const tipoSel = document.getElementById("lista-tipo").value;
+  if (!(await guardarListaEquipos(listables, nombre, tipoSel))) { msg.textContent = ""; return; }
   if (document.getElementById("lista-activa-chk").checked) await ponerListaActiva(nombre);
   listaSel = nombre;
   msg.innerHTML = `✅ Lista "${esc(nombre)}": ${listables.length} equipos.` +
@@ -690,7 +723,7 @@ document.getElementById("lista-anadir-marcados").addEventListener("click", async
   const mcs = [...document.querySelectorAll(".chk-sel-mc:checked")].map(c => c.dataset.mc);
   if (!nombre) { msg.textContent = "⚠️ Escribe el nombre de la lista."; return; }
   if (!mcs.length) { msg.textContent = "⚠️ Marca equipos con la casilla de su cabecera."; return; }
-  if (await guardarListaEquipos(mcs, nombre)) { msg.textContent = `✅ ${mcs.length} equipos añadidos a "${nombre}".`; await recargarOt(); }
+  if (await guardarListaEquipos(mcs, nombre, document.getElementById("lista-tipo").value)) { msg.textContent = `✅ ${mcs.length} equipos añadidos a "${nombre}".`; await recargarOt(); }
 });
 
 document.getElementById("lista-quitar-marcados").addEventListener("click", async () => {
@@ -719,3 +752,31 @@ function mostrarPestana(id) {
   document.querySelectorAll("#orep-tabs button").forEach(b => b.classList.toggle("orep-tab-activa", b.dataset.tab === id));
 }
 document.querySelectorAll("#orep-tabs button").forEach(b => b.addEventListener("click", () => mostrarPestana(b.dataset.tab)));
+
+// Cambiar solo el tipo de reposición de los equipos marcados (sin tocar su lista)
+document.getElementById("lista-aplicar-tipo").addEventListener("click", async () => {
+  const msg = document.getElementById("lista-msg");
+  const mcs = [...document.querySelectorAll(".chk-sel-mc:checked")].map(c => c.dataset.mc);
+  const tipo = document.getElementById("lista-tipo").value;
+  if (!mcs.length) { msg.textContent = "⚠️ Marca equipos con la casilla de su cabecera."; return; }
+  const filas = mcs.map(mc => ({ id_ot: otActual, m_control: mc, tipo_reposicion: tipo, actualizado_en: new Date().toISOString() }));
+  for (let i = 0; i < filas.length; i += 200) {
+    const { error } = await supabaseClient.from("reposicion_equipos").upsert(filas.slice(i, i + 200), { onConflict: "id_ot,m_control" });
+    if (error) { alert("No se pudo guardar: " + error.message + "\n(¿Corriste el SQL 88?)"); return; }
+  }
+  msg.textContent = `✅ ${mcs.length} equipos marcados como "${tipo === "Batería" ? "solo batería" : "piezas / equipo"}".`;
+  await recargarOt();
+});
+
+// Entrega directa de una reposición de solo batería
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".btn-bat-entregada");
+  if (!btn) return;
+  const mc = btn.dataset.mc;
+  const grupo = agruparPorMc(compsOtActual, otActual).find(m => m.mc === mc);
+  const comp = grupo && (grupo.casillas.find(x => x.tipo === "Batería") || {}).comp;
+  if (!comp) { alert("Este equipo no tiene una batería registrada en la orden. Usa la decisión de la pieza que no llegó."); return; }
+  const cambios = { repo_estado: "Entregado", repo_fecha_entrega: hoy() };
+  if ((comp.destino || "").includes("Devolver al cliente")) { cambios.devuelto = true; cambios.devuelto_en = new Date().toISOString(); }
+  if (await guardarComp(comp.id, cambios, false)) { await recargarOt(); cargarOts(); }
+});
