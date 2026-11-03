@@ -1,46 +1,10 @@
 // =========================================================================
 // PANEL DEL CLIENTE — página principal
-// Solo el saludo y el resumen rápido (equipos totales / con alarma). El
-// resto vive en sus propias páginas: cliente-equipos.html,
-// cliente-cambios.html, cliente-fallas.html.
+// Por ahora solo el saludo y el acceso a "Cambio de equipos y componentes".
+// (La vista de equipos, las alarmas y el reporte de fallas se retiraron del
+// panel; sus páginas siguen en el proyecto: cliente-equipos.html,
+// cliente-fallas.html.)
 // =========================================================================
-
-const MAPA_ALARMAS = {
-  alarma_error_servo: "Error servo",
-  alarma_vuelco: "Vuelco",
-  alarma_incendio: "Incendio",
-  alarma_bloqueado: "Bloqueado",
-  alarma_sin_bateria: "Sin batería",
-  alarma_tapa_abierta: "Tapa abierta",
-  alarma_cambiar_bateria: "Batería Crítica",
-  alarma_cambiar_ubicacion: "Cambiar ubicación",
-  alarma_revisar_comunicacion: "Revisar comunicación",
-  alarma_operacion_erratica: "Operación errática"
-};
-
-// Trae TODAS las filas sin toparse con el límite de 1000 por página que
-// aplica Supabase por defecto — necesario porque "equipos" ya pasa de 5000.
-async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
-  const TAM_PAGINA = 1000;
-  let desde = 0;
-  let todas = [];
-  while (true) {
-    let query = supabaseClient.from(tabla).select(columnas).range(desde, desde + TAM_PAGINA - 1);
-    if (aplicarFiltro) query = aplicarFiltro(query);
-    const { data, error } = await query;
-    if (error) throw error;
-    todas = todas.concat(data || []);
-    if (!data || data.length < TAM_PAGINA) break;
-    desde += TAM_PAGINA;
-  }
-  return todas;
-}
-
-// Solo los equipos con Estado de Montaje = Instalado (no Pendiente ni Revisión).
-function esInstalado(eq) {
-  const e = String(eq.estado_montaje || "").toLowerCase();
-  return e.includes("instala") && !e.includes("pendien");
-}
 
 async function cargarInicioCliente() {
   const { data: { user } } = await supabaseClient.auth.getUser();
@@ -51,26 +15,9 @@ async function cargarInicioCliente() {
     .eq("id", user.id)
     .single();
 
-  // El saludo usa cliente_nombre en vez de "nombre" — el campo "nombre" del
-  // perfil puede tener cosas como "Contacto Porto" (como lo haya escrito
-  // el Manager al crear el usuario), mientras que cliente_nombre siempre
-  // es el nombre limpio del cliente.
+  // El saludo usa cliente_nombre (nombre limpio del cliente), no "nombre".
   const spanSaludo = document.getElementById("nombre-usuario");
   if (spanSaludo) spanSaludo.textContent = perfil?.cliente_nombre || "—";
-
-  try {
-    const todos = await traerTodasLasFilas("equipos", "*", (q) => q.order("m_control"));
-    const equiposCliente = todos.filter(esInstalado);
-    const total = equiposCliente.length;
-    const conAlarma = equiposCliente.filter(eq => Object.keys(MAPA_ALARMAS).some(col => eq[col])).length;
-
-    document.getElementById("resumen-cliente").innerHTML = `
-      <div class="tarjeta-resumen"><strong>${total}</strong><span>Equipos instalados</span></div>
-      <div class="tarjeta-resumen ${conAlarma > 0 ? 'tarjeta-alerta' : ''}"><strong>${conAlarma}</strong><span>Con alguna alarma activa</span></div>
-    `;
-  } catch (err) {
-    document.getElementById("resumen-cliente").innerHTML = `<div class="tarjeta-resumen"><strong>—</strong><span>Error: ${err.message}</span></div>`;
-  }
 }
 
 cargarInicioCliente();
