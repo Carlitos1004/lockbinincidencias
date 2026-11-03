@@ -84,6 +84,11 @@ function estadoFalt(f) {
 // ---------- Estado de una casilla ----------
 function estadoCasilla(c) {
   if (c.repo_estado) return c.repo_estado;
+  // Por defecto todo se repone desde stock, salvo lo que está bien o ya entregado
+  const auto = estadoAutomatico(c);
+  return (auto === "Listo (sin cambios)" || auto === "Entregado") ? auto : "Repuesto desde stock";
+}
+function estadoAutomatico(c) {
   const d = c.destino || "";
   if (!d || c.estado === "Pendiente revisión" || d.includes("Sigue en revisión")) return "En revisión";
   if (d.includes("Devolver al cliente")) return c.devuelto ? "Entregado" : "Listo (sin cambios)";
@@ -445,7 +450,7 @@ function bateriaDe(mc) { return compsOtActual.find(c => c.m_control === mc && ti
 function htmlBateriaSinMc(c) {
   const est = estadoCasilla(c);
   const opciones = ['<option value="">Automático</option>']
-    .concat(ESTADOS_MANUALES.map(e => `<option value="${e}" ${c.repo_estado === e ? "selected" : ""}>${nombreEstado(e)}</option>`)).join("");
+    .concat(ESTADOS_MANUALES.map(e => `<option value="${e}" ${(c.repo_estado || (est === "Repuesto desde stock" ? "Repuesto desde stock" : "")) === e ? "selected" : ""}>${nombreEstado(e)}</option>`)).join("");
   const boton = est !== "Entregado" ? `<button type="button" class="btn-bat-entregada-id" data-id="${c.id}">🔋 Marcar batería entregada</button>` : "";
   return `<div class="orep-mc">
     <div class="orep-mc-cab"><strong>Sin MC</strong>
@@ -481,16 +486,16 @@ function htmlMc(m) {
           <option value="Se repone desde stock" ${dec === "Se repone desde stock" ? "selected" : ""}>Se repone desde stock</option>
           <option value="Sin reposición" ${dec === "Sin reposición" ? "selected" : ""}>Sin reposición (el cliente lo acepta)</option>
         </select></td>
-        <td data-label="Serial a entregar"><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager || dec === "Se repone desde stock" ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td>
+        <td data-label="Serial a entregar"><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td>
         <td data-label="Nota"><input type="text" class="inp-falt-nota" placeholder="Nota" value="${esc((f && f.nota) || "")}"></td></tr>`;
     }
     const c = x.comp;
     const est = estadoCasilla(c);
     const opciones = ['<option value="">Automático</option>']
-      .concat(ESTADOS_MANUALES.map(e => `<option value="${e}" ${c.repo_estado === e ? "selected" : ""}>${nombreEstado(e)}</option>`)).join("");
+      .concat(ESTADOS_MANUALES.map(e => `<option value="${e}" ${(c.repo_estado || (est === "Repuesto desde stock" ? "Repuesto desde stock" : "")) === e ? "selected" : ""}>${nombreEstado(e)}</option>`)).join("");
     const extra = c.orden_reposicion_ot
       ? ` <button type="button" class="btn-quitar-extra" data-id="${c.id}" title="Quitar de esta orden">✕ de esta orden</button>` : "";
-    const bloq = !necesitaCambio(c, est);
+    const bloq = false;
     const dis = bloq && !esManager ? "disabled" : "";
     return `<tr data-id="${c.id}" class="${bloq ? "fila-bloq" : ""}">
       <td data-label="Componente">${esc(c.tipo_componente || x.tipo)}${bloq ? ' <small>(sin cambio)</small>' : ""}${c.orden_reposicion_ot ? `<br><small>desde ${esc(c.id_ot)}</small>` : ""}</td>
@@ -577,7 +582,7 @@ function enlazarEventos() {
       const c = compsOtActual.find(x => String(x.id) === String(id)) || {};
       const cambios = { repo_serial_nuevo: val };
       // Con el serial puesto, la pieza queda lista para entregar; si se borra, vuelve a su estado automático
-      if (val && (!c.repo_estado || c.repo_estado === "Presupuesto aprobado")) cambios.repo_estado = "Listo para entregar";
+      // El serial no cambia el estado: la pieza queda "pendiente de OK" hasta que el manager la marque lista
       if (!val && c.repo_estado === "Listo para entregar") cambios.repo_estado = null;
       await guardarComp(id, cambios, true);
     }));
@@ -869,7 +874,6 @@ document.addEventListener("click", async (e) => {
   const comp = grupo && (grupo.casillas.find(x => x.tipo === "Batería") || {}).comp;
   if (!comp) { alert("Este equipo no tiene la batería registrada en la orden."); return; }
   const cambios = { repo_serial_nuevo: btn.dataset.serial, repo_categoria: 2 };
-  if (!comp.repo_estado || comp.repo_estado === "Presupuesto aprobado") cambios.repo_estado = "Listo para entregar";
   if (await guardarComp(comp.id, cambios, true)) cargarOts();
 });
 
