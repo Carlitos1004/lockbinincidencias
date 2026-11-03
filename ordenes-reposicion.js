@@ -43,7 +43,7 @@ function codigoOrden(numero) { return "REP-" + String(numero).padStart(3, "0"); 
 
 const CAMPOS = "id, m_control, tipo_componente, serial_retirado, id_ot, cliente, estado, destino, " +
   "vandalismo, garantia_cliente, devuelto, devuelto_en, repo_estado, repo_serial_nuevo, " +
-  "repo_fecha_entrega, orden_reposicion_ot, repo_nota, cliente_original, repo_lista";
+  "repo_fecha_entrega, orden_reposicion_ot, repo_nota, cliente_original, repo_lista, repo_categoria";
 
 // Supabase devuelve como máximo 1000 filas por consulta: pedimos por páginas
 async function traerComps(filtroOr) {
@@ -77,6 +77,13 @@ function estadoCasilla(c) {
   if (d.includes("Stock") || d.includes("Desechar")) return "Por reponer de stock";
   return "Revisar destino";
 }
+
+// "Repuesto desde stock" + categoría: p. ej. "Repuesto desde stock · 2ª cat."
+const etiquetaEstado = (c, est) => est + (c && c.repo_categoria ? " · " + c.repo_categoria + "ª cat." : "");
+const selCategoria = c => `<select class="sel-cat" title="Categoría de la pieza que se entrega">
+    <option value="">Categoría…</option>
+    <option value="1" ${c.repo_categoria === 1 ? "selected" : ""}>1ª categoría</option>
+    <option value="2" ${c.repo_categoria === 2 ? "selected" : ""}>2ª categoría</option></select>`;
 
 function claseEstado(e) {
   if (e === "Entregado") return "orep-info";
@@ -435,9 +442,9 @@ function htmlBateriaSinMc(c) {
         <td>${esc(c.tipo_componente || "Batería")}<br><small>desde ${esc(c.id_ot || "—")}</small></td>
         <td>${esc(c.serial_retirado || "—")}</td>
         <td>${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}</td>
-        <td><span class="orep-badge ${claseEstado(est)}">${esc(est)}</span></td>
+        <td><span class="orep-badge ${claseEstado(est)}">${esc(etiquetaEstado(c, est))}</span></td>
         <td><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
-        <td><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}"></td>
+        <td><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c)}</td>
         <td><input type="text" class="inp-nota" placeholder="Nota" value="${esc(c.repo_nota || "")}"></td>
       </tr></tbody></table></div>
     <div class="orep-acciones">${boton}</div>
@@ -471,9 +478,9 @@ function htmlMc(m) {
       <td>${esc(c.tipo_componente || x.tipo)}${c.orden_reposicion_ot ? `<br><small>desde ${esc(c.id_ot)}</small>` : ""}</td>
       <td>${esc(c.serial_retirado || "—")}</td>
       <td>${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}<br><small>${esc(notaCasilla(c))}</small></td>
-      <td><span class="orep-badge ${claseEstado(est)}">${esc(est)}</span></td>
+      <td><span class="orep-badge ${claseEstado(est)}">${esc(etiquetaEstado(c, est))}</span></td>
       <td><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
-      <td><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}">${esManager ? extra : ""}</td>
+      <td><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c)}${esManager ? extra : ""}</td>
       <td><input type="text" class="inp-nota" placeholder="Nota" value="${esc(c.repo_nota || "")}"></td>
     </tr>`;
   }).join("");
@@ -565,6 +572,18 @@ function enlazarEventos() {
     inp.addEventListener("change", () => guardarFalt(inp.closest("tr"))));
   document.querySelectorAll(".fila-falt .inp-falt-serial").forEach(inp =>
     inp.addEventListener("change", () => guardarFalt(inp.closest("tr"))));
+
+  document.querySelectorAll(".sel-cat").forEach(sel =>
+    sel.addEventListener("change", async () => {
+      const id = sel.closest("tr").dataset.id;
+      const c = compsOtActual.find(x => String(x.id) === String(id)) || {};
+      const cambios = { repo_categoria: sel.value ? parseInt(sel.value, 10) : null };
+      // Elegir categoría = se repone desde stock (si aún no tenía un estado manual)
+      if (sel.value && (!c.repo_estado || c.repo_estado === "Presupuesto aprobado" || c.repo_estado === "Listo para entregar")) {
+        cambios.repo_estado = c.repo_serial_nuevo ? "Listo para entregar" : "Repuesto desde stock";
+      }
+      if (await guardarComp(id, cambios, true)) cargarOts();
+    }));
 
   document.querySelectorAll(".inp-nota").forEach(inp =>
     inp.addEventListener("change", async () => {
@@ -820,7 +839,7 @@ document.addEventListener("click", async (e) => {
   const grupo = agruparPorMc(compsOtActual, otActual).find(m => m.mc === btn.dataset.mc);
   const comp = grupo && (grupo.casillas.find(x => x.tipo === "Batería") || {}).comp;
   if (!comp) { alert("Este equipo no tiene la batería registrada en la orden."); return; }
-  const cambios = { repo_serial_nuevo: btn.dataset.serial };
+  const cambios = { repo_serial_nuevo: btn.dataset.serial, repo_categoria: 2 };
   if (!comp.repo_estado || comp.repo_estado === "Presupuesto aprobado") cambios.repo_estado = "Listo para entregar";
   if (await guardarComp(comp.id, cambios, true)) cargarOts();
 });
@@ -923,6 +942,7 @@ function renderListas() {
 async function procesarPegado(nombre, texto, tipo, activar, msg) {
   const tokens = [...new Set(texto.toUpperCase().match(/(MC|BA)\d+/g) || [])];
   const mcs = tokens.filter(t => t.startsWith("MC"));
+  const mcsDeBateria = [];   // equipos que entran por el serial de su batería: solo se les cambia la batería
   const serialesBA = tokens.filter(t => t.startsWith("BA"));
   if (!nombre) { msg.textContent = "⚠️ Ponle un nombre a la lista."; return false; }
   if (!tokens.length) { msg.textContent = "⚠️ Pega al menos un MC (MC2500123…) o un serial de batería (BA2500123…)."; return false; }
@@ -937,14 +957,14 @@ async function procesarPegado(nombre, texto, tipo, activar, msg) {
     for (const ba of serialesBA) {
       const c = piezasBA.find(x => x.serial_retirado === ba && !entregadaC(x)) || piezasBA.find(x => x.serial_retirado === ba);
       if (!c) { batNoEncontradas.push(ba); continue; }
-      if (c.m_control) { if (!mcs.includes(c.m_control)) mcs.push(c.m_control); continue; }
+      if (c.m_control) { if (!mcs.includes(c.m_control) && !mcsDeBateria.includes(c.m_control)) mcsDeBateria.push(c.m_control); continue; }
       const { error } = await supabaseClient.from("componentes_retirados").update({ orden_reposicion_ot: otActual, repo_lista: nombre }).eq("id", c.id);
       if (error) { msg.textContent = "❌ No se pudo añadir la batería " + ba + ": " + error.message + " (¿SQL 89?)"; return false; }
       batSinMc.push(ba);
     }
   }
   const enOrden = new Set(compsOtActual.map(c => c.m_control));
-  const fuera = mcs.filter(m => !enOrden.has(m));
+  const fuera = [...mcs, ...mcsDeBateria].filter(m => !enOrden.has(m));
   const anadidos = [], sinPiezas = [];
   if (fuera.length) {
     const pendientes = [];
@@ -962,10 +982,14 @@ async function procesarPegado(nombre, texto, tipo, activar, msg) {
     }
   }
   const listables = mcs.filter(m => !sinPiezas.includes(m));
+  const listablesBat = mcsDeBateria.filter(m => !sinPiezas.includes(m));
   if (listables.length && !(await guardarListaEquipos(listables, nombre, tipo))) { msg.textContent = ""; return false; }
+  if (listablesBat.length && !(await guardarListaEquipos(listablesBat, nombre, "Batería"))) { msg.textContent = ""; return false; }
   if (activar) await ponerListaActiva(nombre);
   listaSel = nombre; listaAbierta = nombre;
-  msg.innerHTML = `✅ Lista "${esc(nombre)}": ${listables.length} equipos` + (batSinMc.length ? ` y ${batSinMc.length} baterías sin MC` : "") + " añadidos." +
+  msg.innerHTML = `✅ Lista "${esc(nombre)}": ${listables.length} equipos` +
+    (listablesBat.length ? `, ${listablesBat.length} baterías de equipos con MC como solo batería (${esc(listablesBat.join(", "))})` : "") +
+    (batSinMc.length ? `, ${batSinMc.length} baterías sin MC (${esc(batSinMc.join(", "))})` : "") + " añadidos." +
     (anadidos.length ? ` ${anadidos.length} se trajeron desde otras OT.` : "") +
     (sinPiezas.length ? `<br>⚠️ Sin piezas pendientes en la base, no entran: ${esc(sinPiezas.join(", "))}` : "") +
     (batNoEncontradas.length ? `<br>⚠️ Baterías no encontradas: ${esc(batNoEncontradas.join(", "))}` : "");
