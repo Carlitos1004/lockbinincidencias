@@ -20,7 +20,7 @@ const codigo = n => "PRE-" + String(n).padStart(3, "0");
 const hoy = () => new Date().toISOString().slice(0, 10);
 const fmt = f => f ? new Date(f + "T00:00:00").toLocaleDateString("es-ES") : "—";
 
-const ESTADOS_REPUESTA = ["Repuesto desde stock", "Entregado", "Reparado recibido"];
+const ESTADOS_REPUESTA = ["Listo para entregar", "Entregado", "Reparado recibido"];
 const esClaveComp = id => id && !String(id).startsWith("T");
 function infoLinea(l) { return esClaveComp(l.componente_id) ? (compInfo[String(l.componente_id)] || null) : null; }
 let detectadoPorLinea = {}; // linea.id -> {serial, ot} cambio hecho en ruta DESPUÉS de aprobar el presupuesto

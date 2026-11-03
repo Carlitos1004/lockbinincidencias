@@ -17,7 +17,7 @@ const ESTADOS_MANUALES = [
   "Entregado"
 ];
 // Casillas que ya no bloquean la entrega del equipo
-const RESUELTOS = new Set(["Listo para entregar", "Listo (sin cambios)", "Reparado recibido", "Repuesto desde stock", "Sin reposición (acordado)", "Entregado"]);
+const RESUELTOS = new Set(["Listo para entregar", "Listo (sin cambios)", "Reparado recibido", "Sin reposición (acordado)", "Entregado"]);
 
 let otsManuales = [];
 let filaHistoricaHtml = "";
@@ -72,7 +72,8 @@ async function traerComps(filtroOr) {
 function estadoFalt(f) {
   if (!f || !f.decision) return null;
   if (f.entregado) return "Entregado";
-  return f.decision === "Se repone desde stock" ? "Repuesto desde stock" : "Sin reposición (acordado)";
+  if (f.decision === "Se repone desde stock") return f.serial_nuevo ? "Listo para entregar" : "Repuesto desde stock";
+  return "Sin reposición (acordado)";
 }
 
 // ---------- Estado de una casilla ----------
@@ -89,7 +90,11 @@ function estadoCasilla(c) {
 }
 
 // "Repuesto desde stock" + categoría: p. ej. "Repuesto desde stock · 2ª cat."
-const etiquetaEstado = (c, est) => est + (c && c.repo_categoria ? " · " + c.repo_categoria + "ª cat." : "");
+const etiquetaEstado = (c, est) => {
+  if (est === "Repuesto desde stock" && c && c.repo_serial_nuevo) est = "Serializado · pendiente de OK";
+  else if (est === "Repuesto desde stock") est = "Por reponer de stock";
+  return est + (c && c.repo_categoria ? " · " + c.repo_categoria + "ª cat." : "");
+};
 const selCategoria = c => `<select class="sel-cat" title="Categoría de la pieza que se entrega">
     <option value="">Categoría…</option>
     <option value="1" ${c.repo_categoria === 1 ? "selected" : ""}>1ª categoría</option>
@@ -586,8 +591,8 @@ function enlazarEventos() {
       const c = compsOtActual.find(x => String(x.id) === String(id)) || {};
       const cambios = { repo_categoria: sel.value ? parseInt(sel.value, 10) : null };
       // Elegir categoría = se repone desde stock (si aún no tenía un estado manual)
-      if (sel.value && (!c.repo_estado || c.repo_estado === "Presupuesto aprobado" || c.repo_estado === "Listo para entregar")) {
-        cambios.repo_estado = c.repo_serial_nuevo ? "Listo para entregar" : "Repuesto desde stock";
+      if (sel.value && (!c.repo_estado || c.repo_estado === "Presupuesto aprobado")) {
+        cambios.repo_estado = "Repuesto desde stock";
       }
       if (await guardarComp(id, cambios, true)) cargarOts();
     }));
