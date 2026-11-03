@@ -26,7 +26,7 @@ function infoLinea(l) { return esClaveComp(l.componente_id) ? (compInfo[String(l
 let detectadoPorLinea = {}; // linea.id -> {serial, ot} cambio hecho en ruta DESPUÉS de aprobar el presupuesto
 function estaRepuesta(l) {
   const i = infoLinea(l);
-  return !!(detectadoPorLinea[l.id] || (i && (ESTADOS_REPUESTA.includes(i.repo_estado) || i.repo_serial_nuevo)));
+  return !!(detectadoPorLinea[l.id] || (i && ESTADOS_REPUESTA.includes(i.repo_estado)));
 }
 const canonTipo = t => /bater/i.test(t || "") ? "Batería" : (t || "");
 

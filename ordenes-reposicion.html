@@ -82,6 +82,10 @@
 
     <div id="tab-equipos">
       <p id="lista-banner" class="ot-meta" style="font-size:.95em;"></p>
+      <div class="orep-tabs" id="sub-tabs">
+        <button type="button" id="sub-piezas" class="orep-tab-activa">📦 Equipos</button>
+        <button type="button" id="sub-bat">🔋 Baterías</button>
+      </div>
     <div class="materiales-controles">
       <input type="text" id="filtro-mc" placeholder="Filtrar por MC...">
       <select id="filtro-estado-mc">
@@ -92,11 +96,6 @@
         <option value="Entregado">Entregados</option>
       </select>
       <select id="filtro-lista" class="solo-manager"></select>
-      <select id="filtro-tipo" class="solo-manager">
-        <option value="">Todos los tipos de reposición</option>
-        <option value="Piezas">Piezas / equipos</option>
-        <option value="Batería">Solo batería</option>
-      </select>
       <select id="orden-mc" class="solo-manager">
         <option value="fecha">Ordenar por fecha de entrega (antiguas primero)</option>
         <option value="mc">Ordenar por MC</option>
@@ -142,12 +141,15 @@
         <button type="button" id="lista-aplicar-tipo">Aplicar solo el tipo a los marcados</button>
         <button type="button" id="lista-anadir-marcados">Añadir marcados a esta lista</button>
       </div>
-      <p class="ot-meta" style="margin-top:10px;">O pega aquí los MC (uno por línea o separados por comas); se les aplica el tipo elegido arriba. Los que tengan piezas pendientes en otras OT se añaden solos a esta orden:</p>
+      <p class="ot-meta" style="margin-top:10px;">O pega aquí MC y/o seriales de batería (BA…), uno por línea o separados por comas; se les aplica el tipo elegido arriba. Una batería sin MC entra sola en la pestaña Baterías. Los que tengan piezas pendientes en otras OT se añaden solos a esta orden:</p>
       <textarea id="lista-mcs" rows="4" style="width:100%;max-width:520px;" placeholder="MC2500123&#10;MC2500456, MC2500789"></textarea>
       <div class="materiales-controles">
         <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="lista-activa-chk" checked> Dejarla como lista activa</label>
         <button type="button" id="lista-crear" class="btn-primario">Crear lista con estos MC</button>
       </div>
+      <p class="ot-meta" style="margin-top:14px;">Baterías OK que se reutilizan en otros equipos (pega los MC de los equipos cuya batería está OK; a esos se les repone una nueva):</p>
+      <textarea id="lista-bok" rows="2" style="width:100%;max-width:520px;" placeholder="MC2500785&#10;MC2500283"></textarea>
+      <div class="materiales-controles"><button type="button" id="lista-bok-aplicar">Marcar como batería OK reutilizable</button></div>
       <p class="ot-meta" id="lista-msg"></p>
     </div>
 
