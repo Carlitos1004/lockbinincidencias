@@ -494,10 +494,10 @@ function htmlMc(m) {
       .concat(ESTADOS_MANUALES.map(e => `<option value="${e}" ${(c.repo_estado || (est === "Repuesto desde stock" ? "Repuesto desde stock" : "")) === e ? "selected" : ""}>${nombreEstado(e)}</option>`)).join("");
     const extra = c.orden_reposicion_ot
       ? ` <button type="button" class="btn-quitar-extra" data-id="${c.id}" title="Quitar de esta orden">✕ de esta orden</button>` : "";
-    const bloq = false;
-    const dis = bloq && !esManager ? "disabled" : "";
+    const bloq = est === "Listo (sin cambios)" && !esManager; // el operario no toca lo que no se cambia
+    const dis = bloq ? "disabled" : "";
     return `<tr data-id="${c.id}" class="${bloq ? "fila-bloq" : ""}">
-      <td data-label="Componente">${esc(c.tipo_componente || x.tipo)}${bloq ? ' <small>(sin cambio)</small>' : ""}${c.orden_reposicion_ot ? `<br><small>desde ${esc(c.id_ot)}</small>` : ""}</td>
+      <td data-label="Componente">${esc(c.tipo_componente || x.tipo)}${c.orden_reposicion_ot ? `<br><small>desde ${esc(c.id_ot)}</small>` : ""}</td>
       <td data-label="Serial retirado">${esc(c.serial_retirado || "—")}</td>
       <td data-label="Destino">${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}<br><small>${esc(notaCasilla(c))}</small></td>
       <td data-label="Estado"><span class="orep-badge ${claseEstado(est)}">${esc(etiquetaEstado(c, est))}</span></td>
