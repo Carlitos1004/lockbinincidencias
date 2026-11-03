@@ -149,6 +149,8 @@ async function detectarRol() {
   document.getElementById("bloque-extra").hidden = !esManager;
   document.getElementById("bloque-lote").hidden = !esManager;
   document.getElementById("bloque-listas").hidden = !esManager;
+  document.getElementById("orep-tabs").hidden = !esManager;
+  document.querySelectorAll(".solo-manager").forEach(el => { el.hidden = !esManager; });
   if (!esManager) {
     const volver = document.querySelector(".btn-volver");
     if (volver) { volver.href = "ruta.html"; volver.innerHTML = '<span class="btn-volver-flecha">←</span> Volver a Ruta'; }
@@ -223,9 +225,9 @@ function filaOt(o) {
 // Las demás OTs manuales (incluidas las HIST-) se encuentran con el buscador.
 function renderLista() {
   const tbody = document.getElementById("tbody-ots");
-  const conOrden = otsManuales.filter(o => ordenesPorOt[o.id_ot]);
+  const conOrden = otsManuales.filter(o => ordenesPorOt[o.id_ot] && (esManager || ordenesPorOt[o.id_ot].lista_activa));
   conOrden.sort((a, b) => ordenesPorOt[a.id_ot].numero - ordenesPorOt[b.id_ot].numero);
-  tbody.innerHTML = filaHistoricaHtml + conOrden.map(filaOt).join("");
+  tbody.innerHTML = (esManager ? filaHistoricaHtml : "") + (conOrden.length || esManager ? conOrden.map(filaOt).join("") : '<tr><td colspan="8">No hay ninguna lista de reposición activa por ahora.</td></tr>');
   enlazarFilas(tbody);
   renderBusqueda();
 }
@@ -265,6 +267,7 @@ async function abrirOt(idOt) {
   }
   otActual = idOt;
   listaSel = (ordenesPorOt[idOt] && ordenesPorOt[idOt].lista_activa) || "";
+  if (typeof mostrarPestana === "function") mostrarPestana("equipos");
   document.querySelectorAll("tr.orep-fila").forEach(tr =>
     tr.classList.toggle("orep-activa", tr.dataset.ot === idOt));
   document.getElementById("detalle").hidden = false;
@@ -314,20 +317,15 @@ async function recargarOt() {
 
 function renderDetalle() {
   const mcs = agruparPorMc(compsOtActual, otActual);
-  const n = e => mcs.filter(m => m.estadoMc === e).length;
-  document.getElementById("detalle-resumen").innerHTML = `
-    <div class="tarjeta-resumen"><strong>${mcs.length}</strong><span>Equipos</span></div>
-    <div class="tarjeta-resumen"><strong>${n("Incompleto")}</strong><span>Incompletos</span></div>
-    <div class="tarjeta-resumen"><strong>${n("En proceso")}</strong><span>En proceso</span></div>
-    <div class="tarjeta-resumen"><strong>${n("Listo para entregar")}</strong><span>Listos para entregar</span></div>
-    <div class="tarjeta-resumen"><strong>${n("Entregado")}</strong><span>Entregados</span></div>`;
-
+  const activa = (ordenesPorOt[otActual] || {}).lista_activa || "";
+  // El operario solo ve la lista activa: no puede cambiarla ni ver el resto de la orden
+  if (!esManager) listaSel = activa;
+  const sinListaActiva = !esManager && !activa;
   const fMc = document.getElementById("filtro-mc").value.trim().toLowerCase();
   const fEst = document.getElementById("filtro-estado-mc").value;
   // Selector de listas (con contador) y orden
   const nombresListas = {};
   Object.values(equiposCompletos).forEach(e => { if (e.lista) nombresListas[e.lista] = (nombresListas[e.lista] || 0) + 1; });
-  const activa = (ordenesPorOt[otActual] || {}).lista_activa || "";
   const selLista = document.getElementById("filtro-lista");
   selLista.innerHTML = '<option value="">Todos los equipos de la orden</option><option value="__sin">Sin lista</option>' +
     Object.keys(nombresListas).sort().map(n => `<option value="${esc(n)}">📋 ${esc(n)} (${nombresListas[n]})${n === activa ? " ★ activa" : ""}</option>`).join("");
@@ -342,7 +340,20 @@ function renderDetalle() {
     return m.casillas.some(x => x.comp && categoriaCasilla(x.comp) === fCat);
   };
   const cumpleLista = m => !listaSel || (listaSel === "__sin" ? !(equiposCompletos[m.mc] && equiposCompletos[m.mc].lista) : (equiposCompletos[m.mc] && equiposCompletos[m.mc].lista) === listaSel);
-  const visibles = mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc)) && (!fEst || m.estadoMc === fEst) && cumpleCat(m) && cumpleLista(m));
+  // Tarjetas: cuentan solo los equipos de la lista mostrada
+  const mcsLista = sinListaActiva ? [] : mcs.filter(cumpleLista);
+  const n = e => mcsLista.filter(m => m.estadoMc === e).length;
+  document.getElementById("detalle-resumen").innerHTML = `
+    <div class="tarjeta-resumen"><strong>${mcsLista.length}</strong><span>Equipos</span></div>
+    <div class="tarjeta-resumen"><strong>${n("Incompleto")}</strong><span>Incompletos</span></div>
+    <div class="tarjeta-resumen"><strong>${n("En proceso")}</strong><span>En proceso</span></div>
+    <div class="tarjeta-resumen"><strong>${n("Listo para entregar")}</strong><span>Listos para entregar</span></div>
+    <div class="tarjeta-resumen"><strong>${n("Entregado")}</strong><span>Entregados</span></div>`;
+  const nombreMostrado = listaSel === "__sin" ? "Equipos sin lista" : listaSel ? "📋 " + listaSel + (listaSel === activa ? " ★ activa" : "") : "Todos los equipos de la orden";
+  document.getElementById("lista-banner").innerHTML = sinListaActiva
+    ? "Esta orden todavía no tiene una lista de reposición activa."
+    : `Mostrando: <strong>${esc(nombreMostrado)}</strong> · ${mcsLista.length} equipos` + (esManager && activa && listaSel !== activa ? ` · <em>la lista activa para el operario es "${esc(activa)}"</em>` : "");
+  const visibles = sinListaActiva ? [] : mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc)) && (!fEst || m.estadoMc === fEst) && cumpleCat(m) && cumpleLista(m));
   // Orden: por fecha de entrega al cliente, de la más antigua a la más reciente (sin fecha, al final)
   const modoOrden = document.getElementById("orden-mc").value;
   if (modoOrden === "fecha") {
@@ -354,7 +365,7 @@ function renderDetalle() {
 
   document.getElementById("lista-mc").innerHTML = visibles.length
     ? visibles.map(htmlMc).join("")
-    : "<p>Ningún equipo coincide.</p>";
+    : `<p>${sinListaActiva ? "No hay nada que reponer por ahora." : "Ningún equipo coincide."}</p>`;
 
   const sinMc = compsOtActual.filter(c => !c.m_control);
   document.getElementById("sin-mc").hidden = sinMc.length === 0;
@@ -701,3 +712,10 @@ document.getElementById("lista-hacer-activa").addEventListener("click", async ()
     renderDetalle();
   }
 });
+
+// ---------- Pestañas (solo manager): Equipos / Listas / Añadir piezas ----------
+function mostrarPestana(id) {
+  ["equipos", "listas", "anadir"].forEach(n => { document.getElementById("tab-" + n).hidden = n !== (esManager ? id : "equipos"); });
+  document.querySelectorAll("#orep-tabs button").forEach(b => b.classList.toggle("orep-tab-activa", b.dataset.tab === id));
+}
+document.querySelectorAll("#orep-tabs button").forEach(b => b.addEventListener("click", () => mostrarPestana(b.dataset.tab)));
