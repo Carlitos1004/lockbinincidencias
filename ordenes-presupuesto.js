@@ -23,10 +23,12 @@ const fmt = f => f ? new Date(f + "T00:00:00").toLocaleDateString("es-ES") : "�
 const ESTADOS_REPUESTA = ["Repuesto desde stock", "Entregado", "Reparado recibido"];
 const esClaveComp = id => id && !String(id).startsWith("T");
 function infoLinea(l) { return esClaveComp(l.componente_id) ? (compInfo[String(l.componente_id)] || null) : null; }
+let detectadoPorLinea = {}; // linea.id -> {serial, ot} cambio hecho en ruta DESPUÉS de aprobar el presupuesto
 function estaRepuesta(l) {
   const i = infoLinea(l);
-  return !!(i && (ESTADOS_REPUESTA.includes(i.repo_estado) || i.repo_serial_nuevo));
+  return !!(detectadoPorLinea[l.id] || (i && (ESTADOS_REPUESTA.includes(i.repo_estado) || i.repo_serial_nuevo)));
 }
+const canonTipo = t => /bater/i.test(t || "") ? "Batería" : (t || "");
 
 // Lee el estado de reposición de las piezas ligadas y la OT en la que va cada equipo aprobado
 async function cargarInfoReposicion() {
@@ -39,6 +41,32 @@ async function cargarInfoReposicion() {
     (data || []).forEach(c => { compInfo[String(c.id)] = c; });
   }
   const mcs = [...new Set(todas.filter(l => l.aprobada === true).map(l => l.m_control))];
+
+  // Cambios hechos en Ruta: el reporte de ruta crea una pieza con serial nuevo en la OT de la visita.
+  // Cuenta como reposición si es del mismo MC y componente y de una OT posterior a la aprobación.
+  detectadoPorLinea = {};
+  const cambios = [];
+  for (let i = 0; i < mcs.length; i += 100) {
+    const { data } = await supabaseClient.from("componentes_retirados")
+      .select("id, m_control, tipo_componente, serial_nuevo, id_ot").in("m_control", mcs.slice(i, i + 100)).not("serial_nuevo", "is", null);
+    (data || []).forEach(c => cambios.push(c));
+  }
+  const otsCamb = [...new Set(cambios.map(c => c.id_ot).filter(Boolean))];
+  const fechaOt = {};
+  for (let i = 0; i < otsCamb.length; i += 100) {
+    const { data } = await supabaseClient.from("ordenes_trabajo").select("id_ot, fecha").in("id_ot", otsCamb.slice(i, i + 100));
+    (data || []).forEach(o => { fechaOt[o.id_ot] = (o.fecha || "").slice(0, 10); });
+  }
+  todas.filter(l => l.aprobada === true).forEach(l => {
+    const ord = ordenes.find(o => o.id === l.orden_id);
+    const desde = ord && ord.fecha_aprobado;
+    if (!desde) return;
+    const coincide = cambios.filter(c => c.m_control === l.m_control && String(c.id) !== String(l.componente_id) &&
+      fechaOt[c.id_ot] && fechaOt[c.id_ot] >= desde &&
+      (l.tipo_componente === "Equipo completo" || canonTipo(c.tipo_componente) === canonTipo(l.tipo_componente)));
+    if (coincide.length) detectadoPorLinea[l.id] = { serial: coincide.map(c => c.serial_nuevo).join(", "), ot: coincide[0].id_ot };
+  });
+
   for (let i = 0; i < mcs.length; i += 100) {
     const { data } = await supabaseClient.from("historial_fallas")
       .select("m_control, id_ot, estado").in("m_control", mcs.slice(i, i + 100)).eq("estado", "🚨 ABIERTO");
@@ -237,10 +265,12 @@ function pintarDetalle() {
 
 function celdaReposicion(l) {
   if (l.aprobada !== true) return '<span style="color:#888;">—</span>';
-  const i = infoLinea(l);
+  const i = infoLinea(l) || {};
   if (estaRepuesta(l)) {
+    const d = detectadoPorLinea[l.id];
     const f = i.repo_fecha_entrega ? " el " + fmt(i.repo_fecha_entrega) : "";
-    return `<span class="orep-badge orep-ok">Repuesta${f}</span>${i.repo_serial_nuevo ? `<br><small>Serial nuevo: ${esc(i.repo_serial_nuevo)}</small>` : ""}`;
+    const serial = i.repo_serial_nuevo || (d && d.serial);
+    return `<span class="orep-badge orep-ok">Repuesta${f}</span>${serial ? `<br><small>Serial nuevo: ${esc(serial)}${d ? " (" + esc(d.ot) + ")" : ""}</small>` : ""}`;
   }
   const ot = otPorMc[l.m_control];
   return `<span class="orep-badge orep-proc">Por reponer</span>${ot ? `<br><small>En ${esc(ot)}</small>` : ""}`;
