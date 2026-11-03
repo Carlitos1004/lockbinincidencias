@@ -7,6 +7,8 @@
 let ordenes = [];          // ordenes_presupuesto
 let lineasPorOrden = {};   // orden_id -> [lineas]
 let ordenActual = null;
+let compInfo = {};         // componente_id -> {repo_estado, repo_serial_nuevo, repo_fecha_entrega}
+let otPorMc = {};          // MC -> última OT en la que va (ticket abierto)
 let disponibles = [];      // piezas vandalizadas del cliente de la orden abierta, aún sin orden
 
 function esc(t) {
@@ -17,6 +19,47 @@ function esc(t) {
 const codigo = n => "PRE-" + String(n).padStart(3, "0");
 const hoy = () => new Date().toISOString().slice(0, 10);
 const fmt = f => f ? new Date(f + "T00:00:00").toLocaleDateString("es-ES") : "—";
+
+const ESTADOS_REPUESTA = ["Repuesto desde stock", "Entregado", "Reparado recibido"];
+const esClaveComp = id => id && !String(id).startsWith("T");
+function infoLinea(l) { return esClaveComp(l.componente_id) ? (compInfo[String(l.componente_id)] || null) : null; }
+function estaRepuesta(l) {
+  const i = infoLinea(l);
+  return !!(i && (ESTADOS_REPUESTA.includes(i.repo_estado) || i.repo_serial_nuevo));
+}
+
+// Lee el estado de reposición de las piezas ligadas y la OT en la que va cada equipo aprobado
+async function cargarInfoReposicion() {
+  compInfo = {}; otPorMc = {};
+  const todas = Object.values(lineasPorOrden).flat();
+  const ids = [...new Set(todas.filter(l => esClaveComp(l.componente_id)).map(l => String(l.componente_id)))];
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data } = await supabaseClient.from("componentes_retirados")
+      .select("id, repo_estado, repo_serial_nuevo, repo_fecha_entrega").in("id", ids.slice(i, i + 100));
+    (data || []).forEach(c => { compInfo[String(c.id)] = c; });
+  }
+  const mcs = [...new Set(todas.filter(l => l.aprobada === true).map(l => l.m_control))];
+  for (let i = 0; i < mcs.length; i += 100) {
+    const { data } = await supabaseClient.from("historial_fallas")
+      .select("m_control, id_ot, estado").in("m_control", mcs.slice(i, i + 100)).eq("estado", "🚨 ABIERTO");
+    (data || []).forEach(t => { if (!otPorMc[t.m_control] || t.id_ot > otPorMc[t.m_control]) otPorMc[t.m_control] = t.id_ot; });
+  }
+}
+
+// Deja la Orden de reposición coherente: piezas aprobadas -> "Presupuesto aprobado"; rechazadas -> "Presupuesto rechazado"
+// (solo si la pieza aún no tiene un estado manual, para no pisar nada)
+async function sincronizarReposicion(orden) {
+  if (!orden || orden.estado !== "Presupuesto aprobado") return;
+  const ls = lineasPorOrden[orden.id] || [];
+  const poner = (valor, filtro) => {
+    const ids = ls.filter(l => filtro(l) && esClaveComp(l.componente_id) && !(compInfo[String(l.componente_id)] || {}).repo_estado)
+      .map(l => String(l.componente_id));
+    return ids.length ? supabaseClient.from("componentes_retirados").update({ repo_estado: valor }).in("id", ids).then(r => {
+      if (!r.error) ids.forEach(id => { compInfo[id] = Object.assign(compInfo[id] || {}, { repo_estado: valor }); });
+    }) : null;
+  };
+  await Promise.all([poner("Presupuesto aprobado", l => l.aprobada === true), poner("Presupuesto rechazado", l => l.aprobada === false)].filter(Boolean));
+}
 
 function claseEstado(e) {
   return { "Borrador": "orep-gris", "Presupuesto enviado": "orep-proc", "Presupuesto aprobado": "orep-ok",
@@ -58,6 +101,7 @@ async function cargar() {
   if (e2) { tbody.innerHTML = `<tr><td colspan="10">Error: ${esc(e2.message)}</td></tr>`; return; }
   lineasPorOrden = {};
   (lins || []).forEach(l => (lineasPorOrden[l.orden_id] = lineasPorOrden[l.orden_id] || []).push(l));
+  await cargarInfoReposicion();
   renderLista();
 }
 
@@ -79,7 +123,7 @@ function renderLista() {
     return `<tr class="orep-fila ${ordenActual === o.id ? "orep-activa" : ""}" data-id="${o.id}">
       <td><strong>${codigo(o.numero)}</strong></td><td>${esc(o.numero_oferta || "—")}</td><td>${esc(o.cliente)}</td>
       <td><span class="orep-badge ${claseEstado(o.estado)}">${esc(o.estado)}</span></td>
-      <td>${ls.length}</td><td>${ls.filter(l => l.aprobada === true).length}</td><td>${mcs}</td>
+      <td>${ls.length}</td><td>${ls.filter(l => l.aprobada === true).length}${ls.some(estaRepuesta) ? ` (${ls.filter(l => l.aprobada === true && estaRepuesta(l)).length} repuestas)` : ""}</td><td>${mcs}</td>
       <td>${fmt(o.fecha_enviado)}</td><td>${fmt(o.fecha_aprobado)}</td><td>${fmt(o.fecha_repuesto)}</td></tr>`;
   }).join("");
   tbody.querySelectorAll("tr.orep-fila").forEach(tr => tr.addEventListener("click", () => abrir(tr.dataset.id)));
@@ -116,6 +160,8 @@ async function abrir(id) {
   ordenActual = id;
   const o = ordenes.find(x => x.id === id);
   if (!o) return;
+  await cargarInfoReposicion();
+  await sincronizarReposicion(o);
   document.getElementById("detalle").hidden = false;
   renderLista();
   pintarDetalle();
@@ -135,7 +181,21 @@ function pintarDetalle() {
     <div class="tarjeta-resumen"><strong>${ls.length}</strong><span>Piezas</span></div>
     <div class="tarjeta-resumen"><strong>${n(l => l.aprobada === true)}</strong><span>Aprobadas</span></div>
     <div class="tarjeta-resumen"><strong>${n(l => l.aprobada === null)}</strong><span>Pendientes</span></div>
-    <div class="tarjeta-resumen"><strong>${n(l => l.aprobada === false)}</strong><span>Rechazadas</span></div>`;
+    <div class="tarjeta-resumen"><strong>${n(l => l.aprobada === false)}</strong><span>Rechazadas</span></div>
+    <div class="tarjeta-resumen"><strong>${n(l => l.aprobada === true && estaRepuesta(l))}</strong><span>Repuestas</span></div>`;
+
+  // Piezas a preparar: aprobadas que aún no se han repuesto, por tipo
+  const porTipo = {};
+  ls.filter(l => l.aprobada === true && !estaRepuesta(l)).forEach(l => { const t = l.tipo_componente || "Sin tipo"; porTipo[t] = (porTipo[t] || 0) + 1; });
+  const prep = Object.entries(porTipo).sort();
+  document.getElementById("det-preparar").innerHTML = prep.length
+    ? "<strong>Piezas nuevas a preparar (aprobadas, sin reponer):</strong> " + prep.map(([t, n]) => `${esc(t)}: <strong>${n}</strong>`).join(" · ")
+    : "Sin piezas pendientes de preparar.";
+
+  // Si todo lo aprobado ya está repuesto, ofrecer cerrar la orden
+  const aprobadas = ls.filter(l => l.aprobada === true);
+  const todasRepuestas = aprobadas.length > 0 && aprobadas.every(estaRepuesta);
+  document.getElementById("det-cerrar-aviso").hidden = !(todasRepuestas && o.estado === "Presupuesto aprobado");
   document.getElementById("det-oferta").value = o.numero_oferta || "";
   document.getElementById("det-estado").value = o.estado;
   document.getElementById("det-notas").value = o.notas || "";
@@ -152,8 +212,9 @@ function pintarDetalle() {
         <option value="si" ${l.aprobada === true ? "selected" : ""}>✅ Acepta pagar</option>
         <option value="no" ${l.aprobada === false ? "selected" : ""}>❌ Rechaza</option>
       </select></td>
+      <td>${celdaReposicion(l)}</td>
       <td><button type="button" class="btn-quitar-lin" title="Quitar de la orden">✕</button></td>
-    </tr>`).join("") : '<tr><td colspan="6">La orden está vacía. Añade piezas abajo.</td></tr>';
+    </tr>`).join("") : '<tr><td colspan="7">La orden está vacía. Añade piezas abajo.</td></tr>';
 
   document.querySelectorAll(".sel-aprob").forEach(sel => sel.addEventListener("change", async () => {
     const v = sel.value === "si" ? true : sel.value === "no" ? false : null;
@@ -161,6 +222,8 @@ function pintarDetalle() {
     const { error } = await supabaseClient.from("presupuesto_lineas").update({ aprobada: v }).eq("id", id);
     if (error) { alert("No se pudo guardar: " + error.message); return; }
     const l = (lineasPorOrden[ordenActual] || []).find(x => x.id === id); if (l) l.aprobada = v;
+    await cargarInfoReposicion();
+    await sincronizarReposicion(ordenes.find(x => x.id === ordenActual));
     pintarDetalle(); renderLista();
   }));
   document.querySelectorAll(".btn-quitar-lin").forEach(b => b.addEventListener("click", async () => {
@@ -170,6 +233,17 @@ function pintarDetalle() {
     lineasPorOrden[ordenActual] = (lineasPorOrden[ordenActual] || []).filter(x => x.id !== id);
     pintarDetalle(); renderLista(); cargarDisponibles();
   }));
+}
+
+function celdaReposicion(l) {
+  if (l.aprobada !== true) return '<span style="color:#888;">—</span>';
+  const i = infoLinea(l);
+  if (estaRepuesta(l)) {
+    const f = i.repo_fecha_entrega ? " el " + fmt(i.repo_fecha_entrega) : "";
+    return `<span class="orep-badge orep-ok">Repuesta${f}</span>${i.repo_serial_nuevo ? `<br><small>Serial nuevo: ${esc(i.repo_serial_nuevo)}</small>` : ""}`;
+  }
+  const ot = otPorMc[l.m_control];
+  return `<span class="orep-badge orep-proc">Por reponer</span>${ot ? `<br><small>En ${esc(ot)}</small>` : ""}`;
 }
 
 async function guardarOrden(cambios) {
@@ -204,7 +278,7 @@ document.getElementById("det-estado").addEventListener("change", async e => {
   if (nuevo === "Equipos repuestos") {
     const aprob = ls.filter(l => l.aprobada === true);
     if (!aprob.length) { alert("No hay piezas aprobadas en esta orden."); e.target.value = o.estado; return; }
-    const conComp = aprob.filter(l => l.componente_id && !String(l.componente_id).startsWith("T"));
+    const conComp = aprob.filter(l => esClaveComp(l.componente_id) && !estaRepuesta(l));
     if (!confirm(`Se marcará la orden como repuesta (${aprob.length} pieza(s) aprobadas).\n` +
       (conComp.length ? `Además, ${conComp.length} pieza(s) pasarán a "Repuesto desde stock" en la Orden de reposición. ¿Continuar?` : "¿Continuar?"))) { e.target.value = o.estado; return; }
     cambios.fecha_repuesto = hoy();
@@ -214,8 +288,11 @@ document.getElementById("det-estado").addEventListener("change", async e => {
       if (error) { alert("No se pudo actualizar la reposición: " + error.message); e.target.value = o.estado; return; }
     }
   }
-  if (await guardarOrden(cambios)) { pintarDetalle(); renderLista(); }
-  else e.target.value = o.estado;
+  if (await guardarOrden(cambios)) {
+    await cargarInfoReposicion();
+    await sincronizarReposicion(o);
+    pintarDetalle(); renderLista();
+  } else e.target.value = o.estado;
 });
 
 document.getElementById("det-eliminar").addEventListener("click", async () => {
@@ -300,4 +377,10 @@ document.getElementById("man-anadir").addEventListener("click", async () => {
   const tipo = document.getElementById("man-tipo").value;
   if (await insertarLineas([{ orden_id: ordenActual, m_control: mc, tipo_componente: tipo, aprobada: null }]))
     document.getElementById("man-mc").value = "";
+});
+
+document.getElementById("det-cerrar-btn").addEventListener("click", async () => {
+  const o = ordenes.find(x => x.id === ordenActual);
+  if (!o || !confirm(`Todas las piezas aprobadas de ${codigo(o.numero)} ya están repuestas. ¿Marcar la orden como "Equipos repuestos"?`)) return;
+  if (await guardarOrden({ estado: "Equipos repuestos", fecha_repuesto: hoy() })) { pintarDetalle(); renderLista(); }
 });
