@@ -444,13 +444,13 @@ function htmlBateriaSinMc(c) {
     <div class="scroll-x-tabla" style="max-height:none;"><table>
       <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th><th>Nota</th></tr></thead>
       <tbody><tr data-id="${c.id}">
-        <td>${esc(c.tipo_componente || "Batería")}<br><small>desde ${esc(c.id_ot || "—")}</small></td>
-        <td>${esc(c.serial_retirado || "—")}</td>
-        <td>${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}</td>
-        <td><span class="orep-badge ${claseEstado(est)}">${esc(etiquetaEstado(c, est))}</span></td>
-        <td><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
-        <td><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c)}</td>
-        <td><input type="text" class="inp-nota" placeholder="Nota" value="${esc(c.repo_nota || "")}"></td>
+        <td data-label="Componente">${esc(c.tipo_componente || "Batería")}<br><small>desde ${esc(c.id_ot || "—")}</small></td>
+        <td data-label="Serial retirado">${esc(c.serial_retirado || "—")}</td>
+        <td data-label="Destino">${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}</td>
+        <td data-label="Estado"><span class="orep-badge ${claseEstado(est)}">${esc(etiquetaEstado(c, est))}</span></td>
+        <td data-label="Ajuste manual"><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
+        <td data-label="Serial a entregar"><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c)}</td>
+        <td data-label="Nota"><input type="text" class="inp-nota" placeholder="Nota" value="${esc(c.repo_nota || "")}"></td>
       </tr></tbody></table></div>
     <div class="orep-acciones">${boton}</div>
   </div>`;
@@ -463,15 +463,15 @@ function htmlMc(m) {
       const estF = estadoFalt(f);
       const dec = f && f.decision;
       return `<tr class="fila-falt" data-mc="${esc(m.mc)}" data-tipo="${esc(x.tipo)}">
-        <td>${esc(x.tipo)}</td><td>—</td><td><small>No llegó</small></td>
-        <td>${estF ? `<span class="orep-badge ${claseEstado(estF)}">${esc(estF)}</span>` : '<span class="orep-badge orep-falta">Falta — aclarar con el cliente</span>'}</td>
-        <td><select class="sel-falt" ${esManager ? "" : "disabled"}>
+        <td data-label="Componente">${esc(x.tipo)}</td><td data-label="Serial retirado">—</td><td data-label="Destino"><small>No llegó</small></td>
+        <td data-label="Estado">${estF ? `<span class="orep-badge ${claseEstado(estF)}">${esc(estF)}</span>` : '<span class="orep-badge orep-falta">Falta — aclarar con el cliente</span>'}</td>
+        <td data-label="Decisión"><select class="sel-falt" ${esManager ? "" : "disabled"}>
           <option value="">Pendiente de aclarar</option>
           <option value="Se repone desde stock" ${dec === "Se repone desde stock" ? "selected" : ""}>Se repone desde stock</option>
           <option value="Sin reposición" ${dec === "Sin reposición" ? "selected" : ""}>Sin reposición (el cliente lo acepta)</option>
         </select></td>
-        <td><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td>
-        <td><input type="text" class="inp-falt-nota" placeholder="Nota" value="${esc((f && f.nota) || "")}"></td></tr>`;
+        <td data-label="Serial a entregar"><input type="text" class="inp-falt-serial" placeholder="Serial entregado" ${esManager ? "" : "disabled"} value="${esc((f && f.serial_nuevo) || "")}"></td>
+        <td data-label="Nota"><input type="text" class="inp-falt-nota" placeholder="Nota" value="${esc((f && f.nota) || "")}"></td></tr>`;
     }
     const c = x.comp;
     const est = estadoCasilla(c);
@@ -480,13 +480,13 @@ function htmlMc(m) {
     const extra = c.orden_reposicion_ot
       ? ` <button type="button" class="btn-quitar-extra" data-id="${c.id}" title="Quitar de esta orden">✕ de esta orden</button>` : "";
     return `<tr data-id="${c.id}">
-      <td>${esc(c.tipo_componente || x.tipo)}${c.orden_reposicion_ot ? `<br><small>desde ${esc(c.id_ot)}</small>` : ""}</td>
-      <td>${esc(c.serial_retirado || "—")}</td>
-      <td>${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}<br><small>${esc(notaCasilla(c))}</small></td>
-      <td><span class="orep-badge ${claseEstado(est)}">${esc(etiquetaEstado(c, est))}</span></td>
-      <td><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
-      <td><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c)}${esManager ? extra : ""}</td>
-      <td><input type="text" class="inp-nota" placeholder="Nota" value="${esc(c.repo_nota || "")}"></td>
+      <td data-label="Componente">${esc(c.tipo_componente || x.tipo)}${c.orden_reposicion_ot ? `<br><small>desde ${esc(c.id_ot)}</small>` : ""}</td>
+      <td data-label="Serial retirado">${esc(c.serial_retirado || "—")}</td>
+      <td data-label="Destino">${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}<br><small>${esc(notaCasilla(c))}</small></td>
+      <td data-label="Estado"><span class="orep-badge ${claseEstado(est)}">${esc(etiquetaEstado(c, est))}</span></td>
+      <td data-label="Ajuste manual"><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
+      <td data-label="Serial a entregar"><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c)}${esManager ? extra : ""}</td>
+      <td data-label="Nota"><input type="text" class="inp-nota" placeholder="Nota" value="${esc(c.repo_nota || "")}"></td>
     </tr>`;
   }).join("");
 
