@@ -407,6 +407,7 @@ function renderDetalle() {
     `<li>${esc(c.tipo_componente)} — serial ${esc(c.serial_retirado || "—")} (${esc(estadoCasilla(c))})</li>`).join("");
 
   enlazarEventos();
+  if (esManager) renderListas();
 }
 
 function claseMc(e) {
@@ -496,7 +497,6 @@ function htmlMc(m) {
   const fEntTxt = fEnt ? new Date(fEnt + "T00:00:00").toLocaleDateString("es-ES") : "sin fecha de entrega";
   return `<div class="orep-mc">
     <div class="orep-mc-cab">
-      ${esManager ? `<input type="checkbox" class="chk-sel-mc" data-mc="${esc(m.mc)}" title="Marcar para añadir a una lista">` : ""}
       <strong>${esc(m.mc)}</strong>
       <span class="orep-badge ${claseMc(m.estadoMc)}">${esc(m.estadoMc)}</span>
       ${esBat ? '<span class="orep-badge orep-info">🔋 Solo batería</span>' : ""}
@@ -740,114 +740,12 @@ async function ponerListaActiva(nombre) {
   return true;
 }
 
-document.getElementById("lista-crear").addEventListener("click", async () => {
-  const msg = document.getElementById("lista-msg");
-  const nombre = document.getElementById("lista-nombre").value.trim();
-  const tokens = [...new Set(document.getElementById("lista-mcs").value.toUpperCase().match(/(MC|BA)\d+/g) || [])];
-  let mcs = tokens.filter(t => t.startsWith("MC"));
-  const serialesBA = tokens.filter(t => t.startsWith("BA"));
-  if (!otActual) { msg.textContent = "Abre primero una orden."; return; }
-  if (!nombre) { msg.textContent = "⚠️ Ponle un nombre a la lista (ej. Semana 45)."; return; }
-  if (!mcs.length && !serialesBA.length) { msg.textContent = "⚠️ Pega al menos un MC (MC2500123...) o un serial de batería (BA2500123...)."; return; }
-  msg.textContent = "Procesando...";
-  // Seriales de batería: si la pieza tiene MC, entra el equipo; si no tiene MC, entra la propia batería
-  const batSinMc = [], batNoEncontradas = [];
-  if (serialesBA.length) {
-    const piezasBA = [];
-    for (let i = 0; i < serialesBA.length; i += 100) {
-      const { data } = await supabaseClient.from("componentes_retirados").select(CAMPOS).in("serial_retirado", serialesBA.slice(i, i + 100));
-      (data || []).forEach(c => piezasBA.push(c));
-    }
-    for (const ba of serialesBA) {
-      const cand = piezasBA.filter(c => c.serial_retirado === ba && !entregadaC(c));
-      const c = cand[0] || piezasBA.find(x => x.serial_retirado === ba);
-      if (!c) { batNoEncontradas.push(ba); continue; }
-      if (c.m_control) { if (!mcs.includes(c.m_control)) mcs.push(c.m_control); continue; }
-      const { error } = await supabaseClient.from("componentes_retirados").update({ orden_reposicion_ot: otActual, repo_lista: nombre }).eq("id", c.id);
-      if (error) { msg.textContent = "❌ No se pudo añadir la batería " + ba + ": " + error.message + " (¿SQL 89?)"; return; }
-      batSinMc.push(ba);
-    }
-  }
-  const enOrden = new Set(compsOtActual.map(c => c.m_control));
-  const fuera = mcs.filter(m => !enOrden.has(m));
-  const anadidos = [], sinPiezas = [];
-  if (fuera.length) {
-    const pendientes = [];
-    for (let i = 0; i < fuera.length; i += 100) {
-      const { data } = await supabaseClient.from("componentes_retirados").select(CAMPOS).in("m_control", fuera.slice(i, i + 100));
-      (data || []).forEach(c => pendientes.push(c));
-    }
-    const porMc = {};
-    pendientes.filter(c => !entregadaC(c)).forEach(c => { (porMc[c.m_control] = porMc[c.m_control] || []).push(c.id); });
-    for (const mc of fuera) {
-      if (!porMc[mc]) { sinPiezas.push(mc); continue; }
-      const { error } = await supabaseClient.from("componentes_retirados").update({ orden_reposicion_ot: otActual }).in("id", porMc[mc]);
-      if (error) { msg.textContent = "❌ No se pudieron añadir piezas de " + mc + ": " + error.message; return; }
-      anadidos.push(mc);
-    }
-  }
-  const listables = mcs.filter(m => !sinPiezas.includes(m));
-  const tipoSel = document.getElementById("lista-tipo").value;
-  if (listables.length && !(await guardarListaEquipos(listables, nombre, tipoSel))) { msg.textContent = ""; return; }
-  if (document.getElementById("lista-activa-chk").checked) await ponerListaActiva(nombre);
-  listaSel = nombre;
-  msg.innerHTML = `✅ Lista "${esc(nombre)}": ${listables.length} equipos` + (batSinMc.length ? ` y ${batSinMc.length} baterías sin MC (${esc(batSinMc.join(", "))})` : "") + "." +
-    (batNoEncontradas.length ? `<br>⚠️ Baterías no encontradas en la base: ${esc(batNoEncontradas.join(", "))}` : "") +
-    (anadidos.length ? ` ${anadidos.length} se añadieron desde otras OT (${esc(anadidos.join(", "))}).` : "") +
-    (sinPiezas.length ? `<br>⚠️ Sin piezas pendientes en la base, no entran: ${esc(sinPiezas.join(", "))}` : "");
-  await recargarOt(); cargarOts();
-});
-
-document.getElementById("lista-anadir-marcados").addEventListener("click", async () => {
-  const msg = document.getElementById("lista-msg");
-  const nombre = document.getElementById("lista-nombre").value.trim();
-  const mcs = [...document.querySelectorAll(".chk-sel-mc:checked")].map(c => c.dataset.mc);
-  if (!nombre) { msg.textContent = "⚠️ Escribe el nombre de la lista."; return; }
-  if (!mcs.length) { msg.textContent = "⚠️ Marca equipos con la casilla de su cabecera."; return; }
-  if (await guardarListaEquipos(mcs, nombre, document.getElementById("lista-tipo").value)) { msg.textContent = `✅ ${mcs.length} equipos añadidos a "${nombre}".`; await recargarOt(); }
-});
-
-document.getElementById("lista-quitar-marcados").addEventListener("click", async () => {
-  const msg = document.getElementById("lista-msg");
-  const mcs = [...document.querySelectorAll(".chk-sel-mc:checked")].map(c => c.dataset.mc);
-  if (!mcs.length) { msg.textContent = "⚠️ Marca equipos con la casilla de su cabecera."; return; }
-  if (await guardarListaEquipos(mcs, null)) { msg.textContent = `✅ ${mcs.length} equipos quitados de su lista.`; await recargarOt(); }
-});
-
-document.getElementById("lista-marcar-visibles").addEventListener("click", () =>
-  document.querySelectorAll(".chk-sel-mc").forEach(c => { c.checked = true; }));
-
-document.getElementById("lista-hacer-activa").addEventListener("click", async () => {
-  const msg = document.getElementById("lista-msg");
-  if (!otActual) return;
-  const nombre = (listaSel && listaSel !== "__sin") ? listaSel : "";
-  if (await ponerListaActiva(nombre)) {
-    msg.textContent = nombre ? `★ "${nombre}" es ahora la lista activa: es la que se muestra por defecto.` : "Sin lista activa: se muestran todos los equipos.";
-    renderDetalle();
-  }
-});
-
 // ---------- Pestañas (solo manager): Equipos / Listas / Añadir piezas ----------
 function mostrarPestana(id) {
   ["equipos", "listas", "anadir"].forEach(n => { document.getElementById("tab-" + n).hidden = n !== (esManager ? id : "equipos"); });
   document.querySelectorAll("#orep-tabs button").forEach(b => b.classList.toggle("orep-tab-activa", b.dataset.tab === id));
 }
 document.querySelectorAll("#orep-tabs button").forEach(b => b.addEventListener("click", () => mostrarPestana(b.dataset.tab)));
-
-// Cambiar solo el tipo de reposición de los equipos marcados (sin tocar su lista)
-document.getElementById("lista-aplicar-tipo").addEventListener("click", async () => {
-  const msg = document.getElementById("lista-msg");
-  const mcs = [...document.querySelectorAll(".chk-sel-mc:checked")].map(c => c.dataset.mc);
-  const tipo = document.getElementById("lista-tipo").value;
-  if (!mcs.length) { msg.textContent = "⚠️ Marca equipos con la casilla de su cabecera."; return; }
-  const filas = mcs.map(mc => ({ id_ot: otActual, m_control: mc, tipo_reposicion: tipo, actualizado_en: new Date().toISOString() }));
-  for (let i = 0; i < filas.length; i += 200) {
-    const { error } = await supabaseClient.from("reposicion_equipos").upsert(filas.slice(i, i + 200), { onConflict: "id_ot,m_control" });
-    if (error) { alert("No se pudo guardar: " + error.message + "\n(¿Corriste el SQL 88?)"); return; }
-  }
-  msg.textContent = `✅ ${mcs.length} equipos marcados como "${tipo === "Batería" ? "solo batería" : "piezas / equipo"}".`;
-  await recargarOt();
-});
 
 // Entrega directa de una reposición de solo batería
 document.addEventListener("click", async (e) => {
@@ -911,4 +809,188 @@ document.getElementById("lista-bok-aplicar").addEventListener("click", async () 
   if (error) { msg.textContent = "❌ " + error.message + " (¿SQL 89?)"; return; }
   msg.textContent = `✅ ${mcs.length} equipos marcados con batería OK reutilizable. Indica en cada uno, en la pestaña Baterías, el MC al que va.`;
   await recargarOt();
+});
+
+// =========================================================================
+// PESTAÑA "LISTAS": cada lista es una fila; al pulsarla se despliega su contenido
+// =========================================================================
+let listaAbierta = null;
+
+function nombresDeListas() {
+  const n = new Set();
+  Object.values(equiposCompletos).forEach(e => { if (e.lista) n.add(e.lista); });
+  compsOtActual.forEach(c => { if (!c.m_control && c.repo_lista) n.add(c.repo_lista); });
+  return [...n].sort();
+}
+
+function renderListas() {
+  const tb = document.getElementById("tbody-listas");
+  if (!tb) return;
+  const grupos = agruparPorMc(compsOtActual, otActual);
+  grupos.forEach(aplicarTipoBateria);
+  const activa = (ordenesPorOt[otActual] || {}).lista_activa || "";
+  const nombres = nombresDeListas();
+  if (!nombres.length) { tb.innerHTML = '<tr><td colspan="7">Aún no hay listas en esta orden. Crea la primera con "➕ Nueva lista".</td></tr>'; return; }
+  const estS = c => { const e = estadoCasilla(c); return e === "Entregado" ? "Entregado" : RESUELTOS.has(e) ? "Listo para entregar" : "En proceso"; };
+  tb.innerHTML = nombres.map(nombre => {
+    const eq = grupos.filter(m => (equiposCompletos[m.mc] || {}).lista === nombre);
+    const sinMc = compsOtActual.filter(c => !c.m_control && c.repo_lista === nombre);
+    const nEq = eq.filter(m => tipoRep(m.mc) !== "Batería").length;
+    const nBat = eq.filter(m => tipoRep(m.mc) === "Batería").length + sinMc.length;
+    const listos = eq.filter(m => m.estadoMc === "Listo para entregar").length + sinMc.filter(c => estS(c) === "Listo para entregar").length;
+    const entregados = eq.filter(m => m.estadoMc === "Entregado").length + sinMc.filter(c => estS(c) === "Entregado").length;
+    const total = eq.length + sinMc.length;
+    const fila = `<tr class="orep-fila ${listaAbierta === nombre ? "orep-activa" : ""}" data-lista="${esc(nombre)}">
+      <td><strong>📋 ${esc(nombre)}</strong>${nombre === activa ? ' <span class="orep-badge orep-ok">★ activa</span>' : ""}</td>
+      <td>${nEq}</td><td>${nBat}</td><td>${listos}</td><td>${entregados}</td>
+      <td>${total ? Math.round(entregados * 100 / total) : 0}% entregado</td><td>${listaAbierta === nombre ? "▲" : "▼"}</td></tr>`;
+    if (listaAbierta !== nombre) return fila;
+
+    const items = eq.sort((a, b) => (fechasEntrega[a.mc] || "9999").localeCompare(fechasEntrega[b.mc] || "9999") || a.mc.localeCompare(b.mc)).map(m => {
+      const e = equiposCompletos[m.mc] || {};
+      const f = fechasEntrega[m.mc];
+      return `<tr><td><input type="checkbox" class="chk-item" data-mc="${esc(m.mc)}"></td><td>${esc(m.mc)}</td>
+        <td>${tipoRep(m.mc) === "Batería" ? "🔋 Batería" : "📦 Equipo"}${e.bateria_ok ? " · 🔁 batería OK" : ""}</td>
+        <td><span class="orep-badge ${claseMc(m.estadoMc)}">${esc(m.estadoMc)}</span></td>
+        <td>${f ? new Date(f + "T00:00:00").toLocaleDateString("es-ES") : "—"}</td></tr>`;
+    }).join("") + sinMc.map(c => `<tr><td><input type="checkbox" class="chk-item" data-id="${c.id}"></td><td>Sin MC · ${esc(c.serial_retirado || "—")}</td>
+        <td>🔋 Batería</td><td><span class="orep-badge ${claseEstado(estadoCasilla(c))}">${esc(estadoCasilla(c))}</span></td><td>—</td></tr>`).join("");
+
+    return fila + `<tr class="orep-detalle-fila" data-detalle="${esc(nombre)}"><td colspan="7">
+      <div class="materiales-controles">
+        ${nombre === activa
+          ? '<button type="button" data-act="desactivar">Quitar como lista activa</button>'
+          : '<button type="button" data-act="activa" class="btn-primario">★ Dejar como lista activa (la que ve el operario)</button>'}
+        <button type="button" data-act="eliminar" style="color:#a3261c;">🗑 Eliminar la lista</button>
+      </div>
+      <div style="max-height:320px;overflow:auto;border:1px solid #e8eee9;border-radius:8px;margin:8px 0;">
+        <table class="tabla-revision"><thead><tr><th></th><th>Equipo</th><th>Tipo</th><th>Estado</th><th>Entrega</th></tr></thead>
+        <tbody>${items || '<tr><td colspan="5">La lista está vacía.</td></tr>'}</tbody></table></div>
+      <div class="materiales-controles">
+        <span>Con los marcados:</span>
+        <button type="button" data-act="quitar">Quitar de la lista</button>
+        <select class="sel-pasar-tipo"><option value="Piezas">Pasar a: equipos / piezas</option><option value="Batería">Pasar a: solo batería</option></select>
+        <button type="button" data-act="tipo">Aplicar</button>
+      </div>
+      <p class="ot-meta" style="margin-top:10px;">Añadir a esta lista (pega MC y/o seriales de batería BA…):</p>
+      <textarea class="txt-anadir" rows="3" style="width:100%;max-width:520px;" placeholder="MC2500123&#10;BA2500123"></textarea>
+      <div class="materiales-controles">
+        <select class="sel-anadir-tipo"><option value="Piezas">Son equipos / piezas</option><option value="Batería">Son solo batería</option></select>
+        <button type="button" data-act="anadir" class="btn-primario">Añadir a la lista</button>
+      </div></td></tr>`;
+  }).join("");
+}
+
+// Pegar MC y/o seriales BA: los pone en una lista (y trae a la orden las piezas pendientes de otras OT)
+async function procesarPegado(nombre, texto, tipo, activar, msg) {
+  const tokens = [...new Set(texto.toUpperCase().match(/(MC|BA)\d+/g) || [])];
+  const mcs = tokens.filter(t => t.startsWith("MC"));
+  const serialesBA = tokens.filter(t => t.startsWith("BA"));
+  if (!nombre) { msg.textContent = "⚠️ Ponle un nombre a la lista."; return false; }
+  if (!tokens.length) { msg.textContent = "⚠️ Pega al menos un MC (MC2500123…) o un serial de batería (BA2500123…)."; return false; }
+  msg.textContent = "Procesando...";
+  const batSinMc = [], batNoEncontradas = [];
+  if (serialesBA.length) {
+    const piezasBA = [];
+    for (let i = 0; i < serialesBA.length; i += 100) {
+      const { data } = await supabaseClient.from("componentes_retirados").select(CAMPOS).in("serial_retirado", serialesBA.slice(i, i + 100));
+      (data || []).forEach(c => piezasBA.push(c));
+    }
+    for (const ba of serialesBA) {
+      const c = piezasBA.find(x => x.serial_retirado === ba && !entregadaC(x)) || piezasBA.find(x => x.serial_retirado === ba);
+      if (!c) { batNoEncontradas.push(ba); continue; }
+      if (c.m_control) { if (!mcs.includes(c.m_control)) mcs.push(c.m_control); continue; }
+      const { error } = await supabaseClient.from("componentes_retirados").update({ orden_reposicion_ot: otActual, repo_lista: nombre }).eq("id", c.id);
+      if (error) { msg.textContent = "❌ No se pudo añadir la batería " + ba + ": " + error.message + " (¿SQL 89?)"; return false; }
+      batSinMc.push(ba);
+    }
+  }
+  const enOrden = new Set(compsOtActual.map(c => c.m_control));
+  const fuera = mcs.filter(m => !enOrden.has(m));
+  const anadidos = [], sinPiezas = [];
+  if (fuera.length) {
+    const pendientes = [];
+    for (let i = 0; i < fuera.length; i += 100) {
+      const { data } = await supabaseClient.from("componentes_retirados").select(CAMPOS).in("m_control", fuera.slice(i, i + 100));
+      (data || []).forEach(c => pendientes.push(c));
+    }
+    const porMc = {};
+    pendientes.filter(c => !entregadaC(c)).forEach(c => { (porMc[c.m_control] = porMc[c.m_control] || []).push(c.id); });
+    for (const mc of fuera) {
+      if (!porMc[mc]) { sinPiezas.push(mc); continue; }
+      const { error } = await supabaseClient.from("componentes_retirados").update({ orden_reposicion_ot: otActual }).in("id", porMc[mc]);
+      if (error) { msg.textContent = "❌ No se pudieron añadir piezas de " + mc + ": " + error.message; return false; }
+      anadidos.push(mc);
+    }
+  }
+  const listables = mcs.filter(m => !sinPiezas.includes(m));
+  if (listables.length && !(await guardarListaEquipos(listables, nombre, tipo))) { msg.textContent = ""; return false; }
+  if (activar) await ponerListaActiva(nombre);
+  listaSel = nombre; listaAbierta = nombre;
+  msg.innerHTML = `✅ Lista "${esc(nombre)}": ${listables.length} equipos` + (batSinMc.length ? ` y ${batSinMc.length} baterías sin MC` : "") + " añadidos." +
+    (anadidos.length ? ` ${anadidos.length} se trajeron desde otras OT.` : "") +
+    (sinPiezas.length ? `<br>⚠️ Sin piezas pendientes en la base, no entran: ${esc(sinPiezas.join(", "))}` : "") +
+    (batNoEncontradas.length ? `<br>⚠️ Baterías no encontradas: ${esc(batNoEncontradas.join(", "))}` : "");
+  await recargarOt(); cargarOts();
+  return true;
+}
+
+// Nueva lista
+document.getElementById("lista-nueva-btn").addEventListener("click", () => {
+  const f = document.getElementById("lista-nueva-form");
+  f.hidden = !f.hidden;
+});
+document.getElementById("nl-cancelar").addEventListener("click", () => { document.getElementById("lista-nueva-form").hidden = true; });
+document.getElementById("nl-crear").addEventListener("click", async () => {
+  if (!otActual) { document.getElementById("lista-msg").textContent = "Abre primero una orden."; return; }
+  const ok = await procesarPegado(document.getElementById("nl-nombre").value.trim(), document.getElementById("nl-mcs").value,
+    document.getElementById("nl-tipo").value, document.getElementById("nl-activa").checked, document.getElementById("lista-msg"));
+  if (ok) { document.getElementById("lista-nueva-form").hidden = true; document.getElementById("nl-mcs").value = ""; }
+});
+
+// Filas de listas: desplegar / acciones
+document.getElementById("tbody-listas").addEventListener("click", async (e) => {
+  const msg = document.getElementById("lista-msg");
+  const btn = e.target.closest("button[data-act]");
+  const fila = e.target.closest("tr.orep-fila[data-lista]");
+  if (!btn) {
+    if (fila) { listaAbierta = listaAbierta === fila.dataset.lista ? null : fila.dataset.lista; renderListas(); }
+    return;
+  }
+  const detalle = btn.closest("tr.orep-detalle-fila");
+  const nombre = detalle.dataset.detalle;
+  const marcados = [...detalle.querySelectorAll(".chk-item:checked")];
+  const mcsMarc = marcados.filter(c => c.dataset.mc).map(c => c.dataset.mc);
+  const idsMarc = marcados.filter(c => c.dataset.id).map(c => c.dataset.id);
+  const act = btn.dataset.act;
+
+  if (act === "activa" || act === "desactivar") {
+    if (await ponerListaActiva(act === "activa" ? nombre : "")) {
+      msg.textContent = act === "activa" ? `★ "${nombre}" es ahora la lista activa: es la que ve el operario.` : "Sin lista activa: el operario no verá nada por ahora.";
+      renderDetalle();
+    }
+  } else if (act === "eliminar") {
+    if (!confirm(`¿Eliminar la lista "${nombre}"? Los equipos y las piezas no se borran, solo dejan de estar en la lista.`)) return;
+    const mcs = Object.values(equiposCompletos).filter(x => x.lista === nombre).map(x => x.m_control);
+    const ids = compsOtActual.filter(c => !c.m_control && c.repo_lista === nombre).map(c => c.id);
+    if (mcs.length && !(await guardarListaEquipos(mcs, null))) return;
+    if (ids.length) await supabaseClient.from("componentes_retirados").update({ repo_lista: null }).in("id", ids);
+    if (((ordenesPorOt[otActual] || {}).lista_activa || "") === nombre) await ponerListaActiva("");
+    listaAbierta = null; if (listaSel === nombre) listaSel = "";
+    await recargarOt(); msg.textContent = `Lista "${nombre}" eliminada.`;
+  } else if (act === "quitar") {
+    if (!mcsMarc.length && !idsMarc.length) { msg.textContent = "⚠️ Marca primero los equipos de la lista."; return; }
+    if (mcsMarc.length && !(await guardarListaEquipos(mcsMarc, null))) return;
+    if (idsMarc.length) await supabaseClient.from("componentes_retirados").update({ repo_lista: null }).in("id", idsMarc);
+    await recargarOt(); msg.textContent = `✅ ${mcsMarc.length + idsMarc.length} quitados de la lista.`;
+  } else if (act === "tipo") {
+    if (!mcsMarc.length) { msg.textContent = "⚠️ Marca primero equipos con MC (las baterías sin MC siempre son de batería)."; return; }
+    const tipo = detalle.querySelector(".sel-pasar-tipo").value;
+    const filas = mcsMarc.map(mc => ({ id_ot: otActual, m_control: mc, tipo_reposicion: tipo, actualizado_en: new Date().toISOString() }));
+    const { error } = await supabaseClient.from("reposicion_equipos").upsert(filas, { onConflict: "id_ot,m_control" });
+    if (error) { alert("No se pudo guardar: " + error.message + "\n(¿SQL 88?)"); return; }
+    await recargarOt(); msg.textContent = `✅ ${mcsMarc.length} equipos pasados a "${tipo === "Batería" ? "solo batería" : "equipos / piezas"}".`;
+  } else if (act === "anadir") {
+    await procesarPegado(nombre, detalle.querySelector(".txt-anadir").value, detalle.querySelector(".sel-anadir-tipo").value, false, msg);
+  }
 });

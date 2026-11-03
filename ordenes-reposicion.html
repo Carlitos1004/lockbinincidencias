@@ -34,6 +34,7 @@
   .orep-tabs button { background:none; border:none; padding:9px 16px; font-weight:600; cursor:pointer; border-radius:8px 8px 0 0; color:#555; }
   .orep-tabs button.orep-tab-activa { background:#e6f2ea; color:#1d6b32; border-bottom:3px solid #6aa820; }
   .orep-seccion { margin:22px 0 4px; padding-bottom:4px; border-bottom:2px solid #d9e2dc; }
+  .orep-detalle-fila > td { background:#f7faf8; padding:12px 16px; }
   .orep-lista tr.orep-fila { cursor:pointer; }
   .orep-lista tr.orep-fila:hover { background:#f3f7f4; }
   .orep-lista tr.orep-activa { background:#e6f2ea; }
@@ -125,34 +126,44 @@
 
     <div id="tab-listas" hidden>
     <div id="bloque-listas" class="pre-caja" style="border:1px solid #d9e2dc;border-radius:10px;padding:12px 14px;margin:14px 0;background:#fff;">
-      <h3 style="margin-top:0;">📋 Listas de reposición</h3>
-      <p class="ot-meta">Una lista es lo que se repone ahora dentro de esta orden. El operario ve por defecto la lista activa (★). Los equipos se muestran de la entrega más antigua a la más reciente.</p>
-      <div class="materiales-controles">
-        <button type="button" id="lista-hacer-activa">★ Dejar la lista seleccionada como activa</button>
-        <button type="button" id="lista-marcar-visibles">Marcar los equipos visibles</button>
-        <button type="button" id="lista-quitar-marcados">Quitar marcados de su lista</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <h3 style="margin:0;">📋 Listas de reposición de esta orden</h3>
+        <button type="button" id="lista-nueva-btn" class="btn-primario">➕ Nueva lista</button>
       </div>
-      <div class="materiales-controles">
-        <input type="text" id="lista-nombre" placeholder="Nombre de la lista (ej. Semana 45)">
-        <select id="lista-tipo">
-          <option value="Piezas">Tipo: piezas / equipos</option>
-          <option value="Batería">Tipo: solo batería</option>
-        </select>
-        <button type="button" id="lista-aplicar-tipo">Aplicar solo el tipo a los marcados</button>
-        <button type="button" id="lista-anadir-marcados">Añadir marcados a esta lista</button>
-      </div>
-      <p class="ot-meta" style="margin-top:10px;">O pega aquí MC y/o seriales de batería (BA…), uno por línea o separados por comas; se les aplica el tipo elegido arriba. Una batería sin MC entra sola en la pestaña Baterías. Los que tengan piezas pendientes en otras OT se añaden solos a esta orden:</p>
-      <textarea id="lista-mcs" rows="4" style="width:100%;max-width:520px;" placeholder="MC2500123&#10;MC2500456, MC2500789"></textarea>
-      <div class="materiales-controles">
-        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="lista-activa-chk" checked> Dejarla como lista activa</label>
-        <button type="button" id="lista-crear" class="btn-primario">Crear lista con estos MC</button>
-      </div>
-      <p class="ot-meta" style="margin-top:14px;">Baterías OK que se reutilizan en otros equipos (pega los MC de los equipos cuya batería está OK; a esos se les repone una nueva):</p>
-      <textarea id="lista-bok" rows="2" style="width:100%;max-width:520px;" placeholder="MC2500785&#10;MC2500283"></textarea>
-      <div class="materiales-controles"><button type="button" id="lista-bok-aplicar">Marcar como batería OK reutilizable</button></div>
-      <p class="ot-meta" id="lista-msg"></p>
-    </div>
+      <p class="ot-meta">Una lista es lo que se repone en una visita. El operario solo ve la lista ★ activa. Pulsa una fila para ver y editar su contenido.</p>
 
+      <div id="lista-nueva-form" hidden style="border:1px dashed #b9c9bd;border-radius:8px;padding:10px 12px;margin:8px 0;">
+        <div class="materiales-controles">
+          <input type="text" id="nl-nombre" placeholder="Nombre de la lista (ej. Reposición Porto 05/11)">
+          <select id="nl-tipo">
+            <option value="Piezas">Son equipos / piezas</option>
+            <option value="Batería">Son solo batería</option>
+          </select>
+        </div>
+        <p class="ot-meta">Pega los MC y/o seriales de batería (BA…), uno por línea o separados por comas. Lo que esté pendiente en otras OT se trae a esta orden. Una batería sin MC entra sola.</p>
+        <textarea id="nl-mcs" rows="4" style="width:100%;max-width:520px;" placeholder="MC2500123&#10;BA2500456"></textarea>
+        <div class="materiales-controles">
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="nl-activa" checked> Dejarla como lista activa</label>
+          <button type="button" id="nl-crear" class="btn-primario">Crear lista</button>
+          <button type="button" id="nl-cancelar">Cancelar</button>
+        </div>
+      </div>
+
+      <div class="scroll-x-tabla" style="max-height:none;">
+        <table class="tabla-revision orep-lista">
+          <thead><tr><th>Lista</th><th>Equipos</th><th>Baterías</th><th>Listos</th><th>Entregados</th><th>Avance</th><th></th></tr></thead>
+          <tbody id="tbody-listas"></tbody>
+        </table>
+      </div>
+      <p class="ot-meta" id="lista-msg" style="margin-top:8px;"></p>
+
+      <details style="margin-top:12px;">
+        <summary style="cursor:pointer;font-weight:600;">🔁 Baterías OK que se reutilizan en otros equipos</summary>
+        <p class="ot-meta">Pega los MC de los equipos cuya batería está OK: esa batería se usa en otro equipo y a ellos se les repone una nueva. Después, en la pestaña Baterías, indica a qué MC va cada una.</p>
+        <textarea id="lista-bok" rows="2" style="width:100%;max-width:520px;" placeholder="MC2500785&#10;MC2500283"></textarea>
+        <div class="materiales-controles"><button type="button" id="lista-bok-aplicar">Marcar como batería OK reutilizable</button></div>
+      </details>
+    </div>
     </div>
 
     <div id="tab-anadir" hidden>
