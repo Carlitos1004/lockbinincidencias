@@ -25,6 +25,11 @@
   .orep-mc th, .orep-mc td { padding:6px 10px; border-top:1px solid #e8eee9; text-align:left; font-size:.92em; }
   .orep-mc input[type=text], .orep-mc select { max-width:190px; }
   .orep-acciones { padding:8px 14px 12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .orep-mc-cab { padding-bottom:8px; }
+  .orep-fecha-ent { margin-left:auto; font-size:.88em; font-weight:600; color:#1f4e8c; white-space:nowrap; }
+  .orep-mc-sub { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:6px 14px; background:#fafcfa; border-top:1px solid #e8eee9; font-size:.88em; }
+  .orep-mc-sub input[type=text] { width:260px; max-width:100%; }
+  .orep-mc input[type=text] { max-width:150px; }
   .orep-lista tr.orep-fila { cursor:pointer; }
   .orep-lista tr.orep-fila:hover { background:#f3f7f4; }
   .orep-lista tr.orep-activa { background:#e6f2ea; }
@@ -74,6 +79,11 @@
         <option value="Listo para entregar">Listos para entregar</option>
         <option value="Entregado">Entregados</option>
       </select>
+      <select id="filtro-lista"></select>
+      <select id="orden-mc">
+        <option value="fecha">Ordenar por fecha de entrega (antiguas primero)</option>
+        <option value="mc">Ordenar por MC</option>
+      </select>
       <select id="filtro-categoria">
         <option value="">Todas las categorías</option>
         <option>Equipo OK</option>
@@ -85,6 +95,27 @@
         <option>Con piezas faltantes</option>
         <option>Cambio de equipo completo</option>
       </select>
+    </div>
+
+    <div id="bloque-listas" class="pre-caja" style="border:1px solid #d9e2dc;border-radius:10px;padding:12px 14px;margin:14px 0;background:#fff;">
+      <h3 style="margin-top:0;">📋 Listas de reposición</h3>
+      <p class="ot-meta">Una lista es lo que se repone ahora dentro de esta orden. El operario ve por defecto la lista activa (★). Los equipos se muestran de la entrega más antigua a la más reciente.</p>
+      <div class="materiales-controles">
+        <button type="button" id="lista-hacer-activa">★ Dejar la lista seleccionada como activa</button>
+        <button type="button" id="lista-marcar-visibles">Marcar los equipos visibles</button>
+        <button type="button" id="lista-quitar-marcados">Quitar marcados de su lista</button>
+      </div>
+      <div class="materiales-controles">
+        <input type="text" id="lista-nombre" placeholder="Nombre de la lista (ej. Semana 45)">
+        <button type="button" id="lista-anadir-marcados">Añadir marcados a esta lista</button>
+      </div>
+      <p class="ot-meta" style="margin-top:10px;">O pega aquí los MC (uno por línea o separados por comas). Los que tengan piezas pendientes en otras OT se añaden solos a esta orden:</p>
+      <textarea id="lista-mcs" rows="4" style="width:100%;max-width:520px;" placeholder="MC2500123&#10;MC2500456, MC2500789"></textarea>
+      <div class="materiales-controles">
+        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="lista-activa-chk" checked> Dejarla como lista activa</label>
+        <button type="button" id="lista-crear" class="btn-primario">Crear lista con estos MC</button>
+      </div>
+      <p class="ot-meta" id="lista-msg"></p>
     </div>
 
     <div id="lista-mc"></div>

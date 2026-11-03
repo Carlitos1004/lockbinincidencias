@@ -26,6 +26,8 @@ let ordenesPorOt = {};   // id_ot -> fila de ordenes_reposicion
 let otActual = null;
 let compsOtActual = [];   // componentes de la orden abierta
 let clienteOtActual = "";
+let fechasEntrega = {};    // mc -> fecha de entrega del equipo al cliente (para ordenar)
+let listaSel = "";         // lista seleccionada en pantalla ("" = todas, "__sin" = sin lista)
 let equiposCompletos = {}; // mc -> fila de reposicion_equipos (cambio de equipo completo + nota)
 let presPorComp = {};      // componente_id -> {numero, oferta, estado, aprobada}
 
@@ -146,6 +148,7 @@ async function detectarRol() {
   document.getElementById("bloque-buscar").hidden = !esManager;
   document.getElementById("bloque-extra").hidden = !esManager;
   document.getElementById("bloque-lote").hidden = !esManager;
+  document.getElementById("bloque-listas").hidden = !esManager;
   if (!esManager) {
     const volver = document.querySelector(".btn-volver");
     if (volver) { volver.href = "ruta.html"; volver.innerHTML = '<span class="btn-volver-flecha">←</span> Volver a Ruta'; }
@@ -261,6 +264,7 @@ async function abrirOt(idOt) {
     cargarOts();
   }
   otActual = idOt;
+  listaSel = (ordenesPorOt[idOt] && ordenesPorOt[idOt].lista_activa) || "";
   document.querySelectorAll("tr.orep-fila").forEach(tr =>
     tr.classList.toggle("orep-activa", tr.dataset.ot === idOt));
   document.getElementById("detalle").hidden = false;
@@ -283,6 +287,19 @@ async function recargarOt() {
     const { data: eqs } = await supabaseClient.from("reposicion_equipos").select("*").eq("id_ot", otActual);
     (eqs || []).forEach(e => { equiposCompletos[e.m_control] = e; });
   } catch (err) { console.error(err); }
+  fechasEntrega = {};
+  try {
+    const mcsOt = [...new Set(compsOtActual.map(c => c.m_control).filter(Boolean))];
+    for (let i = 0; i < mcsOt.length; i += 100) {
+      const { data: fe } = await supabaseClient.from("fechas_entrega").select("identificador, fecha_entrega").in("identificador", mcsOt.slice(i, i + 100));
+      (fe || []).forEach(f => { if (f.fecha_entrega) fechasEntrega[f.identificador] = f.fecha_entrega; });
+    }
+    const sinFecha = mcsOt.filter(m => !fechasEntrega[m]);
+    for (let i = 0; i < sinFecha.length; i += 100) {
+      const { data: eq } = await supabaseClient.from("equipos").select("m_control, fecha_instalacion").in("m_control", sinFecha.slice(i, i + 100));
+      (eq || []).forEach(e => { if (e.fecha_instalacion) fechasEntrega[e.m_control] = e.fecha_instalacion; });
+    }
+  } catch (err) { console.error("No se pudieron cargar las fechas de entrega:", err); }
   presPorComp = {};
   try {
     const ids = [...new Set(compsOtActual.map(c => String(c.id)))];
@@ -307,6 +324,15 @@ function renderDetalle() {
 
   const fMc = document.getElementById("filtro-mc").value.trim().toLowerCase();
   const fEst = document.getElementById("filtro-estado-mc").value;
+  // Selector de listas (con contador) y orden
+  const nombresListas = {};
+  Object.values(equiposCompletos).forEach(e => { if (e.lista) nombresListas[e.lista] = (nombresListas[e.lista] || 0) + 1; });
+  const activa = (ordenesPorOt[otActual] || {}).lista_activa || "";
+  const selLista = document.getElementById("filtro-lista");
+  selLista.innerHTML = '<option value="">Todos los equipos de la orden</option><option value="__sin">Sin lista</option>' +
+    Object.keys(nombresListas).sort().map(n => `<option value="${esc(n)}">📋 ${esc(n)} (${nombresListas[n]})${n === activa ? " ★ activa" : ""}</option>`).join("");
+  if (listaSel && listaSel !== "__sin" && !nombresListas[listaSel]) listaSel = "";
+  selLista.value = listaSel;
   const fCat = document.getElementById("filtro-categoria").value;
   const cumpleCat = m => {
     if (!fCat) return true;
@@ -315,7 +341,16 @@ function renderDetalle() {
     if (fCat === "Presupuesto aprobado") return m.casillas.some(x => x.comp && presPorComp[String(x.comp.id)] && presPorComp[String(x.comp.id)].aprobada === true);
     return m.casillas.some(x => x.comp && categoriaCasilla(x.comp) === fCat);
   };
-  const visibles = mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc)) && (!fEst || m.estadoMc === fEst) && cumpleCat(m));
+  const cumpleLista = m => !listaSel || (listaSel === "__sin" ? !(equiposCompletos[m.mc] && equiposCompletos[m.mc].lista) : (equiposCompletos[m.mc] && equiposCompletos[m.mc].lista) === listaSel);
+  const visibles = mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc)) && (!fEst || m.estadoMc === fEst) && cumpleCat(m) && cumpleLista(m));
+  // Orden: por fecha de entrega al cliente, de la más antigua a la más reciente (sin fecha, al final)
+  const modoOrden = document.getElementById("orden-mc").value;
+  if (modoOrden === "fecha") {
+    visibles.sort((a, b) => {
+      const fa = fechasEntrega[a.mc] || "9999", fb = fechasEntrega[b.mc] || "9999";
+      return fa.localeCompare(fb) || a.mc.localeCompare(b.mc);
+    });
+  }
 
   document.getElementById("lista-mc").innerHTML = visibles.length
     ? visibles.map(htmlMc).join("")
@@ -373,15 +408,22 @@ function htmlMc(m) {
   const detalleFaltan = m.faltan.length ? ` · faltan: ${esc(m.faltan.join(", "))}` : "";
 
   const eqc = equiposCompletos[m.mc] || {};
-  const bloqueEqc = `<label class="orep-eqc" style="display:flex;align-items:center;gap:6px;font-size:.88em;">
-      <input type="checkbox" class="chk-eqc" data-mc="${esc(m.mc)}" ${eqc.cambio_completo ? "checked" : ""} ${esManager ? "" : "disabled"}> 🔄 Se cambia el equipo completo</label>
-      <input type="text" class="inp-eqc-nota" data-mc="${esc(m.mc)}" placeholder="Nota del equipo" value="${esc(eqc.nota || "")}" style="min-width:200px;" ${esManager ? "" : "disabled"}>`;
+  const fEnt = fechasEntrega[m.mc];
+  const fEntTxt = fEnt ? new Date(fEnt + "T00:00:00").toLocaleDateString("es-ES") : "sin fecha de entrega";
   return `<div class="orep-mc">
-    <div class="orep-mc-cab"><strong>${esc(m.mc)}</strong>
+    <div class="orep-mc-cab">
+      ${esManager ? `<input type="checkbox" class="chk-sel-mc" data-mc="${esc(m.mc)}" title="Marcar para añadir a una lista">` : ""}
+      <strong>${esc(m.mc)}</strong>
       <span class="orep-badge ${claseMc(m.estadoMc)}">${esc(m.estadoMc)}</span>
       ${eqc.cambio_completo ? '<span class="orep-badge orep-info">🔄 Equipo completo</span>' : ""}
+      ${eqc.lista ? `<span class="orep-badge orep-gris">📋 ${esc(eqc.lista)}</span>` : ""}
       <span>${esc(m.cliente || "")}${detalleFaltan}${fechaEnt ? ` · entregado el ${esc(fechaEnt)}` : ""}</span>
-      <span style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${bloqueEqc}</span></div>
+      <span class="orep-fecha-ent" title="Fecha de entrega del equipo al cliente">📅 ${esc(fEntTxt)}</span></div>
+    <div class="orep-mc-sub">
+      <label style="display:flex;align-items:center;gap:6px;">
+        <input type="checkbox" class="chk-eqc" data-mc="${esc(m.mc)}" ${eqc.cambio_completo ? "checked" : ""} ${esManager ? "" : "disabled"}> 🔄 Se cambia el equipo completo</label>
+      <input type="text" class="inp-eqc-nota" data-mc="${esc(m.mc)}" placeholder="Nota del equipo" value="${esc(eqc.nota || "")}" ${esManager ? "" : "disabled"}>
+    </div>
     <div class="scroll-x-tabla" style="max-height:none;"><table>
       <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th><th>Nota</th></tr></thead>
       <tbody>${filas}</tbody></table></div>
@@ -439,7 +481,7 @@ function enlazarEventos() {
       id_ot: otActual, m_control: mc, cambio_completo: chk.checked, nota, actualizado_en: new Date().toISOString()
     }, { onConflict: "id_ot,m_control" });
     if (error) { alert("No se pudo guardar: " + error.message + "\n(¿Corriste el SQL 86?)"); return; }
-    equiposCompletos[mc] = { id_ot: otActual, m_control: mc, cambio_completo: chk.checked, nota };
+    equiposCompletos[mc] = Object.assign({}, equiposCompletos[mc], { id_ot: otActual, m_control: mc, cambio_completo: chk.checked, nota });
     renderDetalle();
   };
   document.querySelectorAll(".chk-eqc").forEach(c => c.addEventListener("change", () => guardarEqc(c.dataset.mc)));
@@ -499,6 +541,8 @@ async function entregarEquipo(mc) {
 document.getElementById("filtro-mc").addEventListener("input", () => otActual && renderDetalle());
 document.getElementById("filtro-estado-mc").addEventListener("change", () => otActual && renderDetalle());
 document.getElementById("filtro-categoria").addEventListener("change", () => otActual && renderDetalle());
+document.getElementById("orden-mc").addEventListener("change", () => otActual && renderDetalle());
+document.getElementById("filtro-lista").addEventListener("change", e => { listaSel = e.target.value; if (otActual) renderDetalle(); });
 
 document.getElementById("extra-buscar").addEventListener("click", async () => {
   const mc = document.getElementById("extra-mc").value.trim().toUpperCase();
@@ -572,4 +616,88 @@ document.getElementById("lote-anadir").addEventListener("click", async () => {
   document.getElementById("lote-resultado").innerHTML = `<p>✅ ${ids.length} pieza(s) añadidas a esta orden.</p>`;
   loteCandidatas = loteCandidatas.filter(c => !ids.includes(String(c.id)));
   await recargarOt(); cargarOts();
+});
+
+// ---------- Listas de reposición (lo que se repone ahora) ----------
+const entregadaC = c => c.repo_estado === "Entregado" || ((c.destino || "").includes("Devolver al cliente") && !!c.devuelto);
+
+async function guardarListaEquipos(mcs, lista) {
+  const filas = mcs.map(mc => ({ id_ot: otActual, m_control: mc, lista, actualizado_en: new Date().toISOString() }));
+  for (let i = 0; i < filas.length; i += 200) {
+    const { error } = await supabaseClient.from("reposicion_equipos").upsert(filas.slice(i, i + 200), { onConflict: "id_ot,m_control" });
+    if (error) { alert("No se pudo guardar la lista: " + error.message + "\n(¿Corriste el SQL 87?)"); return false; }
+  }
+  return true;
+}
+
+async function ponerListaActiva(nombre) {
+  const { error } = await supabaseClient.from("ordenes_reposicion").update({ lista_activa: nombre || null }).eq("id_ot", otActual);
+  if (error) { alert("No se pudo guardar la lista activa: " + error.message + "\n(¿Corriste el SQL 87?)"); return false; }
+  ordenesPorOt[otActual].lista_activa = nombre || null;
+  return true;
+}
+
+document.getElementById("lista-crear").addEventListener("click", async () => {
+  const msg = document.getElementById("lista-msg");
+  const nombre = document.getElementById("lista-nombre").value.trim();
+  const mcs = [...new Set(document.getElementById("lista-mcs").value.toUpperCase().match(/MC\d+/g) || [])];
+  if (!otActual) { msg.textContent = "Abre primero una orden."; return; }
+  if (!nombre) { msg.textContent = "⚠️ Ponle un nombre a la lista (ej. Semana 45)."; return; }
+  if (!mcs.length) { msg.textContent = "⚠️ Pega al menos un MC (MC2500123...)."; return; }
+  msg.textContent = "Procesando...";
+  const enOrden = new Set(compsOtActual.map(c => c.m_control));
+  const fuera = mcs.filter(m => !enOrden.has(m));
+  const anadidos = [], sinPiezas = [];
+  if (fuera.length) {
+    const pendientes = [];
+    for (let i = 0; i < fuera.length; i += 100) {
+      const { data } = await supabaseClient.from("componentes_retirados").select(CAMPOS).in("m_control", fuera.slice(i, i + 100));
+      (data || []).forEach(c => pendientes.push(c));
+    }
+    const porMc = {};
+    pendientes.filter(c => !entregadaC(c)).forEach(c => { (porMc[c.m_control] = porMc[c.m_control] || []).push(c.id); });
+    for (const mc of fuera) {
+      if (!porMc[mc]) { sinPiezas.push(mc); continue; }
+      const { error } = await supabaseClient.from("componentes_retirados").update({ orden_reposicion_ot: otActual }).in("id", porMc[mc]);
+      if (error) { msg.textContent = "❌ No se pudieron añadir piezas de " + mc + ": " + error.message; return; }
+      anadidos.push(mc);
+    }
+  }
+  const listables = mcs.filter(m => !sinPiezas.includes(m));
+  if (!(await guardarListaEquipos(listables, nombre))) { msg.textContent = ""; return; }
+  if (document.getElementById("lista-activa-chk").checked) await ponerListaActiva(nombre);
+  listaSel = nombre;
+  msg.innerHTML = `✅ Lista "${esc(nombre)}": ${listables.length} equipos.` +
+    (anadidos.length ? ` ${anadidos.length} se añadieron desde otras OT (${esc(anadidos.join(", "))}).` : "") +
+    (sinPiezas.length ? `<br>⚠️ Sin piezas pendientes en la base, no entran: ${esc(sinPiezas.join(", "))}` : "");
+  await recargarOt(); cargarOts();
+});
+
+document.getElementById("lista-anadir-marcados").addEventListener("click", async () => {
+  const msg = document.getElementById("lista-msg");
+  const nombre = document.getElementById("lista-nombre").value.trim();
+  const mcs = [...document.querySelectorAll(".chk-sel-mc:checked")].map(c => c.dataset.mc);
+  if (!nombre) { msg.textContent = "⚠️ Escribe el nombre de la lista."; return; }
+  if (!mcs.length) { msg.textContent = "⚠️ Marca equipos con la casilla de su cabecera."; return; }
+  if (await guardarListaEquipos(mcs, nombre)) { msg.textContent = `✅ ${mcs.length} equipos añadidos a "${nombre}".`; await recargarOt(); }
+});
+
+document.getElementById("lista-quitar-marcados").addEventListener("click", async () => {
+  const msg = document.getElementById("lista-msg");
+  const mcs = [...document.querySelectorAll(".chk-sel-mc:checked")].map(c => c.dataset.mc);
+  if (!mcs.length) { msg.textContent = "⚠️ Marca equipos con la casilla de su cabecera."; return; }
+  if (await guardarListaEquipos(mcs, null)) { msg.textContent = `✅ ${mcs.length} equipos quitados de su lista.`; await recargarOt(); }
+});
+
+document.getElementById("lista-marcar-visibles").addEventListener("click", () =>
+  document.querySelectorAll(".chk-sel-mc").forEach(c => { c.checked = true; }));
+
+document.getElementById("lista-hacer-activa").addEventListener("click", async () => {
+  const msg = document.getElementById("lista-msg");
+  if (!otActual) return;
+  const nombre = (listaSel && listaSel !== "__sin") ? listaSel : "";
+  if (await ponerListaActiva(nombre)) {
+    msg.textContent = nombre ? `★ "${nombre}" es ahora la lista activa: es la que se muestra por defecto.` : "Sin lista activa: se muestran todos los equipos.";
+    renderDetalle();
+  }
 });
