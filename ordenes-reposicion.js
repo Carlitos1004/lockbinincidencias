@@ -33,6 +33,7 @@ let otActual = null;
 let compsOtActual = [];   // componentes de la orden abierta
 let clienteOtActual = "";
 let subTab = "Piezas";     // pestaña activa: "Piezas" (equipos) o "Batería"
+let fechasFactura = {};    // mc -> fecha de factura / inicio de contrato (la que suele traer el Excel de Porto)
 let fechasEntrega = {};    // mc -> fecha de entrega del equipo al cliente (para ordenar)
 let listaSel = "";         // lista seleccionada en pantalla ("" = todas, "__sin" = sin lista)
 let equiposCompletos = {}; // mc -> fila de reposicion_equipos (cambio de equipo completo + nota)
@@ -347,11 +348,12 @@ async function recargarOt() {
     (eqs || []).forEach(e => { equiposCompletos[e.m_control] = e; });
   } catch (err) { console.error(err); }
   fechasEntrega = {};
+  fechasFactura = {};
   try {
     const mcsOt = [...new Set(compsOtActual.map(c => c.m_control).filter(Boolean))];
     for (let i = 0; i < mcsOt.length; i += 100) {
-      const { data: fe } = await supabaseClient.from("fechas_entrega").select("identificador, fecha_entrega").in("identificador", mcsOt.slice(i, i + 100));
-      (fe || []).forEach(f => { if (f.fecha_entrega) fechasEntrega[f.identificador] = f.fecha_entrega; });
+      const { data: fe } = await supabaseClient.from("fechas_entrega").select("identificador, fecha_entrega, fecha_factura").in("identificador", mcsOt.slice(i, i + 100));
+      (fe || []).forEach(f => { if (f.fecha_entrega) fechasEntrega[f.identificador] = f.fecha_entrega; if (f.fecha_factura) fechasFactura[f.identificador] = f.fecha_factura; });
     }
     const sinFecha = mcsOt.filter(m => !fechasEntrega[m]);
     for (let i = 0; i < sinFecha.length; i += 100) {
@@ -427,7 +429,12 @@ function renderDetalle() {
   const visibles = sinListaActiva ? [] : mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc)) && (!fEst || m.estadoMc === fEst) && cumpleCat(m) && cumpleLista(m) && cumpleTipo(m));
   // Orden: por fecha de entrega al cliente, de la más antigua a la más reciente (sin fecha, al final)
   const modoOrden = document.getElementById("orden-mc").value;
-  if (modoOrden === "fecha") {
+  if (modoOrden === "factura") {
+    visibles.sort((a, b) => {
+      const fa = fechasFactura[a.mc] || "9999", fb = fechasFactura[b.mc] || "9999";
+      return fa.localeCompare(fb) || a.mc.localeCompare(b.mc);
+    });
+  } else if (modoOrden === "fecha") {
     visibles.sort((a, b) => {
       const fa = fechasEntrega[a.mc] || "9999", fb = fechasEntrega[b.mc] || "9999";
       return fa.localeCompare(fb) || a.mc.localeCompare(b.mc);
@@ -612,6 +619,7 @@ function htmlMc(m) {
     ? `<span class="orep-chip-cambiar">🔧 Cambiar: ${esc(aCambiar.join(", "))}</span>`
     : '<span class="orep-chip-nada">Nada que cambiar</span>';
   const otsOrigen = [...new Set(m.casillas.map(x => x.comp && x.comp.id_ot).filter(Boolean))].sort();
+  const fFac = fechasFactura[m.mc] ? new Date(fechasFactura[m.mc] + "T00:00:00").toLocaleDateString("es-ES") : "";
   const fEnt = fechasEntrega[m.mc];
   const fEntTxt = fEnt ? new Date(fEnt + "T00:00:00").toLocaleDateString("es-ES") : "sin fecha de entrega";
   return `<div class="orep-mc">
@@ -626,7 +634,7 @@ function htmlMc(m) {
       ${esBat ? chipCambiar : ""}
       ${eqc.lista ? `<span class="orep-badge orep-gris">📋 ${esc(eqc.lista)}</span>` : ""}
       <span>${esc(m.cliente || "")}${detalleFaltan}${fechaEnt ? ` · entregado el ${esc(fechaEnt)}` : ""}</span>
-      <span class="orep-fecha-ent" title="Fecha de entrega del equipo al cliente">📅 ${esc(fEntTxt)}</span></div>
+      <span class="orep-fecha-ent" title="Fecha real de entrega del equipo al cliente">📅 Entrega: ${esc(fEntTxt)}${fFac ? ` · <span title="Fecha de factura / inicio de contrato (la del Excel de Porto)">🧾 Factura: ${esc(fFac)}</span>` : ""}</span></div>
     ${esBat ? (esManager ? `<div class="orep-mc-sub">
       <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="chk-bok" data-mc="${esc(m.mc)}" ${eqc.bateria_ok ? "checked" : ""}> 🔁 Batería OK: reutilizar en otro equipo</label>
       <input type="text" class="inp-bok-dest" data-mc="${esc(m.mc)}" placeholder="MC al que va" value="${esc(eqc.bateria_ok_destino || "")}" style="width:160px;">
