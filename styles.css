@@ -2155,3 +2155,30 @@ a.tarjeta-resumen:hover {
   grid-column: 2;
   margin-top: 2px;
 }
+
+/* --- Gestión de equipos: equipos ocultos por reposición --- */
+#bloque-ocultos {
+  background: var(--blanco);
+  border: 1px solid var(--gris-200);
+  border-radius: 10px;
+  padding: 4px 16px 14px;
+}
+#bloque-ocultos > summary {
+  padding: 12px 0;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+}
+#bloque-ocultos > .ot-meta {
+  margin: 4px 0 14px;
+  line-height: 1.45;
+}
+#bloque-ocultos td { vertical-align: middle; }
+#bloque-ocultos td:last-child { text-align: right; white-space: nowrap; }
+#info-ots-rep { line-height: 1.5; }
+
+/* --- Campo con botón de escanear QR (panel cliente) --- */
+.campo-scan { display: flex; gap: 6px; align-items: center; flex: 1 1 220px; min-width: 0; }
+.campo-scan input { flex: 1; min-width: 0; }
+.btn-scan { flex: 0 0 auto; min-width: 46px; min-height: 42px; padding: 0 12px; border: none; border-radius: 10px; background: var(--verde-medio); color: var(--blanco); font-size: 1.2rem; cursor: pointer; }
+#qr-lector-cliente { border-radius: 10px; overflow: hidden; max-width: 420px; }

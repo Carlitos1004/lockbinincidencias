@@ -141,4 +141,56 @@ document.getElementById("cambio-btn").addEventListener("click", async () => {
   cargarCambiosPropios();
 });
 
+// ---------- Escaneo de QR con la cámara del móvil / tablet ----------
+let scannerCliente = null;
+const TIPO_POR_PREFIJO = { MC: "Módulo de Control", LE: "Lector Electrónico", CE: "Cierre Electrónico", BA: "Batería" };
+
+function detenerScannerCliente() {
+  if (scannerCliente) {
+    const s = scannerCliente;
+    scannerCliente = null;
+    s.stop().then(() => s.clear()).catch(() => {});
+  }
+  document.getElementById("scan-zona").hidden = true;
+}
+
+function iniciarScannerCliente(idDestino) {
+  if (typeof Html5Qrcode === "undefined") {
+    alert("El lector de QR no se pudo cargar. Revisa tu conexión y recarga la página.");
+    return;
+  }
+  detenerScannerCliente();
+  const zona = document.getElementById("scan-zona");
+  zona.hidden = false;
+  document.getElementById("qr-lector-cliente").innerHTML = "";
+  zona.scrollIntoView({ behavior: "smooth", block: "center" });
+
+  scannerCliente = new Html5Qrcode("qr-lector-cliente");
+  scannerCliente.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 220 },
+    (texto) => {
+      const valor = texto.trim().toUpperCase();
+      detenerScannerCliente();
+      const input = document.getElementById(idDestino);
+      input.value = valor;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      // Si no han elegido el tipo, lo deducimos del prefijo del serial escaneado (LE, CE, BA, MC)
+      if (idDestino === "cambio-serial-nuevo" || idDestino === "cambio-serial-anterior") {
+        const tipoSel = document.getElementById("cambio-tipo");
+        const tipo = TIPO_POR_PREFIJO[valor.slice(0, 2)];
+        if (!tipoSel.value && tipo) tipoSel.value = tipo;
+      }
+    },
+    () => {} // frames sin QR: normal mientras enfoca
+  ).catch(err => {
+    detenerScannerCliente();
+    alert("No se pudo acceder a la cámara. Permite el acceso a la cámara en el navegador y vuelve a intentarlo.\n\n" + err);
+  });
+}
+
+document.querySelectorAll(".btn-scan").forEach(btn =>
+  btn.addEventListener("click", () => iniciarScannerCliente(btn.dataset.destino)));
+document.getElementById("scan-cancelar").addEventListener("click", detenerScannerCliente);
+
 iniciar();

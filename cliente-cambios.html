@@ -30,7 +30,7 @@
   <div class="agregar-equipo-box">
     <label><strong>Reportar un cambio</strong></label>
     <div class="materiales-controles">
-      <input type="text" id="cambio-mc" list="datalist-equipos-cliente" placeholder="Escribe o elige el módulo (MC)...">
+      <span class="campo-scan"><input type="text" id="cambio-mc" list="datalist-equipos-cliente" placeholder="Escribe, elige o escanea el módulo (MC)..."><button type="button" class="btn-scan" data-destino="cambio-mc" title="Escanear con la cámara" aria-label="Escanear con la cámara">📷</button></span>
       <datalist id="datalist-equipos-cliente"></datalist>
       <select id="cambio-tipo">
         <option value="">Tipo de componente...</option>
@@ -42,8 +42,13 @@
       </select>
     </div>
     <div class="materiales-controles">
-      <input type="text" id="cambio-serial-anterior" placeholder="Serial anterior (si lo conoces)">
-      <input type="text" id="cambio-serial-nuevo" placeholder="Serial nuevo (si lo conoces)">
+      <span class="campo-scan"><input type="text" id="cambio-serial-anterior" placeholder="Serial anterior (si lo conoces)"><button type="button" class="btn-scan" data-destino="cambio-serial-anterior" title="Escanear con la cámara" aria-label="Escanear con la cámara">📷</button></span>
+      <span class="campo-scan"><input type="text" id="cambio-serial-nuevo" placeholder="Serial nuevo (si lo conoces)"><button type="button" class="btn-scan" data-destino="cambio-serial-nuevo" title="Escanear con la cámara" aria-label="Escanear con la cámara">📷</button></span>
+    </div>
+    <div id="scan-zona" class="qr-zona" hidden>
+      <p id="scan-texto" style="margin:0 0 8px;">Apunta la cámara al código QR de la etiqueta.</p>
+      <div id="qr-lector-cliente"></div>
+      <button type="button" id="scan-cancelar" class="btn-secundario" style="margin-top:8px;">Cancelar</button>
     </div>
     <textarea id="cambio-descripcion" rows="2" placeholder="Cuéntanos qué cambiaron y cuándo (ej: 'Cambiamos la batería el 20/9, no tenemos el serial a mano')."></textarea>
     <button id="cambio-btn" class="btn-primario" style="margin-top:8px;">Enviar reporte de cambio</button>
@@ -60,6 +65,7 @@
 <script src="config.js"></script>
 <script>const ROL_ESPERADO = "cliente";</script>
 <script src="sesion.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="cliente-cambios.js"></script>
 
 <footer class="footer-fv">
