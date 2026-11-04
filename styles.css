@@ -2182,3 +2182,7 @@ a.tarjeta-resumen:hover {
 .campo-scan input { flex: 1; min-width: 0; }
 .btn-scan { flex: 0 0 auto; min-width: 46px; min-height: 42px; padding: 0 12px; border: none; border-radius: 10px; background: var(--verde-medio); color: var(--blanco); font-size: 1.2rem; cursor: pointer; }
 #qr-lector-cliente { border-radius: 10px; overflow: hidden; max-width: 420px; }
+
+/* --- Botones de acción al final de una fila de tabla: en columna, mismo ancho --- */
+.acciones-fila { display: flex; flex-direction: column; gap: 6px; align-items: stretch; min-width: 138px; }
+.acciones-fila .btn-compacto { width: 100%; margin: 0; text-align: center; white-space: nowrap; display: block; box-sizing: border-box; text-decoration: none; }

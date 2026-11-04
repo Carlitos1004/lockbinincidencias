@@ -74,11 +74,11 @@ function renderFallas() {
       <td>${f.m_control}</td>
       <td>${f.mensaje}</td>
       <td>${f.estado}</td>
-      <td>
+      <td><div class="acciones-fila">
         ${f.estado === "Nueva" ? `<button class="btn-marcar-vista-falla btn-secundario btn-compacto" data-id="${f.id}">Marcar vista</button>` : ""}
         ${f.estado !== "Atendida" ? `<button class="btn-atender-falla btn-primario btn-compacto" data-id="${f.id}">Marcar atendida</button>` : ""}
         <button class="btn-crear-ot-falla btn-secundario btn-compacto" data-id="${f.id}">Crear OT →</button>
-      </td>
+      </div></td>
     </tr>
   `).join("");
 
@@ -155,11 +155,11 @@ function renderCambios() {
       <td>${c.serial_anterior || "—"} → ${c.serial_nuevo || "—"}</td>
       <td>${c.descripcion || "—"}</td>
       <td>${c.estado}</td>
-      <td>
+      <td><div class="acciones-fila">
         ${c.estado === "Nueva" ? `<button class="btn-marcar-vista-cambio btn-secundario btn-compacto" data-id="${c.id}">Marcar vista</button>` : ""}
         ${c.estado !== "Aplicado en equipos" ? `<button class="btn-aplicar-cambio btn-primario btn-compacto" data-id="${c.id}">Marcar aplicado</button>` : ""}
         <a href="buscar-serial.html" class="btn-secundario btn-compacto btn-ver-mc-cambio" data-mc="${c.m_control}">Ver equipo →</a>
-      </td>
+      </div></td>
     </tr>
   `).join("");
 
