@@ -1127,6 +1127,13 @@ document.addEventListener("click", (e) => {
   if (btn) abrirHistorialEquipo(btn.dataset.mc);
 });
 
+// Fecha de la OT abierta (para saber en qué contenedor estaba el MC en ese momento)
+function fechaOtParaHistorial() {
+  const o = otActualCargada || {};
+  const f = o.fecha || o.fecha_creacion || o.created_at || null;
+  return f ? String(f).slice(0, 10) : null;
+}
+
 async function abrirHistorialEquipo(mc) {
   document.getElementById("modal-historial")?.remove();
   const m = document.createElement("div");
@@ -1139,7 +1146,7 @@ async function abrirHistorialEquipo(mc) {
 
   try {
     const idOtActual = otActualCargada?.id_ot;
-    const cont = await resolverContenedores(supabaseClient, [mc]);
+    const cont = await resolverContenedores(supabaseClient, [mc], fechaOtParaHistorial());
     const id = cont.contenedorDe[mc];
     const ms = cont.miembros[id] || [mc];
     const numero = (cont.numeros || {})[id];
@@ -1147,12 +1154,12 @@ async function abrirHistorialEquipo(mc) {
     const [{ data: eqs }, { data: notas }, visitas, { data: comps }] = await Promise.all([
       supabaseClient.from("equipos").select("m_control, cliente, fraccion, estado_montaje, fecha_instalacion, modelo_bateria, serie_bateria, ultima_comunicacion").in("m_control", ms),
       supabaseClient.from("notas_equipo").select("mc, nota, foto_url").in("mc", ms).eq("activa", true),
-      visitasPorMc(supabaseClient, ms),
+      visitasDeContenedores(supabaseClient, cont, [id]),
       supabaseClient.from("componentes_retirados").select("id_ot, m_control, tipo_componente, serial_retirado, serial_nuevo, destino, causa_falla").in("m_control", ms).order("id_ot", { ascending: false }).limit(60)
     ]);
     const eqPor = {}; (eqs || []).forEach(x => { eqPor[x.m_control] = x; });
     const eq = eqPor[mc] || {};
-    const todas = ms.flatMap(x => visitas[x] || []).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const todas = visitas[id] || [];
 
     let html = `<div class="hist-bloque">
       <strong>${escH(eq.cliente || "—")}</strong> · ${escH(eq.fraccion || "sin fracción")} · ${escH(eq.estado_montaje || "—")}${eq.fecha_instalacion ? " · instalado " + fechaH(eq.fecha_instalacion) : ""}

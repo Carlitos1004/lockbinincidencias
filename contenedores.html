@@ -37,29 +37,30 @@
 <div class="panel-body panel-body-ancho">
   <a href="operacion-diaria.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Operación Diaria</a>
 
-  <p style="margin-top:20px;">Cada contenedor conserva su historial aunque cambie su MC. Aquí ves qué MC ha tenido, sus visitas, y puedes ponerle un número, añadir o quitar MC. Un MC sin enlazar cuenta como su propio contenedor.</p>
+  <p style="margin-top:20px;">Cada contenedor conserva su historial aunque cambie su MC. Cada MC pasa por un contenedor durante una <strong>estancia</strong> (desde que se instala hasta que se retira), y un mismo MC puede tener estancias en contenedores distintos. Aquí ves las estancias, las visitas de cada una, y puedes ponerle número y nota. Un MC sin estancias cuenta como su propio contenedor.</p>
 
   <div class="fila-form">
     <input type="text" id="buscar-cont" placeholder="Buscar por MC o por número de contenedor..." style="min-width:300px;">
     <button type="button" id="buscar-btn">Buscar</button>
   </div>
   <p id="msg-lista" class="msg-cont"></p>
+  <label style="font-size:.9rem;"><input type="checkbox" id="solo-mixtos"> Mostrar solo contenedores cuyas estancias figuran con clientes distintos (revisar)</label>
 
   <h2 style="margin-top:18px;">Contenedores con varios MC o con número</h2>
   <div class="scroll-x-tabla" style="max-height:340px;">
     <table class="tabla-revision">
-      <thead><tr><th>Nº</th><th>ID (MC de origen)</th><th>MC que ha tenido</th><th>Última visita</th></tr></thead>
-      <tbody id="tbody-cont"><tr><td colspan="4">Cargando...</td></tr></tbody>
+      <thead><tr><th>Nº</th><th>Cliente(s)</th><th>ID (MC de origen)</th><th>MC que ha tenido</th><th>Última visita</th></tr></thead>
+      <tbody id="tbody-cont"><tr><td colspan="5">Cargando...</td></tr></tbody>
     </table>
   </div>
 
-  <h2 style="margin-top:26px;">Cambios de MC registrados en OT que faltan por enlazar</h2>
-  <p style="font-size:.88rem;color:#555;">Se buscan en las OT los cambios donde se anotó un MC nuevo (campo "serial nuevo") y que todavía no están enlazados como el mismo contenedor. Revisa y enlaza.</p>
+  <h2 style="margin-top:26px;">Cambios de MC registrados en OT que faltan por registrar en contenedores</h2>
+  <p style="font-size:.88rem;color:#555;">Se buscan en las OT los cambios donde se anotó un MC nuevo (campo "serial nuevo") y que todavía no tienen su estancia en un contenedor. Al enlazar, el MC retirado termina su estancia en esa fecha y el nuevo continúa el contenedor.</p>
   <div class="fila-form"><button type="button" id="enlazar-todos" class="sec" hidden>Enlazar todos los de la lista</button><span id="msg-pend" class="msg-cont"></span></div>
   <div class="scroll-x-tabla" style="max-height:340px;">
     <table class="tabla-revision">
-      <thead><tr><th>Fecha</th><th>OT</th><th>MC que se retiró</th><th>MC nuevo</th><th></th></tr></thead>
-      <tbody id="tbody-pend"><tr><td colspan="5">Cargando...</td></tr></tbody>
+      <thead><tr><th>Fecha</th><th>OT</th><th>MC que se retiró (cliente en la OT)</th><th>MC nuevo</th><th></th><th></th></tr></thead>
+      <tbody id="tbody-pend"><tr><td colspan="6">Cargando...</td></tr></tbody>
     </table>
   </div>
 

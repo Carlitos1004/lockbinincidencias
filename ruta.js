@@ -645,14 +645,15 @@ async function cargarAvisoContenedor(mc) {
     const idOtActiva = sessionStorage.getItem("lockbin_ot_activa");
     const cont = await resolverContenedores(supabaseClient, [mc]);
     if (equipoAbierto !== mc) return;
-    const ms = cont.miembros[cont.contenedorDe[mc]] || [mc];
-    const visitas = await visitasPorMc(supabaseClient, ms, idOtActiva);
+    const cidC = cont.contenedorDe[mc];
+    const ms = cont.miembros[cidC] || [mc];
+    const visitasC = await visitasDeContenedores(supabaseClient, cont, [cidC], idOtActiva);
     if (equipoAbierto !== mc) return;
-    const todas = ms.flatMap(m => visitas[m] || []).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const todas = visitasC[cidC] || [];
     let html = "";
     const numCont = (cont.numeros || {})[cont.contenedorDe[mc]];
     if (numCont) html += `<div style="font-size:0.88rem; font-weight:700;">🗂️ Contenedor Nº ${numCont}</div>`;
-    if (ms.length > 1) html += `<div style="font-size:0.82rem; color:#555;">🔗 Mismo contenedor que: ${ms.filter(m => m !== mc).join(", ")}</div>`;
+    if (ms.length > 1) html += `<div style="font-size:0.82rem; color:#555;">🔗 MC que ha tenido este contenedor: ${ms.filter(m => m !== mc).join(", ")}</div>`;
     if (todas.length) {
       const u = todas[0], dias = diasDesde(u.fecha);
       const reciente = dias <= DIAS_AVISO_VISITA_RECIENTE;
@@ -1053,7 +1054,7 @@ modalEnviarBtn.addEventListener("click", async () => {
   }
   // El MC nuevo hereda la identidad del contenedor del MC al que sustituye
   if (serialesNuevos.MC && codigosCambio.includes("MC") && String(serialesNuevos.MC).toUpperCase() !== equipoAbierto) {
-    await vincularMcContenedor(supabaseClient, equipoAbierto, serialesNuevos.MC, idOtActiva, "ruta");
+    await registrarCambioMc(supabaseClient, equipoAbierto, serialesNuevos.MC, idOtActiva, "ruta");
   }
   if (huboAlgunCambio) {
     // Sin esto, "Utilizados"/"Vuelven" en Materiales se quedan con el

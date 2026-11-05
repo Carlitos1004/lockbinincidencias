@@ -345,13 +345,11 @@ const normFr = f => String(f || "").normalize("NFD").replace(/[\u0300-\u036f]/g,
 async function recalcularHistorialContenedores() {
   const mcs = equiposEncontrados.map(e => e.m_control);
   contenedorInfo = await resolverContenedores(supabaseClient, mcs);
-  const miembrosTodos = [...new Set(Object.values(contenedorInfo.miembros).flat())];
-  const visitas = await visitasPorMc(supabaseClient, miembrosTodos);
+  const visitasC = await visitasDeContenedores(supabaseClient, contenedorInfo, Object.values(contenedorInfo.contenedorDe));
 
   historialPorMC = {};
   mcs.forEach(mc => {
-    const ms = contenedorInfo.miembros[contenedorInfo.contenedorDe[mc]] || [mc];
-    historialPorMC[mc] = ms.flatMap(m => visitas[m] || []).sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 3);
+    historialPorMC[mc] = (visitasC[contenedorInfo.contenedorDe[mc]] || []).slice(0, 3);
   });
 
   // Respaldo por ubicación: otros equipos a pocos metros que ya tengan visitas y no sean del mismo contenedor
@@ -373,13 +371,11 @@ async function recalcularHistorialContenedores() {
   const mcsVecinos = [...new Set(Object.values(candidatos).flat().map(v => v.mc))];
   if (mcsVecinos.length) {
     const contVecinos = await resolverContenedores(supabaseClient, mcsVecinos);
-    const todosMiembrosV = [...new Set(Object.values(contVecinos.miembros).flat())];
-    const visitasV = await visitasPorMc(supabaseClient, todosMiembrosV);
+    const visitasV = await visitasDeContenedores(supabaseClient, contVecinos, Object.values(contVecinos.contenedorDe));
     Object.keys(candidatos).forEach(mc => {
       const lista = [];
       candidatos[mc].forEach(v => {
-        const ms = contVecinos.miembros[contVecinos.contenedorDe[v.mc]] || [v.mc];
-        const ult = ms.flatMap(m => visitasV[m] || []).sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
+        const ult = (visitasV[contVecinos.contenedorDe[v.mc]] || [])[0];
         lista.push({ mc: v.mc, metros: Math.round(v.metros), fraccion: v.fraccion, estado: v.estado, instalado: v.instalado, ultima: ult || null });
       });
       if (lista.length) vecinosPorMC[mc] = lista;
@@ -421,7 +417,7 @@ function renderTabla() {
     const numCont = (contenedorInfo.numeros || {})[contenedorInfo.contenedorDe[eq.m_control]];
     if (numCont) avisoCont += `<div style="font-size:0.8rem; margin-bottom:4px; font-weight:700;">🗂️ Contenedor Nº ${numCont}</div>`;
     if (ms.length > 1) {
-      avisoCont += `<div style="font-size:0.78rem; margin-bottom:4px; color:#555;">🔗 Mismo contenedor que: ${ms.filter(m => m !== eq.m_control).join(", ")}</div>`;
+      avisoCont += `<div style="font-size:0.78rem; margin-bottom:4px; color:#555;">🔗 MC que ha tenido este contenedor: ${ms.filter(m => m !== eq.m_control).join(", ")}</div>`;
     }
     if (historial && historial.length > 0) {
       const dias = diasDesde(historial[0].fecha);
@@ -636,10 +632,12 @@ document.addEventListener("click", async (e) => {
   const btn = e.target.closest(".btn-mismo-contenedor");
   if (!btn) return;
   const actual = btn.dataset.actual, vecino = btn.dataset.vecino;
-  if (!confirm(`¿Confirmas que ${actual} y ${vecino} son el MISMO contenedor?\nA partir de ahora comparten historial.`)) return;
+  const eqActual = equiposEncontrados.find(x => x.m_control === actual) || {};
+  const desde = /^\d{4}-\d{2}-\d{2}/.test(String(eqActual.fecha_instalacion || "")) ? String(eqActual.fecha_instalacion).slice(0, 10) : hoyISO();
+  if (!confirm(`¿Confirmas que ${actual} sustituyó a ${vecino} en el MISMO contenedor?\n${vecino} termina su estancia el ${desde} y ${actual} continúa el historial desde esa fecha.`)) return;
   btn.disabled = true;
-  const r = await vincularMcContenedor(supabaseClient, vecino, actual, null, "manual");
-  if (!r.ok) { alert("No se pudo enlazar: " + r.error + "\n(¿Corriste el SQL 93?)"); btn.disabled = false; return; }
+  const r = await registrarCambioMc(supabaseClient, vecino, actual, null, "manual", desde);
+  if (!r.ok) { alert("No se pudo enlazar: " + r.error + "\n(¿Corriste el SQL 97?)"); btn.disabled = false; return; }
   await recalcularHistorialContenedores();
   renderTabla();
 });
