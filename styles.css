@@ -2186,3 +2186,6 @@ a.tarjeta-resumen:hover {
 /* --- Botones de acción al final de una fila de tabla: en columna, mismo ancho --- */
 .acciones-fila { display: flex; flex-direction: column; gap: 6px; align-items: stretch; min-width: 138px; }
 .acciones-fila .btn-compacto { width: 100%; margin: 0; text-align: center; white-space: nowrap; display: block; box-sizing: border-box; text-decoration: none; }
+
+/* Caja con scroll para tablas: sin esto, una tabla más alta que su max-height se desborda y tapa lo de debajo */
+.scroll-x-tabla { overflow: auto; max-width: 100%; }
