@@ -273,6 +273,7 @@ async function abrirModal(mc) {
   resultadoCom.className = "resultado-comunicacion";
   const info = equiposPorMC[mc];
   modalMc.textContent = mc;
+  cargarAvisoContenedor(mc);
   modalInfo.textContent = `Cliente: ${info.equipo.cliente || "—"} — Fracción: ${info.equipo.fraccion || "—"} — Batería: ${textoBateria(info.equipo)}`;
 
   // Mostramos TODOS los tickets de este equipo en esta OT, no solo los
@@ -633,6 +634,30 @@ function mostrarSelectorManualCategoria(codigo, celda, avisoHtml) {
     categoriasPorComponente[codigo] = e.target.value || null;
     if (!e.target.value) delete categoriasPorComponente[codigo];
   });
+}
+
+// ---------- Historial del contenedor (aunque haya cambiado el MC) ----------
+async function cargarAvisoContenedor(mc) {
+  const aviso = document.getElementById("aviso-contenedor");
+  if (!aviso) return;
+  aviso.innerHTML = "";
+  try {
+    const idOtActiva = sessionStorage.getItem("lockbin_ot_activa");
+    const cont = await resolverContenedores(supabaseClient, [mc]);
+    if (equipoAbierto !== mc) return;
+    const ms = cont.miembros[cont.contenedorDe[mc]] || [mc];
+    const visitas = await visitasPorMc(supabaseClient, ms, idOtActiva);
+    if (equipoAbierto !== mc) return;
+    const todas = ms.flatMap(m => visitas[m] || []).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    let html = "";
+    if (ms.length > 1) html += `<div style="font-size:0.82rem; color:#555;">🔗 Mismo contenedor que: ${ms.filter(m => m !== mc).join(", ")}</div>`;
+    if (todas.length) {
+      const u = todas[0], dias = diasDesde(u.fecha);
+      const reciente = dias <= DIAS_AVISO_VISITA_RECIENTE;
+      html += `<div style="font-size:0.85rem; ${reciente ? "color:#b35c00; font-weight:700;" : "color:#555;"}">${reciente ? "⚠️ " : "🕘 "}Contenedor visitado antes: hace ${dias} día(s) — ${u.id_ot}${u.m_control !== mc ? " (con el MC anterior " + u.m_control + ")" : ""}: ${u.falla || ""}${u.accion_calle ? " — " + u.accion_calle : ""}</div>`;
+    }
+    aviso.innerHTML = html;
+  } catch (err) { console.warn("No se pudo cargar el historial del contenedor:", err); }
 }
 
 // ---------- Comprobación de fracción del MC nuevo ----------
@@ -1023,6 +1048,10 @@ modalEnviarBtn.addEventListener("click", async () => {
   }
   if (filasAInsertar.length > 0) {
     await supabaseClient.from("componentes_retirados").insert(filasAInsertar);
+  }
+  // El MC nuevo hereda la identidad del contenedor del MC al que sustituye
+  if (serialesNuevos.MC && codigosCambio.includes("MC") && String(serialesNuevos.MC).toUpperCase() !== equipoAbierto) {
+    await vincularMcContenedor(supabaseClient, equipoAbierto, serialesNuevos.MC, idOtActiva, "ruta");
   }
   if (huboAlgunCambio) {
     // Sin esto, "Utilizados"/"Vuelven" en Materiales se quedan con el

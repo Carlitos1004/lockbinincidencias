@@ -79,6 +79,10 @@ let equiposEncontrados = []; // [{m_control, fraccion, cliente, fallas: [...]}]
 let notasPorMC = {}; // {mc: [nota1, nota2, ...]}
 let reposicionPorMC = {}; // {mc: {...fila de equipos_reposicion + número de orden}}
 let presupuestoPorMC = {}; // {mc: [{numero, oferta, estado, aprobada, tipo}]} órdenes de presupuesto (vandalismo) aún sin reponer
+let contenedorInfo = { contenedorDe: {}, miembros: {} }; // identidad fija del contenedor (contenedores-core.js)
+let vecinosPorMC = {};   // {mc: [{mc, metros, ultima}]} otros equipos a menos de DIST_VECINO_M con visitas previas
+let todosEquiposCliente = []; // filas de "equipos" del filtro actual (para buscar equipos cercanos)
+const DIST_VECINO_M = 25;
 let historialPorMC = {}; // {mc: [{falla, accion_calle, comentarios, fecha, id_ot}, ...]} últimas 3
 
 const clienteSelect = document.getElementById("cliente-select");
@@ -151,7 +155,7 @@ filtrarBtn.addEventListener("click", async () => {
     })
     .map(eq => {
       const fallas = Object.keys(MAPA_ALARMAS).filter(col => eq[col]).map(col => MAPA_ALARMAS[col]);
-      return { m_control: eq.m_control, fraccion: eq.fraccion, cliente: eq.cliente, estado_montaje: eq.estado_montaje, modelo_bateria: eq.modelo_bateria, serie_bateria: eq.serie_bateria, fallas };
+      return { m_control: eq.m_control, fraccion: eq.fraccion, cliente: eq.cliente, estado_montaje: eq.estado_montaje, modelo_bateria: eq.modelo_bateria, serie_bateria: eq.serie_bateria, latitud: eq.latitud, longitud: eq.longitud, fallas };
     })
     .filter(eq => eq.fallas.length > 0);
 
@@ -175,19 +179,9 @@ filtrarBtn.addEventListener("click", async () => {
     notasPorMC[n.mc].push(n);
   });
 
-  // Traemos el historial de OT anteriores de estos equipos — solo
-  // informativo, para tenerlo a la vista sin salir de esta pantalla
-  const { data: historial } = await supabaseClient
-    .from("historial_fallas")
-    .select("m_control, falla, accion_calle, comentarios, fecha, id_ot")
-    .in("m_control", mcsEncontrados)
-    .order("fecha", { ascending: false });
-
-  historialPorMC = {};
-  (historial || []).forEach(h => {
-    if (!historialPorMC[h.m_control]) historialPorMC[h.m_control] = [];
-    if (historialPorMC[h.m_control].length < 3) historialPorMC[h.m_control].push(h);
-  });
+  // Historial de OT anteriores — por contenedor (incluye los MC que tuvo antes) y equipos cercanos
+  todosEquiposCliente = data || [];
+  await recalcularHistorialContenedores();
 
   // Reposiciones (REP-001 y siguientes): para que se vea en la lista que el
   // equipo salió en una reposición y su falla de comunicación es porque aún
@@ -345,6 +339,54 @@ document.getElementById("ocultos-tbody").addEventListener("click", (e) => {
   renderOcultos();
 });
 
+const normFr = f => String(f || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+
+// Historial por contenedor (MC actuales y anteriores) + aviso de equipos cercanos con visitas
+async function recalcularHistorialContenedores() {
+  const mcs = equiposEncontrados.map(e => e.m_control);
+  contenedorInfo = await resolverContenedores(supabaseClient, mcs);
+  const miembrosTodos = [...new Set(Object.values(contenedorInfo.miembros).flat())];
+  const visitas = await visitasPorMc(supabaseClient, miembrosTodos);
+
+  historialPorMC = {};
+  mcs.forEach(mc => {
+    const ms = contenedorInfo.miembros[contenedorInfo.contenedorDe[mc]] || [mc];
+    historialPorMC[mc] = ms.flatMap(m => visitas[m] || []).sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 3);
+  });
+
+  // Respaldo por ubicación: otros equipos a pocos metros que ya tengan visitas y no sean del mismo contenedor
+  vecinosPorMC = {};
+  const conCoords = todosEquiposCliente.filter(e => isFinite(parseFloat(e.latitud)) && isFinite(parseFloat(e.longitud)));
+  const candidatos = {};
+  equiposEncontrados.forEach(eq => {
+    const lat = parseFloat(eq.latitud), lon = parseFloat(eq.longitud);
+    if (!isFinite(lat) || !isFinite(lon)) return;
+    const propios = new Set(contenedorInfo.miembros[contenedorInfo.contenedorDe[eq.m_control]] || [eq.m_control]);
+    const cercanos = conCoords
+      .filter(o => o.m_control !== eq.m_control && !propios.has(o.m_control) && (!eq.cliente || o.cliente === eq.cliente))
+      .map(o => ({ mc: o.m_control, fraccion: o.fraccion, estado: o.estado_montaje, instalado: o.fecha_instalacion, metros: distanciaMetros(lat, lon, parseFloat(o.latitud), parseFloat(o.longitud)) }))
+      .filter(o => o.metros <= DIST_VECINO_M)
+      .sort((a, b) => a.metros - b.metros)
+      .slice(0, 5);
+    if (cercanos.length) candidatos[eq.m_control] = cercanos;
+  });
+  const mcsVecinos = [...new Set(Object.values(candidatos).flat().map(v => v.mc))];
+  if (mcsVecinos.length) {
+    const contVecinos = await resolverContenedores(supabaseClient, mcsVecinos);
+    const todosMiembrosV = [...new Set(Object.values(contVecinos.miembros).flat())];
+    const visitasV = await visitasPorMc(supabaseClient, todosMiembrosV);
+    Object.keys(candidatos).forEach(mc => {
+      const lista = [];
+      candidatos[mc].forEach(v => {
+        const ms = contVecinos.miembros[contVecinos.contenedorDe[v.mc]] || [v.mc];
+        const ult = ms.flatMap(m => visitasV[m] || []).sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
+        lista.push({ mc: v.mc, metros: Math.round(v.metros), fraccion: v.fraccion, estado: v.estado, instalado: v.instalado, ultima: ult || null });
+      });
+      if (lista.length) vecinosPorMC[mc] = lista;
+    });
+  }
+}
+
 function renderTabla() {
   totalEncontrados.textContent = `${equiposEncontrados.length} equipos encontrados` +
     (ocultosPorReposicion > 0 ? ` (${ocultosPorReposicion} ocultos por estar en reposición)` : "");
@@ -373,10 +415,39 @@ function renderTabla() {
 
     etiquetaRepo += etiquetaPresupuesto(eq.m_control);
 
-    const celdaHistorial = etiquetaRepo + (historial && historial.length > 0
+    // Aviso de contenedor: visita reciente (también con MC anteriores) y equipos cercanos
+    let avisoCont = "";
+    const ms = contenedorInfo.miembros[contenedorInfo.contenedorDe[eq.m_control]] || [eq.m_control];
+    if (ms.length > 1) {
+      avisoCont += `<div style="font-size:0.78rem; margin-bottom:4px; color:#555;">🔗 Mismo contenedor que: ${ms.filter(m => m !== eq.m_control).join(", ")}</div>`;
+    }
+    if (historial && historial.length > 0) {
+      const dias = diasDesde(historial[0].fecha);
+      if (dias <= DIAS_AVISO_VISITA_RECIENTE) {
+        const otroMc = historial[0].m_control !== eq.m_control ? ` (con el MC anterior ${historial[0].m_control})` : "";
+        avisoCont += `<div style="font-size:0.8rem; margin-bottom:4px; color:#b35c00; font-weight:700;">⚠️ Contenedor visitado hace ${dias} día(s)${otroMc} — <a href="ot-detalle.html?ot=${historial[0].id_ot}">${historial[0].id_ot}</a></div>`;
+      }
+    }
+    // Varios contenedores pueden estar juntos (uno por fracción): los de la MISMA fracción son candidatos
+    // a ser el mismo contenedor; los de otra fracción se muestran apagados, como "probablemente otro".
+    const vecinos = (vecinosPorMC[eq.m_control] || []).map(v => ({ ...v, mismaFr: !!eq.fraccion && normFr(v.fraccion) === normFr(eq.fraccion) }))
+      .sort((x, y) => (y.mismaFr - x.mismaFr) || (x.metros - y.metros));
+    vecinos.forEach(v => {
+      const datos = [v.fraccion, v.estado, v.instalado ? "instalado " + new Date(v.instalado).toLocaleDateString("es-ES") : ""].filter(Boolean).join(", ");
+      const visita = v.ultima
+        ? `última visita ${new Date(v.ultima.fecha).toLocaleDateString("es-ES")} (<a href="ot-detalle.html?ot=${v.ultima.id_ot}">${v.ultima.id_ot}</a>)`
+        : "sin visitas registradas";
+      if (v.mismaFr) {
+        avisoCont += `<div style="font-size:0.78rem; margin-bottom:4px; color:#7a4b00; font-weight:600;">📍 A ${v.metros} m, misma fracción: ${v.mc}${datos ? " (" + datos + ")" : ""} — ${visita} <button type="button" class="btn-mismo-contenedor btn-secundario btn-compacto" data-actual="${eq.m_control}" data-vecino="${v.mc}">Es el mismo contenedor</button></div>`;
+      } else {
+        avisoCont += `<div style="font-size:0.74rem; margin-bottom:3px; color:#999;">· A ${v.metros} m hay otro contenedor de otra fracción: ${v.mc}${datos ? " (" + datos + ")" : ""}</div>`;
+      }
+    });
+
+    const celdaHistorial = etiquetaRepo + avisoCont + (historial && historial.length > 0
       ? historial.map(h => {
           const accion = [h.accion_calle, h.comentarios].filter(Boolean).join(" — ") || "sin acción registrada";
-          return `<div style="font-size:0.78rem; margin-bottom:2px;">📅 ${new Date(h.fecha).toLocaleDateString("es-ES")} (<a href="ot-detalle.html?ot=${h.id_ot}">${h.id_ot}</a>) — ${h.falla}: ${accion}</div>`;
+          return `<div style="font-size:0.78rem; margin-bottom:2px;">📅 ${new Date(h.fecha).toLocaleDateString("es-ES")} (<a href="ot-detalle.html?ot=${h.id_ot}">${h.id_ot}</a>)${h.m_control !== eq.m_control ? " · MC anterior " + h.m_control : ""} — ${h.falla}: ${accion}</div>`;
         }).join("")
       : `<span style="color:var(--gris-700); font-size:0.8rem;">Sin historial previo</span>`);
 
@@ -548,3 +619,17 @@ function escaparHtml(texto) {
   div.textContent = texto;
   return div.innerHTML;
 }
+
+
+// "Es el mismo contenedor": enlaza el MC del equipo con el del vecino (hereda su ID de contenedor)
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".btn-mismo-contenedor");
+  if (!btn) return;
+  const actual = btn.dataset.actual, vecino = btn.dataset.vecino;
+  if (!confirm(`¿Confirmas que ${actual} y ${vecino} son el MISMO contenedor?\nA partir de ahora comparten historial.`)) return;
+  btn.disabled = true;
+  const r = await vincularMcContenedor(supabaseClient, vecino, actual, null, "manual");
+  if (!r.ok) { alert("No se pudo enlazar: " + r.error + "\n(¿Corriste el SQL 93?)"); btn.disabled = false; return; }
+  await recalcularHistorialContenedores();
+  renderTabla();
+});
