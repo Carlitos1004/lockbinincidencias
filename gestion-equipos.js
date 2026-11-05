@@ -367,7 +367,7 @@ async function recalcularHistorialContenedores() {
       .map(o => ({ mc: o.m_control, fraccion: o.fraccion, estado: o.estado_montaje, instalado: o.fecha_instalacion, metros: distanciaMetros(lat, lon, parseFloat(o.latitud), parseFloat(o.longitud)) }))
       .filter(o => o.metros <= DIST_VECINO_M)
       .sort((a, b) => a.metros - b.metros)
-      .slice(0, 5);
+      .slice(0, 10);
     if (cercanos.length) candidatos[eq.m_control] = cercanos;
   });
   const mcsVecinos = [...new Set(Object.values(candidatos).flat().map(v => v.mc))];
@@ -432,17 +432,31 @@ function renderTabla() {
     // a ser el mismo contenedor; los de otra fracción se muestran apagados, como "probablemente otro".
     const vecinos = (vecinosPorMC[eq.m_control] || []).map(v => ({ ...v, mismaFr: !!eq.fraccion && normFr(v.fraccion) === normFr(eq.fraccion) }))
       .sort((x, y) => (y.mismaFr - x.mismaFr) || (x.metros - y.metros));
-    vecinos.forEach(v => {
+    // Solo se destacan los de la misma fracción que YA tienen visitas (máx. 3). El resto (sin visitas, o de
+    // otra fracción) va plegado: en campas o naves hay muchos equipos juntos y la ubicación no distingue.
+    const fmtVecino = v => {
       const datos = [v.fraccion, v.estado, v.instalado ? "instalado " + new Date(v.instalado).toLocaleDateString("es-ES") : ""].filter(Boolean).join(", ");
       const visita = v.ultima
         ? `última visita ${new Date(v.ultima.fecha).toLocaleDateString("es-ES")} (<a href="ot-detalle.html?ot=${v.ultima.id_ot}">${v.ultima.id_ot}</a>)`
         : "sin visitas registradas";
-      if (v.mismaFr) {
-        avisoCont += `<div style="font-size:0.78rem; margin-bottom:4px; color:#7a4b00; font-weight:600;">📍 A ${v.metros} m, misma fracción: ${v.mc}${datos ? " (" + datos + ")" : ""} — ${visita} <button type="button" class="btn-mismo-contenedor btn-secundario btn-compacto" data-actual="${eq.m_control}" data-vecino="${v.mc}">Es el mismo contenedor</button></div>`;
-      } else {
-        avisoCont += `<div style="font-size:0.74rem; margin-bottom:3px; color:#999;">· A ${v.metros} m hay otro contenedor de otra fracción: ${v.mc}${datos ? " (" + datos + ")" : ""}</div>`;
-      }
+      const boton = v.mismaFr ? ` <button type="button" class="btn-mismo-contenedor btn-secundario btn-compacto" data-actual="${eq.m_control}" data-vecino="${v.mc}">Es el mismo contenedor</button>` : "";
+      return { datos, visita, boton };
+    };
+    const destacados = vecinos.filter(v => v.mismaFr && v.ultima).slice(0, 3);
+    destacados.forEach(v => {
+      const f = fmtVecino(v);
+      avisoCont += `<div style="font-size:0.78rem; margin-bottom:4px; color:#7a4b00; font-weight:600;">📍 A ${v.metros} m, misma fracción: ${v.mc}${f.datos ? " (" + f.datos + ")" : ""} — ${f.visita}${f.boton}</div>`;
     });
+    const resto = vecinos.filter(v => !destacados.includes(v));
+    if (resto.length) {
+      const nOtraFr = resto.filter(v => !v.mismaFr).length;
+      const zonaDensa = vecinos.filter(v => v.mismaFr).length > 3;
+      avisoCont += `<details style="font-size:0.74rem; color:#888; margin-bottom:4px;"><summary style="cursor:pointer;">📍 ${resto.length} equipo(s) más a menos de ${DIST_VECINO_M} m${nOtraFr ? " (" + nOtraFr + " de otra fracción)" : ""}${zonaDensa ? " — zona con muchos equipos, la ubicación no distingue contenedores" : ""}</summary>` +
+        resto.map(v => {
+          const f = fmtVecino(v);
+          return `<div style="margin:2px 0 2px 10px;">${v.mismaFr ? "" : "· "}A ${v.metros} m: ${v.mc}${f.datos ? " (" + f.datos + ")" : ""} — ${f.visita}${f.boton}</div>`;
+        }).join("") + `</details>`;
+    }
 
     const celdaHistorial = etiquetaRepo + avisoCont + (historial && historial.length > 0
       ? historial.map(h => {
