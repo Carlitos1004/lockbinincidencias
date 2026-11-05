@@ -21,6 +21,19 @@ const nombreEstado = e => e === "Repuesto desde stock" ? "Reponer desde Stock" :
 // Piezas que el operario sí debe tocar: las que hay que reponer, o que ya llevan serial nuevo
 const ESTADOS_A_CAMBIAR = new Set(["Repuesto desde stock", "Por reponer de stock", "Presupuesto aprobado"]);
 const necesitaCambio = (c, est) => ESTADOS_A_CAMBIAR.has(est) || !!c.repo_serial_nuevo;
+// Para una pieza "Módulo de Control" con serial nuevo: ¿el MC nuevo es de la misma fracción que el equipo?
+const normFr = f => String(f || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+function avisoFraccion(c) {
+  if (!/m[oó]dulo/i.test(c.tipo_componente || "") || !c.repo_serial_nuevo || !c.m_control) return "";
+  const nuevo = String(c.repo_serial_nuevo).trim().toUpperCase();
+  if (!(nuevo in fraccionesEq)) return `<br><small class="orep-fr-dato" title="El MC nuevo no está en Equipos">⚠️ No se pudo comprobar la fracción</small>`;
+  const fa = fraccionesEq[c.m_control], fn = fraccionesEq[nuevo];
+  if (!fa || !fn) return `<br><small class="orep-fr-dato">⚠️ Fracción sin dato (equipo: «${esc(fa || "—")}» · nuevo: «${esc(fn || "—")}»)</small>`;
+  return normFr(fa) === normFr(fn)
+    ? `<br><small class="orep-fr-ok">✅ Misma fracción: ${esc(fa)}</small>`
+    : `<br><small class="orep-fr-mal">❌ Fracción distinta: equipo «${esc(fa)}» · MC nuevo «${esc(fn)}»</small>`;
+}
+
 // Casillas que ya no bloquean la entrega del equipo
 const RESUELTOS = new Set(["Listo para entregar", "Listo (sin cambios)", "Reparado recibido", "Sin reposición (acordado)", "Entregado"]);
 
@@ -33,6 +46,7 @@ let otActual = null;
 let compsOtActual = [];   // componentes de la orden abierta
 let clienteOtActual = "";
 let subTab = "Piezas";     // pestaña activa: "Piezas" (equipos) o "Batería"
+let fraccionesEq = {};     // mc -> fracción configurada (para comprobar que el MC nuevo es de la misma fracción)
 let fechasFactura = {};    // mc -> fecha de factura / inicio de contrato (la que suele traer el Excel de Porto)
 let fechasEntrega = {};    // mc -> fecha de entrega del equipo al cliente (para ordenar)
 let listaSel = "";         // lista seleccionada en pantalla ("" = todas, "__sin" = sin lista)
@@ -361,6 +375,15 @@ async function recargarOt() {
       (eq || []).forEach(e => { if (e.fecha_instalacion) fechasEntrega[e.m_control] = e.fecha_instalacion; });
     }
   } catch (err) { console.error("No se pudieron cargar las fechas de entrega:", err); }
+  fraccionesEq = {};
+  try {
+    const mcsNuevos = compsOtActual.filter(c => /m[oó]dulo/i.test(c.tipo_componente || "") && c.repo_serial_nuevo).map(c => String(c.repo_serial_nuevo).trim().toUpperCase());
+    const todosMc = [...new Set([...compsOtActual.map(c => c.m_control).filter(Boolean), ...mcsNuevos])];
+    for (let i = 0; i < todosMc.length; i += 100) {
+      const { data: fr } = await supabaseClient.from("equipos").select("m_control, fraccion").in("m_control", todosMc.slice(i, i + 100));
+      (fr || []).forEach(f => { fraccionesEq[f.m_control] = f.fraccion || ""; });
+    }
+  } catch (err) { console.error("No se pudieron cargar las fracciones:", err); }
   try { await cargarSerialesBok(); } catch (err) { console.error(err); }
   presPorComp = {};
   try {
@@ -589,7 +612,7 @@ function htmlMc(m) {
       <td data-label="Destino">${esc((c.destino || "Sin destino").replace(/^[✓❌🚨]\s*/u, ""))}<br><small>${esc(notaCasilla(c))}</small></td>
       <td data-label="Estado"><span class="orep-badge ${claseEstado(est)}">${esc(etiquetaEstado(c, est))}</span></td>
       <td data-label="Ajuste manual"><select class="sel-estado-manual" ${esManager ? "" : "disabled"}>${opciones}</select></td>
-      <td data-label="Serial a entregar"><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" ${dis} value="${esc(c.repo_serial_nuevo || "")}"><br>${selCategoria(c, dis)}${esManager && c.repo_serial_nuevo && est === "Repuesto desde stock" ? ` <button type="button" class="btn-ok-pieza" data-id="${c.id}">✅ Dar OK</button>` : ""}${esManager ? extra : ""}</td>
+      <td data-label="Serial a entregar"><input type="text" class="inp-serial-nuevo" placeholder="Serial entregado" ${dis} value="${esc(c.repo_serial_nuevo || "")}">${avisoFraccion(c)}<br>${selCategoria(c, dis)}${esManager && c.repo_serial_nuevo && est === "Repuesto desde stock" ? ` <button type="button" class="btn-ok-pieza" data-id="${c.id}">✅ Dar OK</button>` : ""}${esManager ? extra : ""}</td>
     </tr>`;
   }).join("");
 

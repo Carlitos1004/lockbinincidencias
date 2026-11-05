@@ -264,6 +264,10 @@ async function abrirModal(mc) {
   categoriasPorComponente = {};
   tipoRetiradaDetectado = null;
   tipoInstaladaDetectado = null;
+  fraccionMcOk = null;
+  fraccionMcConfirmada = false;
+  const avisoFr = document.getElementById("aviso-fraccion");
+  if (avisoFr) avisoFr.innerHTML = "";
 
   resultadoCom.textContent = "";
   resultadoCom.className = "resultado-comunicacion";
@@ -531,12 +535,15 @@ function refrescarZonaQR() {
     input.addEventListener("change", () => {
       resolverCategoriaComponente(input.dataset.codigo);
       if (input.dataset.codigo === "BA") refrescarTipoBateria();
+      if (input.dataset.codigo === "MC") verificarFraccionMc(input.value);
     });
   });
 
   // Ya con el serial que traía precargado (si estamos editando un ticket
   // existente), intentamos resolver la categoría de una vez
   codigos.forEach(c => { if (serialesNuevos[c]) resolverCategoriaComponente(c); });
+  if (serialesNuevos.MC && codigos.includes("MC")) verificarFraccionMc(serialesNuevos.MC);
+  else if (!codigos.includes("MC")) { const av = document.getElementById("aviso-fraccion"); if (av) av.innerHTML = ""; fraccionMcOk = null; }
 }
 
 // Si el serial coincide con uno registrado en Materiales Serializados para
@@ -628,6 +635,50 @@ function mostrarSelectorManualCategoria(codigo, celda, avisoHtml) {
   });
 }
 
+// ---------- Comprobación de fracción del MC nuevo ----------
+// Los MC se configuran en oficina para una fracción concreta (algunos clientes
+// tienen varias). El MC que se instala en la calle debe ser de la MISMA fracción
+// que el equipo que se está cambiando.
+let fraccionMcOk = null;          // null = no comprobado / sin datos, true = coincide, false = distinta
+let fraccionMcConfirmada = false; // el operario confirmó que sigue adelante aunque no coincida
+const normFraccion = f => String(f || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+
+async function verificarFraccionMc(valor) {
+  const aviso = document.getElementById("aviso-fraccion");
+  if (!aviso) return;
+  const mc = String(valor || "").trim().toUpperCase();
+  fraccionMcOk = null;
+  fraccionMcConfirmada = false;
+  if (!mc) { aviso.innerHTML = ""; return; }
+
+  const fraccionActual = equiposPorMC[equipoAbierto]?.equipo?.fraccion || "";
+  aviso.innerHTML = `<span class="fila-serial-o">🔎 Comprobando la fracción del MC nuevo...</span>`;
+  const { data: nuevo } = await supabaseClient
+    .from("equipos").select("m_control, fraccion").eq("m_control", mc).maybeSingle();
+  if ((serialesNuevos.MC || "").toUpperCase() !== mc) return; // el operario ya cambió el valor
+
+  if (!nuevo) {
+    aviso.innerHTML = `<div style="color:var(--ambar); font-weight:600;">⚠️ No se pudo comprobar la fracción: ${mc} no está en Equipos.</div>`;
+    return;
+  }
+  if (!nuevo.fraccion || !fraccionActual) {
+    aviso.innerHTML = `<div style="color:var(--ambar); font-weight:600;">⚠️ No se pudo comprobar la fracción: ${!fraccionActual ? "este contenedor" : mc} no tiene fracción registrada (este contenedor: «${fraccionActual || "sin dato"}» · ${mc}: «${nuevo.fraccion || "sin dato"}»).</div>`;
+    return;
+  }
+  if (normFraccion(nuevo.fraccion) === normFraccion(fraccionActual)) {
+    fraccionMcOk = true;
+    aviso.innerHTML = `<div class="serial-confirmado">✅ Misma fracción: ${fraccionActual}</div>`;
+    return;
+  }
+  fraccionMcOk = false;
+  aviso.innerHTML = `
+    <div style="color:#c0392b; font-weight:700;">❌ La fracción NO coincide. Este contenedor es «${fraccionActual}» y el MC ${mc} está configurado para «${nuevo.fraccion}».</div>
+    <label class="opcion-check" style="font-weight:normal; color:var(--gris-950);">
+      <input type="checkbox" id="check-confirmar-fraccion"> Lo he revisado y quiero instalarlo de todas formas
+    </label>`;
+  document.getElementById("check-confirmar-fraccion").addEventListener("change", e => { fraccionMcConfirmada = e.target.checked; });
+}
+
 // Busca el MC nuevo en la tabla "equipos" y, si lo encuentra, rellena solo
 // LE/CE/BA/MC con lo que ya traiga configurado — hasta que llegue el
 // endpoint de la API principal, esto depende de que ese equipo ya esté en
@@ -637,9 +688,10 @@ async function buscarEquipoNuevoCompleto(valor) {
   const estadoSpan = document.getElementById("estado-busqueda-mc-nuevo");
   serialesNuevos.MC = mc;
 
-  if (!mc) { estadoSpan.textContent = ""; return; }
+  if (!mc) { estadoSpan.textContent = ""; verificarFraccionMc(""); return; }
 
   estadoSpan.textContent = "🔎 Buscando...";
+  verificarFraccionMc(mc);
   const { data: equipoNuevo } = await supabaseClient
     .from("equipos")
     .select("m_control, serie_lector, serie_cierre, serie_bateria")
@@ -732,6 +784,7 @@ function iniciarScanner(codigo) {
       }
       serialesNuevos[codigo] = valor;
       refrescarZonaQR();
+      if (codigo === "MC") verificarFraccionMc(valor);
       if (codigo === "BA") refrescarTipoBateria();
     },
     () => {} // ignoramos errores de frames sin QR, es normal mientras enfoca
@@ -778,6 +831,10 @@ modalEnviarBtn.addEventListener("click", async () => {
   const faltaCategoria = Object.keys(serialesNuevos).some(c => serialesNuevos[c] && !categoriasPorComponente[c]);
   if (faltaCategoria) {
     mostrarMensaje(modalMsg, "⚠️ Falta elegir la Categoría de algún repuesto instalado (junto al serial).", true);
+    return;
+  }
+  if (serialesNuevos.MC && fraccionMcOk === false && !fraccionMcConfirmada) {
+    mostrarMensaje(modalMsg, "❌ La fracción del MC nuevo no coincide con la del contenedor. Cambia el MC o marca «Lo he revisado y quiero instalarlo de todas formas».", true);
     return;
   }
   if (!estadoEquipo) { mostrarMensaje(modalMsg, "⚠️ Selecciona el estado final.", true); return; }
