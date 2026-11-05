@@ -284,8 +284,10 @@ function renderTabla() {
 
     const celdaAccionComentarios = puedeEditar
       ? `<textarea class="input-accion-comentarios" rows="2" data-id="${t.id_registro}">${[t.accion_calle, t.comentarios].filter(Boolean).join("\n") || ""}</textarea>
-         <button class="btn-guardar-ticket" data-id="${t.id_registro}">Guardar</button>`
-      : ([t.accion_calle, t.comentarios].filter(Boolean).join(" | ") || "—");
+         <button class="btn-guardar-ticket" data-id="${t.id_registro}">Guardar</button>
+         <button type="button" class="btn-historial-equipo" data-mc="${t.m_control}" title="Ver el historial del equipo y del contenedor">🕘 Historial</button>`
+      : ([t.accion_calle, t.comentarios].filter(Boolean).join(" | ") || "—") +
+        ` <button type="button" class="btn-historial-equipo" data-mc="${t.m_control}" title="Ver el historial del equipo y del contenedor">🕘 Historial</button>`;
 
     const nReporte = conteoFotosPorRegistro[t.id_registro] || 0;
     const nRevision = conteoFotosRevisionPorRegistro[t.id_registro] || 0;
@@ -1114,3 +1116,69 @@ function ajustarEncabezadoSticky() {
   });
 }
 window.addEventListener("resize", ajustarEncabezadoSticky);
+
+
+// ---------- Historial del equipo / contenedor en una ventana emergente ----------
+const escH = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fechaH = f => f ? new Date(f).toLocaleDateString("es-ES") : "—";
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".btn-historial-equipo");
+  if (btn) abrirHistorialEquipo(btn.dataset.mc);
+});
+
+async function abrirHistorialEquipo(mc) {
+  document.getElementById("modal-historial")?.remove();
+  const m = document.createElement("div");
+  m.id = "modal-historial";
+  m.className = "modal-historial";
+  m.innerHTML = `<div class="modal-historial-caja"><div class="modal-historial-cab"><h3>🕘 Historial de ${escH(mc)}</h3><button type="button" class="modal-historial-x" aria-label="Cerrar">✕</button></div><div id="historial-cuerpo">Cargando...</div></div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click", ev => { if (ev.target === m || ev.target.closest(".modal-historial-x")) m.remove(); });
+  const cuerpo = m.querySelector("#historial-cuerpo");
+
+  try {
+    const idOtActual = otActualCargada?.id_ot;
+    const cont = await resolverContenedores(supabaseClient, [mc]);
+    const id = cont.contenedorDe[mc];
+    const ms = cont.miembros[id] || [mc];
+    const numero = (cont.numeros || {})[id];
+
+    const [{ data: eqs }, { data: notas }, visitas, { data: comps }] = await Promise.all([
+      supabaseClient.from("equipos").select("m_control, cliente, fraccion, estado_montaje, fecha_instalacion, modelo_bateria, serie_bateria, ultima_comunicacion").in("m_control", ms),
+      supabaseClient.from("notas_equipo").select("mc, nota, foto_url").in("mc", ms).eq("activa", true),
+      visitasPorMc(supabaseClient, ms),
+      supabaseClient.from("componentes_retirados").select("id_ot, m_control, tipo_componente, serial_retirado, serial_nuevo, destino, causa_falla").in("m_control", ms).order("id_ot", { ascending: false }).limit(60)
+    ]);
+    const eqPor = {}; (eqs || []).forEach(x => { eqPor[x.m_control] = x; });
+    const eq = eqPor[mc] || {};
+    const todas = ms.flatMap(x => visitas[x] || []).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    let html = `<div class="hist-bloque">
+      <strong>${escH(eq.cliente || "—")}</strong> · ${escH(eq.fraccion || "sin fracción")} · ${escH(eq.estado_montaje || "—")}${eq.fecha_instalacion ? " · instalado " + fechaH(eq.fecha_instalacion) : ""}
+      <br>Batería: ${escH(eq.modelo_bateria || "—")} ${eq.serie_bateria ? "(" + escH(eq.serie_bateria) + ")" : ""}${eq.ultima_comunicacion ? " · última comunicación " + fechaH(eq.ultima_comunicacion) : ""}</div>`;
+
+    if (numero || ms.length > 1) {
+      html += `<div class="hist-bloque">${numero ? `<strong>🗂️ Contenedor Nº ${escH(numero)}</strong><br>` : ""}${ms.length > 1 ? "🔗 MC que ha tenido este contenedor: " + ms.map(x => x === mc ? `<strong>${escH(x)}</strong>` : escH(x)).join(" → ") : ""}</div>`;
+    }
+    if ((notas || []).length) {
+      html += `<div class="hist-bloque hist-alerta">${notas.map(n => `⚠️ ${escH(n.nota)} <small>(${escH(n.mc)})</small>${n.foto_url ? ` <a href="${escH(n.foto_url)}" target="_blank" rel="noopener">📷</a>` : ""}`).join("<br>")}</div>`;
+    }
+
+    html += `<h4>Visitas${ms.length > 1 ? " (de todos sus MC)" : ""}</h4>`;
+    html += todas.length
+      ? `<div class="hist-scroll"><table class="tabla-revision"><thead><tr><th>Fecha</th><th>OT</th>${ms.length > 1 ? "<th>MC</th>" : ""}<th>Falla</th><th>Acción / comentarios</th></tr></thead><tbody>` +
+        todas.map(h => `<tr${h.id_ot === idOtActual ? ' style="background:#fff8e1;"' : ""}><td>${fechaH(h.fecha)}</td><td><a href="ot-detalle.html?ot=${encodeURIComponent(h.id_ot)}" target="_blank" rel="noopener">${escH(h.id_ot)}</a>${h.id_ot === idOtActual ? " <small>(esta OT)</small>" : ""}</td>${ms.length > 1 ? `<td>${escH(h.m_control)}</td>` : ""}<td>${escH(h.falla || "")}</td><td>${escH([h.accion_calle, h.comentarios].filter(Boolean).join(" — "))}</td></tr>`).join("") +
+        `</tbody></table></div>`
+      : `<p>Sin visitas registradas.</p>`;
+
+    if ((comps || []).length) {
+      html += `<h4>Componentes retirados / cambiados</h4><div class="hist-scroll"><table class="tabla-revision"><thead><tr><th>OT</th>${ms.length > 1 ? "<th>MC</th>" : ""}<th>Componente</th><th>Retirado</th><th>Nuevo</th><th>Destino</th></tr></thead><tbody>` +
+        comps.map(c => `<tr><td>${escH(c.id_ot)}</td>${ms.length > 1 ? `<td>${escH(c.m_control)}</td>` : ""}<td>${escH(c.tipo_componente)}</td><td>${escH(c.serial_retirado || "—")}</td><td>${escH(c.serial_nuevo || "—")}</td><td>${escH(c.destino || "—")}</td></tr>`).join("") +
+        `</tbody></table></div>`;
+    }
+    cuerpo.innerHTML = html;
+  } catch (err) {
+    cuerpo.innerHTML = `<p style="color:#c0392b;">No se pudo cargar el historial: ${escH(err.message || err)}</p>`;
+  }
+}

@@ -36,6 +36,7 @@ async function cargar() {
     return;
   }
   await pintarLista();
+  cargarPendientes();
 }
 
 function gruposPorId() {
@@ -189,5 +190,66 @@ async function quitarMc(id, mc) {
   await cargar();
   abrirContenedor(id);
 }
+
+// ---------- Cambios de MC registrados en las OT que aún no están enlazados ----------
+let pendientes = [];
+async function cargarPendientes() {
+  const tbody = document.getElementById("tbody-pend");
+  try {
+    let filas = [];
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await supabaseClient.from("historial_fallas")
+        .select("m_control, id_ot, fecha, nuevo_serial").ilike("nuevo_serial", "%MC%").order("fecha", { ascending: false }).range(desde, desde + 999);
+      if (error) throw error;
+      filas = filas.concat(data || []);
+      if (!data || data.length < 1000) break;
+    }
+    const contDe = {};
+    filasMc.forEach(r => { contDe[r.m_control] = r.contenedor_id; });
+    const cid = mc => contDe[mc] || mc;
+    const vistos = new Set();
+    pendientes = [];
+    filas.forEach(h => {
+      const viejo = String(h.m_control || "").toUpperCase();
+      String(h.nuevo_serial || "").toUpperCase().split(/[\s,;]+/).filter(t => /^MC\d+$/.test(t)).forEach(nuevo => {
+        if (nuevo === viejo || !/^MC\d+$/.test(viejo)) return;
+        if (cid(nuevo) === cid(viejo)) return; // ya enlazados
+        const clave = viejo + ">" + nuevo;
+        if (vistos.has(clave)) return;
+        vistos.add(clave);
+        pendientes.push({ viejo, nuevo, id_ot: h.id_ot, fecha: h.fecha });
+      });
+    });
+    document.getElementById("enlazar-todos").hidden = pendientes.length < 2;
+    if (!pendientes.length) { tbody.innerHTML = `<tr><td colspan="5">No hay cambios de MC pendientes de enlazar en las OT. ✅</td></tr>`; return; }
+    tbody.innerHTML = pendientes.map((p, i) => `<tr>
+      <td>${fmtFecha(p.fecha)}</td><td><a href="ot-detalle.html?ot=${encodeURIComponent(p.id_ot)}">${esc(p.id_ot)}</a></td>
+      <td>${esc(p.viejo)}</td><td>${esc(p.nuevo)}</td>
+      <td><button type="button" class="btn-enlazar-pend" data-i="${i}">Enlazar</button></td></tr>`).join("");
+    tbody.querySelectorAll(".btn-enlazar-pend").forEach(b => b.addEventListener("click", async () => {
+      const p = pendientes[parseInt(b.dataset.i, 10)];
+      b.disabled = true;
+      const r = await vincularMcContenedor(supabaseClient, p.viejo, p.nuevo, p.id_ot, "historial");
+      if (!r.ok) { alert("No se pudo enlazar: " + r.error); b.disabled = false; return; }
+      await cargar();
+    }));
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+document.getElementById("enlazar-todos").addEventListener("click", async () => {
+  if (!confirm(`¿Enlazar los ${pendientes.length} cambios de la lista? Revisa antes que sean correctos.`)) return;
+  const msg = document.getElementById("msg-pend");
+  let ok = 0;
+  // en orden cronológico, para que las cadenas se formen bien
+  for (const p of [...pendientes].sort((a, b) => new Date(a.fecha) - new Date(b.fecha))) {
+    msg.textContent = `Enlazando... ${ok}/${pendientes.length}`;
+    const r = await vincularMcContenedor(supabaseClient, p.viejo, p.nuevo, p.id_ot, "historial");
+    if (r.ok) ok++;
+  }
+  msg.textContent = `✅ ${ok} enlazados.`;
+  await cargar();
+});
 
 cargar();

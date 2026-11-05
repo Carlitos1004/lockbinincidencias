@@ -2189,3 +2189,15 @@ a.tarjeta-resumen:hover {
 
 /* Caja con scroll para tablas: sin esto, una tabla más alta que su max-height se desborda y tapa lo de debajo */
 .scroll-x-tabla { overflow: auto; max-width: 100%; }
+
+/* --- Ventana emergente: historial del equipo / contenedor (detalle de OT) --- */
+.btn-historial-equipo { margin-top: 4px; padding: 6px 10px; border: 0; border-radius: 8px; background: var(--gris-200, #e3e8e4); color: var(--gris-950, #222); font-weight: 600; font-size: 0.78rem; cursor: pointer; }
+.modal-historial { position: fixed; inset: 0; background: rgba(20,30,22,.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 14px; }
+.modal-historial-caja { background: #fff; border-radius: 14px; max-width: 980px; width: 100%; max-height: 90vh; overflow: auto; padding: 16px 20px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+.modal-historial-cab { display: flex; justify-content: space-between; align-items: center; }
+.modal-historial-cab h3 { margin: 0; }
+.modal-historial-x { background: none; border: 0; font-size: 1.3rem; cursor: pointer; color: #666; }
+.modal-historial-caja h4 { margin: 16px 0 6px; }
+.hist-bloque { background: #f3f7f4; border-radius: 10px; padding: 8px 12px; margin: 8px 0; font-size: .9rem; }
+.hist-alerta { background: #fdecea; color: #a3261c; font-weight: 600; }
+.hist-scroll { max-height: 280px; overflow: auto; }

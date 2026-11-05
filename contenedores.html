@@ -53,6 +53,16 @@
     </table>
   </div>
 
+  <h2 style="margin-top:26px;">Cambios de MC registrados en OT que faltan por enlazar</h2>
+  <p style="font-size:.88rem;color:#555;">Se buscan en las OT los cambios donde se anotó un MC nuevo (campo "serial nuevo") y que todavía no están enlazados como el mismo contenedor. Revisa y enlaza.</p>
+  <div class="fila-form"><button type="button" id="enlazar-todos" class="sec" hidden>Enlazar todos los de la lista</button><span id="msg-pend" class="msg-cont"></span></div>
+  <div class="scroll-x-tabla" style="max-height:340px;">
+    <table class="tabla-revision">
+      <thead><tr><th>Fecha</th><th>OT</th><th>MC que se retiró</th><th>MC nuevo</th><th></th></tr></thead>
+      <tbody id="tbody-pend"><tr><td colspan="5">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
   <div id="detalle-cont" hidden></div>
 </div>
 
