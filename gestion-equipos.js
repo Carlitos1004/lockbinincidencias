@@ -418,6 +418,8 @@ function renderTabla() {
     // Aviso de contenedor: visita reciente (también con MC anteriores) y equipos cercanos
     let avisoCont = "";
     const ms = contenedorInfo.miembros[contenedorInfo.contenedorDe[eq.m_control]] || [eq.m_control];
+    const numCont = (contenedorInfo.numeros || {})[contenedorInfo.contenedorDe[eq.m_control]];
+    if (numCont) avisoCont += `<div style="font-size:0.8rem; margin-bottom:4px; font-weight:700;">🗂️ Contenedor Nº ${numCont}</div>`;
     if (ms.length > 1) {
       avisoCont += `<div style="font-size:0.78rem; margin-bottom:4px; color:#555;">🔗 Mismo contenedor que: ${ms.filter(m => m !== eq.m_control).join(", ")}</div>`;
     }

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Contenedores</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .panel-body-ancho { max-width: 98vw; }
+  .orep-fila { cursor:pointer; }
+  .orep-fila:hover td { background:#f3f7f4; }
+  .caja-cont { border:1px solid #d9e2dc; border-radius:12px; padding:14px 16px; margin:16px 0; background:#fff; }
+  .caja-cont h3 { margin:0 0 8px; }
+  .fila-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
+  .fila-form input[type=text] { padding:8px 10px; border:1.5px solid var(--gris-200, #d5ddd6); border-radius:10px; font:inherit; }
+  .fila-form button { border:0; border-radius:10px; padding:8px 14px; font-weight:600; cursor:pointer; background:var(--verde-medio, #4c8c2b); color:#fff; }
+  .fila-form button.sec { background:var(--gris-200, #e3e8e4); color:#333; }
+  .msg-cont { font-size:.88rem; margin:6px 0; }
+</style>
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Contenedores</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="operacion-diaria.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Operación Diaria</a>
+
+  <p style="margin-top:20px;">Cada contenedor conserva su historial aunque cambie su MC. Aquí ves qué MC ha tenido, sus visitas, y puedes ponerle un número, añadir o quitar MC. Un MC sin enlazar cuenta como su propio contenedor.</p>
+
+  <div class="fila-form">
+    <input type="text" id="buscar-cont" placeholder="Buscar por MC o por número de contenedor..." style="min-width:300px;">
+    <button type="button" id="buscar-btn">Buscar</button>
+  </div>
+  <p id="msg-lista" class="msg-cont"></p>
+
+  <h2 style="margin-top:18px;">Contenedores con varios MC o con número</h2>
+  <div class="scroll-x-tabla" style="max-height:340px;">
+    <table class="tabla-revision">
+      <thead><tr><th>Nº</th><th>ID (MC de origen)</th><th>MC que ha tenido</th><th>Última visita</th></tr></thead>
+      <tbody id="tbody-cont"><tr><td colspan="4">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div id="detalle-cont" hidden></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="contenedores-core.js"></script>
+<script src="contenedores.js"></script>
+</body>
+</html>

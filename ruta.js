@@ -650,6 +650,8 @@ async function cargarAvisoContenedor(mc) {
     if (equipoAbierto !== mc) return;
     const todas = ms.flatMap(m => visitas[m] || []).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
     let html = "";
+    const numCont = (cont.numeros || {})[cont.contenedorDe[mc]];
+    if (numCont) html += `<div style="font-size:0.88rem; font-weight:700;">🗂️ Contenedor Nº ${numCont}</div>`;
     if (ms.length > 1) html += `<div style="font-size:0.82rem; color:#555;">🔗 Mismo contenedor que: ${ms.filter(m => m !== mc).join(", ")}</div>`;
     if (todas.length) {
       const u = todas[0], dias = diasDesde(u.fecha);

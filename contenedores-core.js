@@ -39,12 +39,21 @@ async function resolverContenedores(sb, mcs) {
   } catch (err) {
     console.warn("Contenedores no disponibles (¿SQL 93?):", err.message || err);
   }
+  // Número visible del contenedor (si se le puso uno)
+  const numeros = {};
+  try {
+    const ids = [...new Set(Object.values(contenedorDe))];
+    for (const trozo of fraccionar(ids)) {
+      const { data } = await sb.from("contenedores").select("contenedor_id, numero").in("contenedor_id", trozo);
+      (data || []).forEach(r => { if (r.numero) numeros[r.contenedor_id] = r.numero; });
+    }
+  } catch (err) { /* tabla aún sin crear (SQL 95) */ }
   // El propio ID de contenedor también es un MC (el primero de la cadena)
   Object.values(contenedorDe).forEach(id => { (miembros[id] = miembros[id] || new Set()).add(id); });
   unicos.forEach(m => { (miembros[contenedorDe[m]] = miembros[contenedorDe[m]] || new Set()).add(m); });
   const miembrosArr = {};
   Object.keys(miembros).forEach(id => { miembrosArr[id] = [...miembros[id]]; });
-  return { contenedorDe, miembros: miembrosArr };
+  return { contenedorDe, miembros: miembrosArr, numeros };
 }
 
 // Visitas (historial_fallas) de una lista de MC. Devuelve {mc -> [filas, más recientes primero]}
