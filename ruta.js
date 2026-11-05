@@ -5,6 +5,19 @@
 // =========================================================================
 
 // Polígono Industrial de San Cibrao das Viñas, Ourense
+// Tipo de batería instalada, según el modelo guardado en "equipos" (BA01 / BA02 / BA03)
+function textoBateria(eq) {
+  const modelo = String((eq && eq.modelo_bateria) || "").trim().toUpperCase();
+  const serial = String((eq && eq.serie_bateria) || "").trim();
+  let tipo = "";
+  if (modelo.startsWith("BA02")) tipo = "Recargable";
+  else if (modelo.startsWith("BA01")) tipo = "No recargable";
+  else if (modelo.startsWith("BA03")) tipo = "PKCELL";
+  else if (modelo) tipo = modelo;
+  if (!tipo && !serial) return "sin dato";
+  return "🔋 " + (tipo || "sin clasificar") + (serial ? " (" + serial + ")" : "");
+}
+
 const LAT_OFICINA = 42.287136;
 const LNG_OFICINA = -7.815185;
 
@@ -256,7 +269,7 @@ async function abrirModal(mc) {
   resultadoCom.className = "resultado-comunicacion";
   const info = equiposPorMC[mc];
   modalMc.textContent = mc;
-  modalInfo.textContent = `Cliente: ${info.equipo.cliente || "—"} — Fracción: ${info.equipo.fraccion || "—"}`;
+  modalInfo.textContent = `Cliente: ${info.equipo.cliente || "—"} — Fracción: ${info.equipo.fraccion || "—"} — Batería: ${textoBateria(info.equipo)}`;
 
   // Mostramos TODOS los tickets de este equipo en esta OT, no solo los
   // abiertos — así uno ya cerrado se puede revisar/editar en vez de

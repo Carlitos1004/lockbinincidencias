@@ -7,6 +7,20 @@
 // Ya no se usan (el botón de ruta ahora exporta CSV para My Maps en vez de
 // abrir enlaces de Google Maps con paradas) — se dejan aquí por si en
 // algún momento se vuelve a necesitar ese enfoque.
+// Tipo de batería instalada, según el modelo guardado en "equipos" (BA01 / BA02 / BA03)
+function etiquetaBateria(eq) {
+  if (!eq) return "—";
+  const modelo = String(eq.modelo_bateria || "").trim().toUpperCase();
+  const serial = String(eq.serie_bateria || "").trim();
+  let tipo = "";
+  if (modelo.startsWith("BA02")) tipo = "Recargable";
+  else if (modelo.startsWith("BA01")) tipo = "No recargable";
+  else if (modelo.startsWith("BA03")) tipo = "PKCELL";
+  else if (modelo) tipo = modelo;
+  if (!tipo && !serial) return "—";
+  return `<strong>🔋 ${tipo || "Sin clasificar"}</strong>` + (serial ? `<br><small>${serial}</small>` : "");
+}
+
 const LAT_OFICINA = 42.2985;
 const LNG_OFICINA = -7.8180;
 const MAX_PARADAS_POR_LINK = 7; // límite práctico de Google Maps por link
@@ -112,7 +126,7 @@ async function buscarOT() {
   if (mcsUnicos.length > 0) {
     const { data: equiposData } = await supabaseClient
       .from("equipos")
-      .select("m_control, fraccion, latitud, longitud, ultima_comunicacion")
+      .select("m_control, fraccion, latitud, longitud, ultima_comunicacion, modelo_bateria, serie_bateria")
       .in("m_control", mcsUnicos);
     (equiposData || []).forEach(eq => { mapaEquipos[eq.m_control] = eq; });
   }
@@ -314,6 +328,7 @@ function renderTabla() {
       <tr>
         <td>${t.m_control}${etiquetaVinculo}</td>
         <td>${t.equipos?.fraccion || "—"}</td>
+        <td>${etiquetaBateria(t.equipos)}</td>
         <td>${t.falla}</td>
         <td>${t.estado}${t.estado_equipo ? " — " + t.estado_equipo : ""}</td>
         <td>${celdaComponentes}</td>
