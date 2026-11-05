@@ -442,19 +442,13 @@ function renderTabla() {
       const boton = v.mismaFr ? ` <button type="button" class="btn-mismo-contenedor btn-secundario btn-compacto" data-actual="${eq.m_control}" data-vecino="${v.mc}">Es el mismo contenedor</button>` : "";
       return { datos, visita, boton };
     };
-    const destacados = vecinos.filter(v => v.mismaFr && v.ultima).slice(0, 3);
-    destacados.forEach(v => {
-      const f = fmtVecino(v);
-      avisoCont += `<div style="font-size:0.78rem; margin-bottom:4px; color:#7a4b00; font-weight:600;">📍 A ${v.metros} m, misma fracción: ${v.mc}${f.datos ? " (" + f.datos + ")" : ""} — ${f.visita}${f.boton}</div>`;
-    });
-    const resto = vecinos.filter(v => !destacados.includes(v));
-    if (resto.length) {
-      const nOtraFr = resto.filter(v => !v.mismaFr).length;
-      const zonaDensa = vecinos.filter(v => v.mismaFr).length > 3;
-      avisoCont += `<details style="font-size:0.74rem; color:#888; margin-bottom:4px;"><summary style="cursor:pointer;">📍 ${resto.length} equipo(s) más a menos de ${DIST_VECINO_M} m${nOtraFr ? " (" + nOtraFr + " de otra fracción)" : ""}${zonaDensa ? " — zona con muchos equipos, la ubicación no distingue contenedores" : ""}</summary>` +
-        resto.map(v => {
+    // Los equipos cercanos van SIEMPRE plegados en un solo desplegable: lo principal es la info del propio contenedor.
+    if (vecinos.length) {
+      const nMismaFr = vecinos.filter(v => v.mismaFr).length;
+      avisoCont += `<details style="font-size:0.76rem; color:#7a4b00; margin-bottom:4px;"><summary style="cursor:pointer; font-weight:600;">📍 Hay ${vecinos.length} equipo(s) cerca (≤ ${DIST_VECINO_M} m)${nMismaFr ? " · " + nMismaFr + " de la misma fracción" : ""}</summary>` +
+        vecinos.map(v => {
           const f = fmtVecino(v);
-          return `<div style="margin:2px 0 2px 10px;">${v.mismaFr ? "" : "· "}A ${v.metros} m: ${v.mc}${f.datos ? " (" + f.datos + ")" : ""} — ${f.visita}${f.boton}</div>`;
+          return `<div style="margin:3px 0 3px 10px; ${v.mismaFr ? "" : "color:#999;"}">A ${v.metros} m: ${v.mc}${f.datos ? " (" + f.datos + ")" : ""} — ${f.visita}${f.boton}</div>`;
         }).join("") + `</details>`;
     }
 
