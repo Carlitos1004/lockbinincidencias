@@ -62,6 +62,19 @@ async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
 let repNuevaPorMC = {};   // {mc: {numero, id_ot}} — MC con piezas aún sin entregar en una orden REP-002 en adelante
 let equiposOcultos = [];  // [{eq, motivo}] equipos que no entran en la lista por estar en una reposición
 let ocultosPorReposicion = 0;
+// Tipo de batería instalada, según el modelo guardado en "equipos" (BA01 / BA02 / BA03)
+function etiquetaBateria(eq) {
+  const modelo = String(eq.modelo_bateria || "").trim().toUpperCase();
+  const serial = String(eq.serie_bateria || "").trim();
+  let tipo = "";
+  if (modelo.startsWith("BA02")) tipo = "Recargable";
+  else if (modelo.startsWith("BA01")) tipo = "No recargable";
+  else if (modelo.startsWith("BA03")) tipo = "PKCELL";
+  else if (modelo) tipo = modelo;
+  if (!tipo && !serial) return '<span style="color:#999;">Sin dato</span>';
+  const clase = tipo === "Recargable" ? "orep-ok" : tipo === "No recargable" ? "orep-proc" : "orep-gris";
+  return `<strong>🔋 ${tipo || "Sin clasificar"}</strong>` + (serial ? `<br><small>${serial}</small>` : "");
+}
 let equiposEncontrados = []; // [{m_control, fraccion, cliente, fallas: [...]}]
 let notasPorMC = {}; // {mc: [nota1, nota2, ...]}
 let reposicionPorMC = {}; // {mc: {...fila de equipos_reposicion + número de orden}}
@@ -138,7 +151,7 @@ filtrarBtn.addEventListener("click", async () => {
     })
     .map(eq => {
       const fallas = Object.keys(MAPA_ALARMAS).filter(col => eq[col]).map(col => MAPA_ALARMAS[col]);
-      return { m_control: eq.m_control, fraccion: eq.fraccion, cliente: eq.cliente, estado_montaje: eq.estado_montaje, fallas };
+      return { m_control: eq.m_control, fraccion: eq.fraccion, cliente: eq.cliente, estado_montaje: eq.estado_montaje, modelo_bateria: eq.modelo_bateria, serie_bateria: eq.serie_bateria, fallas };
     })
     .filter(eq => eq.fallas.length > 0);
 
@@ -373,6 +386,7 @@ function renderTabla() {
       <td>${eq.m_control}</td>
       <td>${eq.estado_montaje || "—"}</td>
       <td>${eq.fraccion || "—"}</td>
+      <td>${etiquetaBateria(eq)}</td>
       <td>${eq.fallas.join(", ")}</td>
       <td>${celdaNota}</td>
       <td>${celdaHistorial}</td>
@@ -402,7 +416,7 @@ generarBtn.addEventListener("click", async () => {
   if (mcsManualesNuevos.length > 0) {
     const { data: datosManuales, error: errorManuales } = await supabaseClient
       .from("equipos")
-      .select("m_control, cliente, fraccion")
+      .select("m_control, cliente, fraccion, modelo_bateria, serie_bateria")
       .in("m_control", mcsManualesNuevos);
 
     if (errorManuales) {
@@ -418,7 +432,7 @@ generarBtn.addEventListener("click", async () => {
     }
 
     equiposManuales = (datosManuales || []).map(eq => ({
-      m_control: eq.m_control, fraccion: eq.fraccion, cliente: eq.cliente,
+      m_control: eq.m_control, fraccion: eq.fraccion, cliente: eq.cliente, modelo_bateria: eq.modelo_bateria, serie_bateria: eq.serie_bateria,
       fallas: ["Revisión general (añadido manualmente)"]
     }));
   }
