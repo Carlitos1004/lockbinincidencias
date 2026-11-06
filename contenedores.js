@@ -33,11 +33,22 @@ async function cargar() {
     datosCont = {};
     try { (await traerTodo("contenedores", "*", "contenedor_id")).forEach(r => { datosCont[r.contenedor_id] = r; }); } catch (e) { console.warn("Sin tabla contenedores (SQL 95)", e.message); }
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5">Error: ${esc(err.message)} (¿Corriste el SQL 97?)</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${esc(err.message)} (¿Corriste el SQL 97?)</td></tr>`;
     return;
   }
+  llenarFiltroCliente();
   await pintarLista();
   cargarPendientes();
+}
+
+// Lista de clientes (según las OT de las estancias) para el filtro
+function llenarFiltroCliente() {
+  const sel = document.getElementById("filtro-cliente");
+  const actual = sel.value;
+  const mapa = {};
+  filasEst.forEach(r => { const c = (r.cliente || "").trim(); if (c) mapa[c.toUpperCase()] = c.toUpperCase(); });
+  sel.innerHTML = `<option value="">Todos los clientes</option>` + Object.keys(mapa).sort((a, b) => a.localeCompare(b)).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  sel.value = actual;
 }
 
 function gruposPorId() {
@@ -56,11 +67,14 @@ async function pintarLista(textoBusqueda) {
   const q = (textoBusqueda || "").trim().toUpperCase();
   const g = gruposPorId();
   let ids = Object.keys(g).filter(id => mcsDe(g, id).length > 1 || (datosCont[id] && datosCont[id].numero));
-  if (q) ids = ids.filter(id => id.toUpperCase().includes(q) || String((datosCont[id] || {}).numero || "").toUpperCase() === q || mcsDe(g, id).some(m => m.toUpperCase().includes(q)));
+  if (q) ids = ids.filter(id => id.toUpperCase().includes(q) || String((datosCont[id] || {}).numero || "").toUpperCase() === q || mcsDe(g, id).some(m => m.toUpperCase().includes(q))
+    || g[id].some(r => String(r.id_ot_entrada || "").toUpperCase().includes(q) || String(r.id_ot_salida || "").toUpperCase().includes(q)));
+  const cli = document.getElementById("filtro-cliente").value;
+  if (cli) ids = ids.filter(id => clientesDe(g, id).some(c => c.toUpperCase() === cli));
   if (document.getElementById("solo-mixtos").checked) ids = ids.filter(id => distintosClientes(clientesDe(g, id)));
   ids.sort((a, b) => a.localeCompare(b));
   if (!ids.length) {
-    tbody.innerHTML = `<tr><td colspan="5">${q || document.getElementById("solo-mixtos").checked ? "Ningún contenedor coincide." : "Todavía no hay contenedores con varios MC. Corre el SQL 97 o se irán creando al cambiar MC en Ruta."}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">${q || cli || document.getElementById("solo-mixtos").checked ? "Ningún contenedor coincide." : "Todavía no hay contenedores con varios MC. Corre el SQL 97 o se irán creando al cambiar MC en Ruta."}</td></tr>`;
     return;
   }
   const info = { estancias: g, miembros: Object.fromEntries(ids.map(id => [id, mcsDe(g, id)])) };
@@ -68,11 +82,13 @@ async function pintarLista(textoBusqueda) {
   tbody.innerHTML = ids.map(id => {
     const ult = (visitas[id] || [])[0];
     const cls = clientesDe(g, id);
+    const ultCambio = [...g[id]].filter(r => r.desde).sort((a, b) => (a.desde < b.desde ? 1 : -1))[0];
     return `<tr class="orep-fila" data-id="${esc(id)}">
       <td><strong>${esc((datosCont[id] || {}).numero || "—")}</strong></td>
       <td>${distintosClientes(cls) ? "⚠️ " : ""}${esc(cls.join(" / ") || "—")}</td>
       <td>${esc(id)}</td>
       <td>${esc(mcsDe(g, id).join(" → "))}</td>
+      <td>${ultCambio ? fmtFecha(ultCambio.desde) + (ultCambio.id_ot_entrada ? " (" + esc(ultCambio.id_ot_entrada) + ")" : "") : "—"}</td>
       <td>${ult ? fmtFecha(ult.fecha) + " (" + esc(ult.id_ot) + ")" : "—"}</td></tr>`;
   }).join("");
   tbody.querySelectorAll(".orep-fila").forEach(tr => tr.addEventListener("click", () => abrirContenedor(tr.dataset.id)));
@@ -286,6 +302,7 @@ document.getElementById("enlazar-todos").addEventListener("click", async () => {
   await cargar();
 });
 
+document.getElementById("filtro-cliente").addEventListener("change", () => pintarLista(document.getElementById("buscar-cont").value));
 document.getElementById("solo-mixtos").addEventListener("change", () => pintarLista(document.getElementById("buscar-cont").value));
 
 cargar();

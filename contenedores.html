@@ -22,6 +22,11 @@
   .fila-form button { border:0; border-radius:10px; padding:8px 14px; font-weight:600; cursor:pointer; background:var(--verde-medio, #4c8c2b); color:#fff; }
   .fila-form button.sec { background:var(--gris-200, #e3e8e4); color:#333; }
   .msg-cont { font-size:.88rem; margin:6px 0; }
+  .fila-form input[type=date], .fila-form select { padding:8px 10px; border:1.5px solid var(--gris-200, #d5ddd6); border-radius:10px; font:inherit; background:#fff; }
+  .fila-form button:hover { filter:brightness(.95); }
+  .fila-form label { font-size:.9rem; display:inline-flex; align-items:center; gap:6px; }
+  .tabla-revision button.btn-quitar { border:1.5px solid #e0b4ae; background:#fff5f4; color:#b3372b; border-radius:8px; padding:4px 10px; font-weight:600; font-size:.82rem; cursor:pointer; }
+  .tabla-revision button.btn-quitar:hover { background:#fde3e0; }
 </style>
 </head>
 <body>
@@ -40,7 +45,8 @@
   <p style="margin-top:20px;">Cada contenedor conserva su historial aunque cambie su MC. Cada MC pasa por un contenedor durante una <strong>estancia</strong> (desde que se instala hasta que se retira), y un mismo MC puede tener estancias en contenedores distintos. Aquí ves las estancias, las visitas de cada una, y puedes ponerle número y nota. Un MC sin estancias cuenta como su propio contenedor.</p>
 
   <div class="fila-form">
-    <input type="text" id="buscar-cont" placeholder="Buscar por MC o por número de contenedor..." style="min-width:300px;">
+    <input type="text" id="buscar-cont" placeholder="Buscar por MC, nº de contenedor u OT..." style="min-width:300px;">
+    <select id="filtro-cliente" title="Filtrar por cliente"><option value="">Todos los clientes</option></select>
     <button type="button" id="buscar-btn">Buscar</button>
   </div>
   <p id="msg-lista" class="msg-cont"></p>
@@ -49,8 +55,8 @@
   <h2 style="margin-top:18px;">Contenedores con varios MC o con número</h2>
   <div class="scroll-x-tabla" style="max-height:340px;">
     <table class="tabla-revision">
-      <thead><tr><th>Nº</th><th>Cliente(s)</th><th>ID (MC de origen)</th><th>MC que ha tenido</th><th>Última visita</th></tr></thead>
-      <tbody id="tbody-cont"><tr><td colspan="5">Cargando...</td></tr></tbody>
+      <thead><tr><th>Nº</th><th>Cliente(s)</th><th>ID (MC de origen)</th><th>MC que ha tenido</th><th>Último cambio de MC</th><th>Última visita</th></tr></thead>
+      <tbody id="tbody-cont"><tr><td colspan="6">Cargando...</td></tr></tbody>
     </table>
   </div>
 
