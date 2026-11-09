@@ -352,19 +352,13 @@ function renderTabla() {
     sel.addEventListener("change", async () => {
       const nuevo = sel.value === "" ? null : sel.value === "si";
       sel.disabled = true;
-      const { error } = await supabaseClient.from("historial_fallas").update({ vandalismo: nuevo }).eq("id_registro", sel.dataset.id);
+      // Ticket y todas sus piezas a la vez (así Ruta y Revisión ven lo mismo)
+      const r = await fijarVandalismoTicket(supabaseClient, sel.dataset.id, nuevo);
       sel.disabled = false;
-      if (error) { alert("No se pudo guardar el vandalismo: " + error.message + "\n(¿Corriste el SQL 74?)"); renderTabla(); return; }
+      if (!r.ok) { alert("No se pudo guardar el vandalismo: " + (r.error?.message || r.error) + "\n(¿Corriste el SQL 74?)"); renderTabla(); return; }
       const tk = ticketsCargados.find(x => x.id_registro === sel.dataset.id);
       if (tk) tk.vandalismo = nuevo;
-      // Si se pone "No"/"Sin revisar" se limpia también la marca de sus componentes, para que no contradiga
-      if (nuevo !== true) {
-        const comps = componentesPorRegistro[sel.dataset.id] || [];
-        if (comps.some(c => c.vandalismo)) {
-          await supabaseClient.from("componentes_retirados").update({ vandalismo: false }).eq("id_registro", sel.dataset.id);
-          comps.forEach(c => { c.vandalismo = false; });
-        }
-      }
+      (componentesPorRegistro[sel.dataset.id] || []).forEach(c => { c.vandalismo = nuevo === true; });
       renderTabla();
     });
   });

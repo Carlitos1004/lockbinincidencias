@@ -34,6 +34,7 @@ let marcadores = {}; // mc -> marcador de Leaflet
 let equiposPorMC = {}; // mc -> {equipo, tickets: [...]}
 let equipoAbierto = null; // mc actualmente mostrado en el modal
 let ticketExistente = null;
+let vandalismoPrefill = false; // la casilla venía marcada al abrir el ticket (desde Ruta, Detalle de OT o Revisión)
 let fallaActual = null; // falla del ticket elegido, o la seleccionada a mano si es nuevo
 let scanner = null;
 let serialesNuevos = {}; // codigo -> serial escaneado, se resetea por reporte
@@ -360,6 +361,10 @@ async function precargarTicket(idRegistro, btnElegido) {
     }
   });
 
+  // Vandalismo: si ya está marcado (aquí, en Detalle de OT o en Revisión) la casilla aparece marcada
+  vandalismoPrefill = ticketEsVandalismo(ticket, componentes);
+  document.getElementById("modal-vandalismo-check").checked = vandalismoPrefill;
+
   refrescarTipoBateria();
   refrescarZonaQR();
   modalForm.hidden = false;
@@ -379,6 +384,7 @@ function limpiarFormularioModal() {
   ["modal-cambio-le", "modal-cambio-ce", "modal-cambio-ba", "modal-cambio-mc", "modal-cambio-completo",
    "modal-retirado-cliente", "modal-falta-le", "modal-falta-ce", "modal-falta-ba", "modal-falta-mc",
    "modal-vandalismo-check"].forEach(id => { document.getElementById(id).checked = false; });
+  vandalismoPrefill = false;
   modalMsg.hidden = true;
   document.getElementById("qr-zona").hidden = true;
   document.getElementById("tipo-bateria-box").hidden = true;
@@ -1052,6 +1058,9 @@ modalEnviarBtn.addEventListener("click", async () => {
   if (filasAInsertar.length > 0) {
     await supabaseClient.from("componentes_retirados").insert(filasAInsertar);
   }
+  // Vandalismo: se fija en el ticket y en todas sus piezas (así lo ven igual Detalle de OT y Revisión)
+  if (esVandalismo) await fijarVandalismoTicket(supabaseClient, idRegistro, true);
+  else if (vandalismoPrefill) await fijarVandalismoTicket(supabaseClient, idRegistro, false);
   // El MC nuevo hereda la identidad del contenedor del MC al que sustituye
   if (serialesNuevos.MC && codigosCambio.includes("MC") && String(serialesNuevos.MC).toUpperCase() !== equipoAbierto) {
     await registrarCambioMc(supabaseClient, equipoAbierto, serialesNuevos.MC, idOtActiva, "ruta");

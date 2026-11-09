@@ -54,6 +54,7 @@ async function buscarEquipo() {
 }
 
 let ticketExistente = null; // si el operario elige uno abierto, aquí queda su id_registro
+let vandalismoPrefill = false; // la casilla venía marcada al elegir el ticket
 
 async function mostrarTicketsAbiertos(mc) {
   const contenedor = document.getElementById("tickets-abiertos");
@@ -89,6 +90,14 @@ async function mostrarTicketsAbiertos(mc) {
       document.getElementById("falla-select").value =
         btn.textContent.replace("🚨", "").split("(")[0].trim();
       document.getElementById("falla-select").disabled = true;
+      // Vandalismo ya marcado en este ticket (Ruta, Detalle de OT o Revisión)
+      Promise.all([
+        supabaseClient.from("historial_fallas").select("vandalismo, accion_calle").eq("id_registro", btn.dataset.id).maybeSingle(),
+        supabaseClient.from("componentes_retirados").select("vandalismo").eq("id_registro", btn.dataset.id)
+      ]).then(([{ data: tk }, { data: piezas }]) => {
+        vandalismoPrefill = ticketEsVandalismo(tk, piezas);
+        document.getElementById("vandalismo-check").checked = vandalismoPrefill;
+      });
     });
   });
 }
@@ -98,6 +107,7 @@ cancelarBtn.addEventListener("click", limpiarFormulario);
 function limpiarFormulario() {
   equipoActual = null;
   ticketExistente = null;
+  vandalismoPrefill = false;
   mcInput.value = "";
   document.getElementById("falla-select").value = "";
   document.getElementById("falla-select").disabled = false;
@@ -295,6 +305,10 @@ enviarBtn.addEventListener("click", async () => {
       await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: idOtActiva });
     }
   }
+
+  // Vandalismo: ticket y todas sus piezas a la vez (Ruta, Detalle de OT y Revisión ven lo mismo)
+  if (esVandalismo) await fijarVandalismoTicket(supabaseClient, idRegistro, true);
+  else if (vandalismoPrefill) await fijarVandalismoTicket(supabaseClient, idRegistro, false);
 
   // Si hay líneas de comentario nuevas (por componentes), las agregamos al ticket
   if (lineasComentario.length > 0) {
