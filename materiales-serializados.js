@@ -338,6 +338,15 @@ async function sincronizarLlevados(idOt) {
 
   if (filas.length === 0) return;
 
+  // Baterías que ya no tienen seriales de ese tipo (p. ej. se registraron como "No Recargable" y luego se
+  // reclasificaron como "Recargable"): su fila vieja se quedaba con el "Llevados" anterior para siempre.
+  // Se ponen a 0, así el reporte no cuenta baterías que nunca salieron.
+  const { data: existentes } = await supabaseClient.from("materiales_ot").select("tipo_componente, llevados").eq("id_ot", idOt);
+  const obsoletas = (existentes || [])
+    .filter(m => m.tipo_componente.startsWith("Batería") && !conteoPorTipo[m.tipo_componente] && (m.llevados || 0) > 0)
+    .map(m => ({ id_ot: idOt, tipo_componente: m.tipo_componente, llevados: 0 }));
+  filas.push(...obsoletas);
+
   await supabaseClient.from("materiales_ot").upsert(filas, { onConflict: "id_ot,tipo_componente" });
   await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: idOt });
 }
