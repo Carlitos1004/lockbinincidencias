@@ -27,6 +27,15 @@
   .pre-caja { border:1px solid #d9e2dc; border-radius:10px; padding:12px 14px; margin:14px 0; background:#fff; }
   .pre-tabla { width:100%; border-collapse:collapse; }
   .pre-tabla th, .pre-tabla td { padding:6px 10px; border-top:1px solid #e8eee9; text-align:left; font-size:.92em; }
+  /* Cuadros de texto, desplegables y áreas de texto de toda la página */
+  .panel-body input[type=text], .panel-body input[type=search], .panel-body input[type=date], .panel-body textarea,
+  .panel-body select { padding:8px 10px; border:1.5px solid var(--gris-200, #d5ddd6); border-radius:10px; font:inherit; font-size:.92em; background:#fff; color:inherit; }
+  .panel-body input[type=text]:focus, .panel-body textarea:focus, .panel-body select:focus { outline:none; border-color:var(--verde-medio, #4c8c2b); box-shadow:0 0 0 3px rgba(76,140,43,.15); }
+  .panel-body input[type=text]::placeholder, .panel-body textarea::placeholder { color:#9aa59d; }
+  .panel-body input[type=text]:disabled, .panel-body select:disabled, .panel-body textarea:disabled { background:#f1f3f1; color:#888; }
+  .pre-tabla select { padding:6px 8px; font-size:.9em; }
+  .pre-form { gap:12px; }
+  .pre-form label input[type=text], .pre-form label select { font-weight:400; }
 </style>
 </head>
 <body>
