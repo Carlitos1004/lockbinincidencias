@@ -41,6 +41,44 @@ let otsInternasLibres = new Set();
 // Fotos de revisión por componente (tabla fotos_revision): { componente_id: [fotos] }
 let fotosPorComponente = {};
 
+// Piezas que ya están en una orden de presupuesto (vandalismo): { componente_id: {codigo, texto, repuesto, ...} }
+// Solo las ve el manager (las tablas de presupuesto son suyas); si no hay acceso, simplemente no se marca nada.
+let presPorComp = {};
+async function cargarPresupuestosRevision(componentes) {
+  presPorComp = {};
+  try {
+    const mcs = [...new Set((componentes || []).map(c => c.m_control).filter(Boolean))];
+    let lineas = [];
+    for (let i = 0; i < mcs.length; i += 100) {
+      const { data, error } = await supabaseClient.from("presupuesto_lineas")
+        .select("m_control, componente_id, id_ot, tipo_componente, alcance, aprobada, ordenes_presupuesto(numero, estado, numero_oferta)")
+        .in("m_control", mcs.slice(i, i + 100));
+      if (error) return;
+      lineas = lineas.concat(data || []);
+    }
+    (componentes || []).forEach(c => {
+      const l = lineas.find(x => x.componente_id === String(c.id))
+        // Línea de "Equipo completo": cubre las 4 piezas del equipo (aunque la línea diga solo "Batería", etc.)
+        || lineas.find(x => (x.alcance === "Equipo completo" || x.tipo_componente === "Equipo completo") && x.m_control === c.m_control && (!x.id_ot || x.id_ot === c.id_ot));
+      if (!l || !l.ordenes_presupuesto) return;
+      const o = l.ordenes_presupuesto;
+      const cod = "PRE-" + String(o.numero).padStart(3, "0");
+      const rechazada = l.aprobada === false || o.estado === "Presupuesto rechazado";
+      const repuesto = !rechazada && o.estado === "Equipos repuestos";
+      const estado = rechazada ? "rechazado" : repuesto ? "repuesto con compra" : l.aprobada === true || o.estado === "Presupuesto aprobado" ? "aprobado" : "pendiente";
+      presPorComp[c.id] = { codigo: cod, estado, repuesto, rechazada, oferta: o.numero_oferta || "", ordenEstado: o.estado };
+    });
+  } catch (err) { console.warn("Presupuestos no disponibles en Revisión:", err); }
+}
+
+function badgePresupuesto(c) {
+  const p = presPorComp[c.id];
+  if (!p) return "";
+  const cls = p.repuesto ? "badge-pre-ok" : p.rechazada ? "badge-pre-no" : "badge-pre-pend";
+  const tip = `${p.codigo}${p.oferta ? " · oferta " + p.oferta : ""} · orden: ${p.ordenEstado}`;
+  return `<div class="badge-pre ${cls}" data-pre="${escaparHtml(p.codigo)}" title="${escaparHtml(tip)}">💰 ${escaparHtml(p.codigo)} · ${escaparHtml(p.estado)}</div>`;
+}
+
 async function cargarFotosRevision(componentes) {
   fotosPorComponente = {};
   const ids = (componentes || []).map(c => c.id);
@@ -119,6 +157,7 @@ async function verTodosPendientes() {
   );
 
   await cargarFotosRevision(data);
+  await cargarPresupuestosRevision(data);
   renderTabla(data, true);
   tabla.hidden = false;
   document.getElementById("guardar-todo-btn").hidden = false;
@@ -163,6 +202,7 @@ async function buscarComponentes() {
   const faltantes = data.filter(c => c.estado === "Faltante/Perdido");
 
   await cargarFotosRevision(normales);
+  await cargarPresupuestosRevision(normales);
   renderTabla(normales);
   tabla.hidden = normales.length === 0;
   document.getElementById("guardar-todo-btn").hidden = normales.length === 0;
@@ -282,7 +322,7 @@ function renderTabla(componentes, mostrarOt = false) {
     `;
 
     return `
-      <tr data-id="${c.id}">
+      <tr data-id="${c.id}"${presPorComp[c.id] ? ' class="fila-pre"' : ""}>
         <td><input type="text" class="input-mc-fila" value="${c.m_control || ""}" placeholder="Ej: MC2500642"></td>
         ${celdaOt}
         <td>${c.tipo_componente}</td>
@@ -292,7 +332,7 @@ function renderTabla(componentes, mostrarOt = false) {
         <td>${celdaEnCalle}</td>
         <td>${celdaCondicionFisica}</td>
         <td>${celdaCausaFalla}</td>
-        <td style="text-align:center;"><input type="checkbox" class="input-vandalismo" ${c.vandalismo ? "checked" : ""} ${bloqueado ? "disabled" : ""} title="Vandalismo / mal uso"></td>
+        <td style="text-align:center;"><input type="checkbox" class="input-vandalismo" ${c.vandalismo ? "checked" : ""} ${bloqueado ? "disabled" : ""} title="Vandalismo / mal uso">${badgePresupuesto(c)}</td>
         <td><textarea class="input-reparacion" rows="2" ${bloqueado ? "disabled" : ""}>${c.reparacion || ""}</textarea></td>
         <td>
           <select class="input-destino" ${bloqueado ? "disabled" : ""}>
@@ -720,7 +760,10 @@ function textoCeldaRevision(td) {
   const sel = td.querySelector("select");
   if (sel && !td.querySelector(".detalle-ammi")) return (sel.selectedOptions[0]?.textContent || "").trim();
   const chk = td.querySelector("input.input-vandalismo");
-  if (chk) return chk.checked ? "Sí" : "No";
+  if (chk) {
+    const pre = td.querySelector(".badge-pre");
+    return (chk.checked ? "Sí" : "No") + (pre ? " · " + pre.dataset.pre : "");
+  }
   if (td.querySelector(".input-foto-revision")) return td.querySelector("a") ? "Con foto" : "Sin foto";
   const inp = td.querySelector('input[type="text"], textarea');
   if (inp) return (inp.value || "").trim();

@@ -2201,3 +2201,11 @@ a.tarjeta-resumen:hover {
 .hist-bloque { background: #f3f7f4; border-radius: 10px; padding: 8px 12px; margin: 8px 0; font-size: .9rem; }
 .hist-alerta { background: #fdecea; color: #a3261c; font-weight: 600; }
 .hist-scroll { max-height: 280px; overflow: auto; }
+
+
+/* Revisión de Taller: piezas que ya están en una orden de presupuesto (vandalismo repuesto con compra) */
+.tabla-revision tr.fila-pre > td:first-child { box-shadow: inset 4px 0 0 #e0a400; }
+.badge-pre { display:inline-block; margin-top:4px; padding:2px 8px; border-radius:10px; font-size:.72rem; font-weight:700; white-space:nowrap; }
+.badge-pre-ok { background:#dff3e4; color:#1d6b32; }
+.badge-pre-pend { background:#fff1d6; color:#8a5a00; }
+.badge-pre-no { background:#fde3e1; color:#a3261c; }
