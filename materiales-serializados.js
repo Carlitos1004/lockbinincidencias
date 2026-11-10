@@ -50,6 +50,7 @@ async function cargarOT() {
   otActual = idOt;
   document.getElementById("contenido").hidden = false;
   msg.hidden = true;
+  await recalcularEstadoSerializados(supabaseClient, idOt);
   await cargarTabla();
 }
 

@@ -689,6 +689,7 @@ async function eliminarTicketDeOT(idRegistro) {
 
   if (otActualCargada?.id_ot) {
     await supabaseClient.rpc("recalcular_materiales_ot", { p_id_ot: otActualCargada.id_ot });
+    await recalcularEstadoSerializados(supabaseClient, otActualCargada.id_ot);
   }
 
   buscarOT();

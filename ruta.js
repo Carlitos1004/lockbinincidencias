@@ -1148,18 +1148,10 @@ modalEnviarBtn.addEventListener("click", async () => {
     if (imeiNuevo) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imeiNuevo });
   }
 
-  // Cruce automático: si alguno de los seriales nuevos coincide con uno
-  // registrado como "Sacado del almacén" para esta OT, lo marcamos como
-  // usado — así queda claro solo, sin que nadie tenga que anotarlo aparte.
-  const serialesUsados = Object.values(serialesNuevos).filter(Boolean);
-  if (serialesUsados.length > 0) {
-    await supabaseClient
-      .from("materiales_serializados")
-      .update({ estado: "Usado en campo", fecha_actualizacion: new Date().toISOString() })
-      .eq("id_ot", idOtActiva)
-      .eq("estado", "Sacado del almacén")
-      .in("serial", serialesUsados);
-  }
+  // Cruce automático: el estado de los seriales de esta OT se recalcula
+  // a partir de lo que de verdad queda en los reportes — así un serial
+  // que se escaneó por error y luego se corrigió no queda "usado".
+  await recalcularEstadoSerializados(supabaseClient, idOtActiva);
 
   modalEnviarBtn.disabled = false;
   modalEnviarBtn.textContent = "Enviar reporte";
