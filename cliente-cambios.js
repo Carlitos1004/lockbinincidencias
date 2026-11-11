@@ -92,14 +92,14 @@ async function cargarCambiosPropios() {
 
 document.getElementById("cambio-btn").addEventListener("click", async () => {
   const mc = document.getElementById("cambio-mc").value.trim().toUpperCase();
-  const tipo = document.getElementById("cambio-tipo").value;
+  const tipo = "Batería"; // de momento el cliente solo registra cambios de baterías
   const serialAnterior = document.getElementById("cambio-serial-anterior").value.trim();
   const serialNuevo = document.getElementById("cambio-serial-nuevo").value.trim();
   const descripcion = document.getElementById("cambio-descripcion").value.trim();
   const msg = document.getElementById("cambio-msg");
 
-  if (!mc || !tipo) {
-    mostrarMensaje(msg, "⚠️ Escribe o elige el módulo, y el tipo de componente.", true);
+  if (!mc) {
+    mostrarMensaje(msg, "⚠️ Escribe, elige o escanea el módulo (MC).", true);
     return;
   }
   if (!equiposCliente.some(eq => eq.m_control === mc)) {
@@ -125,7 +125,7 @@ document.getElementById("cambio-btn").addEventListener("click", async () => {
   });
 
   btn.disabled = false;
-  btn.textContent = "Enviar reporte de cambio";
+  btn.textContent = "Enviar cambio";
 
   if (error) {
     mostrarMensaje(msg, "❌ " + error.message, true);
@@ -134,7 +134,6 @@ document.getElementById("cambio-btn").addEventListener("click", async () => {
 
   mostrarMensaje(msg, "✅ Cambio reportado. Lo revisaremos y actualizaremos el sistema.", false);
   document.getElementById("cambio-mc").value = "";
-  document.getElementById("cambio-tipo").value = "";
   document.getElementById("cambio-serial-anterior").value = "";
   document.getElementById("cambio-serial-nuevo").value = "";
   document.getElementById("cambio-descripcion").value = "";
@@ -143,7 +142,6 @@ document.getElementById("cambio-btn").addEventListener("click", async () => {
 
 // ---------- Escaneo de QR con la cámara del móvil / tablet ----------
 let scannerCliente = null;
-const TIPO_POR_PREFIJO = { MC: "Módulo de Control", LE: "Lector Electrónico", CE: "Cierre Electrónico", BA: "Batería" };
 
 function detenerScannerCliente() {
   if (scannerCliente) {
@@ -175,12 +173,6 @@ function iniciarScannerCliente(idDestino) {
       const input = document.getElementById(idDestino);
       input.value = valor;
       input.dispatchEvent(new Event("input", { bubbles: true }));
-      // Si no han elegido el tipo, lo deducimos del prefijo del serial escaneado (LE, CE, BA, MC)
-      if (idDestino === "cambio-serial-nuevo" || idDestino === "cambio-serial-anterior") {
-        const tipoSel = document.getElementById("cambio-tipo");
-        const tipo = TIPO_POR_PREFIJO[valor.slice(0, 2)];
-        if (!tipoSel.value && tipo) tipoSel.value = tipo;
-      }
     },
     () => {} // frames sin QR: normal mientras enfoca
   ).catch(err => {
