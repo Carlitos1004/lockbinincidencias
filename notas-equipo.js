@@ -5,6 +5,7 @@
 let notasData = [];
 let conteoFotosPorNota = {};
 let editandoId = null;
+let presPorMcNota = {}; // MC -> "PRE-001" (equipos con vandalismo ya incluidos como equipo completo en un presupuesto)
 
 cargarNotas();
 
@@ -31,6 +32,20 @@ async function cargarNotas() {
       conteoFotosPorNota[f.nota_id] = (conteoFotosPorNota[f.nota_id] || 0) + 1;
     });
   }
+
+  // ¿Alguno de los equipos con vandalismo ya va en un presupuesto? (solo lo ve el manager; el resto recibe vacío)
+  presPorMcNota = {};
+  try {
+    const mcs = [...new Set(notasData.filter(n => n.vandalismo).map(n => n.mc))];
+    for (let i = 0; i < mcs.length; i += 100) {
+      const { data } = await supabaseClient.from("presupuesto_lineas")
+        .select("m_control, alcance, tipo_componente, ordenes_presupuesto(numero)").in("m_control", mcs.slice(i, i + 100));
+      (data || []).forEach(l => {
+        if ((l.alcance === "Equipo completo" || l.tipo_componente === "Equipo completo") && l.ordenes_presupuesto)
+          presPorMcNota[l.m_control] = "PRE-" + String(l.ordenes_presupuesto.numero).padStart(3, "0");
+      });
+    }
+  } catch (e) { console.warn(e); }
 
   renderTabla();
 }
@@ -72,7 +87,7 @@ function renderTabla() {
     <tr class="${n.activa ? '' : 'fila-alerta'}">
       <td>${n.mc}</td>
       <td>${n.cliente || "—"}</td>
-      <td>${n.vandalismo ? '<span class="badge-pre badge-pre-no" title="Marcada como vandalismo: sale en la lista de presupuestos">🚨 Vandalismo</span> ' : ""}${n.nota}</td>
+      <td>${n.vandalismo ? '<span class="badge-pre badge-pre-no" title="Marcada como vandalismo: sale en la lista de presupuestos">🚨 Vandalismo</span> ' : ""}${n.vandalismo && presPorMcNota[n.mc] ? `<span class="badge-pre badge-pre-ok" title="Este equipo ya está incluido como equipo completo en el presupuesto">💰 ${presPorMcNota[n.mc]}</span> ` : ""}${n.nota}</td>
       <td>${(conteoFotosPorNota[n.id] > 1)
         ? `<a href="ver-fotos.html?origen=nota&id=${n.id}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver todas las fotos (${conteoFotosPorNota[n.id]}) →</a>`
         : n.foto_url

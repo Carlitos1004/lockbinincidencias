@@ -8,6 +8,7 @@ let ordenes = [];          // ordenes_presupuesto
 let lineasPorOrden = {};   // orden_id -> [lineas]
 let ordenActual = null;
 let compInfo = {};         // componente_id -> {repo_estado, repo_serial_nuevo, repo_fecha_entrega}
+let notaPorClave = {};     // "N<id>" -> {nota, fecha} (líneas que vienen de una nota de equipo)
 let otPorMc = {};          // MC -> última OT en la que va (ticket abierto)
 let disponibles = [];      // piezas vandalizadas del cliente de la orden abierta, aún sin orden
 
@@ -33,13 +34,18 @@ const canonTipo = t => /bater/i.test(t || "") ? "Batería" : (t || "");
 
 // Lee el estado de reposición de las piezas ligadas y la OT en la que va cada equipo aprobado
 async function cargarInfoReposicion() {
-  compInfo = {}; otPorMc = {};
+  compInfo = {}; otPorMc = {}; notaPorClave = {};
   const todas = Object.values(lineasPorOrden).flat();
   const ids = [...new Set(todas.filter(l => esClaveComp(l.componente_id)).map(l => String(l.componente_id)))];
   for (let i = 0; i < ids.length; i += 100) {
     const { data } = await supabaseClient.from("componentes_retirados")
       .select("id, repo_estado, repo_serial_nuevo, repo_fecha_entrega").in("id", ids.slice(i, i + 100));
     (data || []).forEach(c => { compInfo[String(c.id)] = c; });
+  }
+  const idsNota = [...new Set(todas.filter(l => /^N/.test(String(l.componente_id || ""))).map(l => String(l.componente_id).slice(1)))];
+  for (let i = 0; i < idsNota.length; i += 100) {
+    const { data } = await supabaseClient.from("notas_equipo").select("id, nota, fecha").in("id", idsNota.slice(i, i + 100));
+    (data || []).forEach(n => { notaPorClave["N" + n.id] = n; });
   }
   const mcs = [...new Set(todas.filter(l => l.aprobada === true).map(l => l.m_control))];
 
@@ -247,7 +253,7 @@ function pintarDetalle() {
         <option value="Pieza" ${l.alcance !== "Equipo completo" ? "selected" : ""}>Solo la pieza</option>
         <option value="Equipo completo" ${l.alcance === "Equipo completo" ? "selected" : ""}>🔄 Equipo completo</option>
       </select></td><td>${esc(l.serial || "—")}</td>
-      <td>${l.id_ot ? `<a href="ot-detalle.html?ot=${encodeURIComponent(l.id_ot)}">${esc(l.id_ot)}</a>` : "—"}</td>
+      <td>${celdaOrigen(l)}</td>
       <td><select class="sel-aprob">
         <option value="" ${l.aprobada === null ? "selected" : ""}>Pendiente de respuesta</option>
         <option value="si" ${l.aprobada === true ? "selected" : ""}>✅ Acepta pagar</option>
@@ -283,6 +289,13 @@ function pintarDetalle() {
     lineasPorOrden[ordenActual] = (lineasPorOrden[ordenActual] || []).filter(x => x.id !== id);
     pintarDetalle(); renderLista(); cargarDisponibles();
   }));
+}
+
+function celdaOrigen(l) {
+  if (l.id_ot) return `<a href="ot-detalle.html?ot=${encodeURIComponent(l.id_ot)}">${esc(l.id_ot)}</a>`;
+  const n = notaPorClave[String(l.componente_id || "")];
+  if (n) return `<span title="${esc(n.nota)}">📝 Nota de equipo${n.fecha ? "<br><small>" + fmt(String(n.fecha).slice(0, 10)) + "</small>" : ""}</span>`;
+  return "—";
 }
 
 function celdaReposicion(l) {
@@ -370,12 +383,14 @@ async function cargarDisponibles() {
   const { data: usadas } = await traerTodo(() => supabaseClient.from("presupuesto_lineas")
     .select("id, componente_id, m_control, alcance, orden_id, ordenes_presupuesto(numero)").not("componente_id", "is", null).order("id"));
   const usadaEn = {};
-  const completoEn = {}; // MC -> orden donde ya va como equipo completo
+  const completoEn = {}; // MC -> orden donde ya va como equipo completo (con o sin enlace a pieza)
   (usadas || []).forEach(l => {
     const cod = l.ordenes_presupuesto ? codigo(l.ordenes_presupuesto.numero) : "otra orden";
     usadaEn[String(l.componente_id)] = cod;
-    if (l.alcance === "Equipo completo") completoEn[l.m_control] = cod;
   });
+  ordenes.forEach(o => (lineasPorOrden[o.id] || []).forEach(l => {
+    if (l.alcance === "Equipo completo" || l.tipo_componente === "Equipo completo") completoEn[l.m_control] = completoEn[l.m_control] || codigo(o.numero);
+  }));
   const piezasVand = (data || []).filter(esVandPieza).filter(c => c.m_control);
   const mcConPieza = new Set(piezasVand.map(c => c.m_control));
   const lista = piezasVand.map(c => ({ ...c, cliente_ef: c.cliente || c.cliente_original || "", clave: String(c.id) }));
