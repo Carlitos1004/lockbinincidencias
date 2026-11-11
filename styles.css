@@ -158,13 +158,13 @@ body {
 }
 
 .panel-logo-lb {
-  height: 44px;
+  height: 28px;
   width: auto;
 }
 
 @media (max-width: 600px) {
   .panel-logo-lb {
-    height: 36px;
+    height: 22px;
   }
 }
 
