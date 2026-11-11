@@ -21,7 +21,8 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 const fmt = f => f ? new Date(f + "T00:00:00").toLocaleDateString("es-ES") : "—";
 
 const ESTADOS_REPUESTA = ["Listo para entregar", "Entregado", "Reparado recibido"];
-const esClaveComp = id => id && !String(id).startsWith("T");
+// "T…" = ticket de vandalismo, "N…" = nota de equipo con vandalismo: no son piezas de componentes_retirados
+const esClaveComp = id => id && !/^[TN]/.test(String(id));
 function infoLinea(l) { return esClaveComp(l.componente_id) ? (compInfo[String(l.componente_id)] || null) : null; }
 let detectadoPorLinea = {}; // linea.id -> {serial, ot} cambio hecho en ruta DESPUÉS de aprobar el presupuesto
 function estaRepuesta(l) {
@@ -172,7 +173,8 @@ async function cargarClientes() {
   const { data, error } = await traerTodo(() => supabaseClient.from("componentes_retirados").select("id, cliente").eq("vandalismo", true).order("id"));
   if (error) { sel.innerHTML = `<option value="">Error: ${esc(error.message)}</option>`; return; }
   const { data: tk } = await traerTodo(() => supabaseClient.from("historial_fallas").select("id_registro, cliente").or(FILTRO_TICKET_VAND).order("id_registro"));
-  const clientes = [...new Set([...(data || []), ...(tk || [])]
+  const { data: nt } = await traerTodo(() => supabaseClient.from("notas_equipo").select("id, cliente").eq("activa", true).eq("vandalismo", true).order("id"));
+  const clientes = [...new Set([...(data || []), ...(tk || []), ...(nt || [])]
     .flatMap(c => String(c.cliente || "").split(" / ")).map(x => x.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   sel.innerHTML = '<option value="">Elige cliente...</option>' + clientes.map(c => `<option>${esc(c)}</option>`).join("");
 }
@@ -366,9 +368,14 @@ async function cargarDisponibles() {
   const { data: tks } = await traerTodo(() => supabaseClient.from("historial_fallas")
     .select("id_registro, m_control, id_ot, falla, cliente").or(FILTRO_TICKET_VAND).order("id_registro"));
   const { data: usadas } = await traerTodo(() => supabaseClient.from("presupuesto_lineas")
-    .select("id, componente_id, orden_id, ordenes_presupuesto(numero)").not("componente_id", "is", null).order("id"));
+    .select("id, componente_id, m_control, alcance, orden_id, ordenes_presupuesto(numero)").not("componente_id", "is", null).order("id"));
   const usadaEn = {};
-  (usadas || []).forEach(l => { usadaEn[String(l.componente_id)] = l.ordenes_presupuesto ? codigo(l.ordenes_presupuesto.numero) : "otra orden"; });
+  const completoEn = {}; // MC -> orden donde ya va como equipo completo
+  (usadas || []).forEach(l => {
+    const cod = l.ordenes_presupuesto ? codigo(l.ordenes_presupuesto.numero) : "otra orden";
+    usadaEn[String(l.componente_id)] = cod;
+    if (l.alcance === "Equipo completo") completoEn[l.m_control] = cod;
+  });
   const piezasVand = (data || []).filter(esVandPieza).filter(c => c.m_control);
   const mcConPieza = new Set(piezasVand.map(c => c.m_control));
   const lista = piezasVand.map(c => ({ ...c, cliente_ef: c.cliente || c.cliente_original || "", clave: String(c.id) }));
@@ -377,7 +384,26 @@ async function cargarDisponibles() {
     lista.push({ id: "T" + t.id_registro, clave: "T" + t.id_registro, m_control: t.m_control, tipo_componente: "Equipo completo",
       serial_retirado: null, id_ot: t.id_ot, cliente_ef: t.cliente || "", cliente_original: null, destino: "Ticket vandalismo: " + (t.falla || "") });
   });
-  lista.forEach(c => { c.usadaEn = usadaEn[c.clave] || null; });
+  // Equipos en calle con vandalismo anotado en Notas de Equipo (no están en ninguna OT)
+  const mcEnLista = new Set(lista.map(c => c.m_control));
+  const { data: notas } = await traerTodo(() => supabaseClient.from("notas_equipo")
+    .select("id, mc, nota, cliente, fecha").eq("activa", true).eq("vandalismo", true).order("fecha", { ascending: false }));
+  const notasVand = (notas || []).filter(n => n.mc && !mcEnLista.has(n.mc));
+  const clienteDeMc = {};
+  const sinCliente = [...new Set(notasVand.filter(n => !n.cliente).map(n => n.mc))];
+  for (let i = 0; i < sinCliente.length; i += 100) {
+    const { data: eqs } = await supabaseClient.from("equipos").select("m_control, cliente").in("m_control", sinCliente.slice(i, i + 100));
+    (eqs || []).forEach(e => { clienteDeMc[e.m_control] = e.cliente; });
+  }
+  const yaNota = new Set();
+  notasVand.forEach(n => {
+    if (yaNota.has(n.mc)) return; // una sola fila por equipo (la nota más reciente)
+    yaNota.add(n.mc);
+    const resumen = String(n.nota || "").replace(/\s+/g, " ").slice(0, 110);
+    lista.push({ id: "N" + n.id, clave: "N" + n.id, m_control: n.mc, tipo_componente: "Equipo completo", serial_retirado: null, id_ot: null,
+      cliente_ef: n.cliente || clienteDeMc[n.mc] || "", cliente_original: null, destino: "📝 Nota de equipo: " + resumen });
+  });
+  lista.forEach(c => { c.usadaEn = usadaEn[c.clave] || (c.clave[0] === "N" ? completoEn[c.m_control] : null) || null; });
   disponibles = lista.sort((a, b) => a.m_control.localeCompare(b.m_control));
   renderDisponibles();
 }

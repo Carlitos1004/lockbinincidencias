@@ -58,7 +58,8 @@ function renderTabla() {
         <tr>
           <td><input type="text" class="input-editar-mc" value="${n.mc}" data-id="${n.id}"></td>
           <td>${n.cliente || "—"}</td>
-          <td colspan="2"><textarea class="input-editar-nota" rows="2" data-id="${n.id}">${n.nota}</textarea></td>
+          <td colspan="2"><textarea class="input-editar-nota" rows="2" data-id="${n.id}">${n.nota}</textarea>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:.9em;"><input type="checkbox" class="input-editar-vand" ${n.vandalismo ? "checked" : ""}> 🚨 Vandalismo</label></td>
           <td>${new Date(n.fecha).toLocaleDateString("es-ES")}</td>
           <td>
             <button class="btn-guardar-edicion btn-primario btn-compacto" data-id="${n.id}">Guardar</button>
@@ -71,7 +72,7 @@ function renderTabla() {
     <tr class="${n.activa ? '' : 'fila-alerta'}">
       <td>${n.mc}</td>
       <td>${n.cliente || "—"}</td>
-      <td>${n.nota}</td>
+      <td>${n.vandalismo ? '<span class="badge-pre badge-pre-no" title="Marcada como vandalismo: sale en la lista de presupuestos">🚨 Vandalismo</span> ' : ""}${n.nota}</td>
       <td>${(conteoFotosPorNota[n.id] > 1)
         ? `<a href="ver-fotos.html?origen=nota&id=${n.id}" target="_blank" rel="noopener" class="btn-ver-tabla">Ver todas las fotos (${conteoFotosPorNota[n.id]}) →</a>`
         : n.foto_url
@@ -115,6 +116,7 @@ function renderTabla() {
       const fila = btn.closest("tr");
       const mcNuevo = fila.querySelector(".input-editar-mc").value.trim().toUpperCase();
       const notaNueva = fila.querySelector(".input-editar-nota").value.trim();
+      const vandNuevo = fila.querySelector(".input-editar-vand").checked;
 
       if (!mcNuevo || !notaNueva) {
         alert("El MC y la nota no pueden quedar vacíos.");
@@ -130,6 +132,7 @@ function renderTabla() {
       await supabaseClient.from("notas_equipo").update({
         mc: mcNuevo,
         nota: notaNueva,
+        vandalismo: vandNuevo,
         cliente: equipoNuevo ? equipoNuevo.cliente : null
       }).eq("id", btn.dataset.id);
       editandoId = null;
@@ -175,7 +178,7 @@ document.getElementById("agregar-nota-btn").addEventListener("click", async () =
   // vincularle las fotos después.
   const { data: notaCreada, error: errorNota } = await supabaseClient
     .from("notas_equipo")
-    .insert({ mc: mc, nota: texto, autor: user.email, cliente: equipoDeLaNota ? equipoDeLaNota.cliente : null })
+    .insert({ mc: mc, nota: texto, autor: user.email, vandalismo: document.getElementById("nota-vandalismo").checked, cliente: equipoDeLaNota ? equipoDeLaNota.cliente : null })
     .select()
     .single();
 
@@ -213,6 +216,7 @@ document.getElementById("agregar-nota-btn").addEventListener("click", async () =
   mostrarMensaje(msg, "✅ Nota guardada.", false);
   document.getElementById("nota-mc").value = "";
   document.getElementById("nota-texto").value = "";
+  document.getElementById("nota-vandalismo").checked = false;
   document.getElementById("nota-foto-input").value = "";
   cargarNotas();
 });
