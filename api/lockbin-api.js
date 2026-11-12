@@ -9,6 +9,9 @@
 //   GET  ?accion=whoami | equipos | dispositivos      → lectura (solo manager)
 //   GET  ?accion=comunicacion&mc=MC123456              → ¿ha comunicado este equipo? (manager y operario)
 //   POST {accion: battery|lock|reader|recycle, deviceId, valor} → escritura
+//   POST {accion: "desvincular", mc}                   → baja del equipo (DELETE /equipment/{id}).
+//        El id del equipo NO lo manda el navegador: el puente lo busca por el
+//        MC exacto y solo da de baja si hay exactamente un equipo con ese MC.
 //
 // Variables de entorno (Vercel → Settings → Environment Variables):
 //   LOCKBIN_API_USER          usuario de la API (obligatoria)
@@ -247,6 +250,47 @@ async function registrarOperacion(usuario, fila) {
   }
 }
 
+// Desvincular un MC de la plataforma = dar de baja su equipo (DELETE /equipment/{id}).
+// Resultados: "desvinculado" | "ya_dado_de_baja" | "no_esta_en_plataforma" | "error"
+async function manejarDesvinculacion(cuerpo, usuario) {
+  const mc = String(cuerpo.mc ?? "").trim().toUpperCase();
+  if (!/^MC\d{4,12}$/.test(mc)) throw fallo(400, "MC no válido.");
+
+  const rl = await llamarApi("/api/operations/v1/equipment/?serialBoard=" + encodeURIComponent(mc) + "&pageNo=0&pageSize=5");
+  let equipo = null;
+  if (rl.status !== 204) {
+    if (!rl.ok) throw fallo(502, `La API respondió HTTP ${rl.status} al buscar el equipo.`);
+    const coincidencias = (await rl.json()).map(aplanarEquipo).filter(x => String(x.serialBoard || "").toUpperCase() === mc);
+    if (coincidencias.length > 1) throw fallo(409, `Hay ${coincidencias.length} equipos con el MC ${mc} en la plataforma: no se da de baja ninguno.`);
+    equipo = coincidencias[0] || null;
+  }
+
+  if (!equipo) {
+    const registrado = await registrarOperacion(usuario, { accion: "desvincular", device_id: null, datos: { mc }, estado_api: 404, respuesta: { motivo: "El MC no tiene equipo en la plataforma" } });
+    return { estadoApi: 404, resultado: "no_esta_en_plataforma", respuesta: null, registrado };
+  }
+
+  // Sin reintentos: una baja no debe repetirse a ciegas.
+  const r = await llamarApi(`/api/operations/v1/equipment/${equipo.id}`, { method: "DELETE" });
+  const texto = await r.text();
+  let respuesta = null;
+  try { respuesta = texto ? JSON.parse(texto) : null; } catch (e) { respuesta = { texto: texto.slice(0, 300) }; }
+
+  let resultado = "error";
+  if (r.status === 204 || r.status === 200) resultado = "desvinculado";
+  else if (r.status === 409 && respuesta && respuesta.code === "012") resultado = "ya_dado_de_baja";
+  else if (r.status === 404) resultado = "no_esta_en_plataforma";
+
+  const registrado = await registrarOperacion(usuario, {
+    accion: "desvincular",
+    device_id: Number.isInteger(equipo.deviceId) ? equipo.deviceId : null,
+    datos: { mc, equipmentId: equipo.id, equipmentSerial: equipo.serial || null },
+    estado_api: r.status,
+    respuesta
+  });
+  return { estadoApi: r.status, resultado, respuesta, registrado, equipmentId: equipo.id, deviceId: equipo.deviceId ?? null };
+}
+
 async function manejarEscritura(req, usuario) {
   if (!escrituraPermitida()) {
     throw fallo(403, "Las escrituras están desactivadas: la API configurada no es la de preproducción.");
@@ -254,6 +298,8 @@ async function manejarEscritura(req, usuario) {
   let cuerpo = req.body;
   if (typeof cuerpo === "string") { try { cuerpo = JSON.parse(cuerpo); } catch (e) { cuerpo = null; } }
   if (!cuerpo || typeof cuerpo !== "object") throw fallo(400, "Cuerpo de la petición no válido.");
+
+  if (cuerpo.accion === "desvincular") return await manejarDesvinculacion(cuerpo, usuario);
 
   const def = ESCRITURAS[cuerpo.accion];
   if (!def) throw fallo(400, "Acción de escritura no permitida.");
