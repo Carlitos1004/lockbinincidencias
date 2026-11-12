@@ -609,6 +609,8 @@ async function guardarFila(btn) {
   // (ej. de Stock a AMMI) para la MISMA OT, se sobreescribe el que ya
   // había en vez de sumar uno nuevo. Si es otra OT, sí es un evento
   // aparte y se agrega.
+  let avisoPlataforma = "";
+  let avisoPlataformaFallo = false;
   if (componente.tipo_componente === "Módulo de Control") {
     const esDestinoStock = destino === "✓ Equipo OK - Stock (1ra categoría)" || destino === "✓ Equipo OK - Stock (2da categoría)";
     if (esDestinoStock || destino === DESTINO_AMMI) {
@@ -662,13 +664,23 @@ async function guardarFila(btn) {
           await supabaseClient.from("historial_equipo").insert(datosEvento);
         }
         if (imeiFinal) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imeiFinal });
+
+        // Primera vez que este MC sale de calle por esta OT: se desvincula también en la plataforma
+        // (cubre las OT manuales que no pasan por Ruta). Si ya se había hecho, la API responde "ya desvinculado".
+        if (!eventoExistente) {
+          const plat = await desvincularEnPlataforma(supabaseClient, mcEquipo);
+          if (plat.resultado === "desvinculado") avisoPlataforma = " · 🔓 desvinculado en la plataforma";
+          else if (plat.ok) avisoPlataforma = " · ya estaba desvinculado en la plataforma";
+          else { avisoPlataforma = ` · ⚠️ no se pudo desvincular ${mcEquipo} en la plataforma (${plat.mensaje || plat.resultado})`; avisoPlataformaFallo = true; }
+        }
       }
       // si ya existía uno del mismo tipo para esta misma OT, no se toca
     }
   }
 
-  btn.textContent = "✅ Guardado";
+  btn.textContent = "✅ Guardado" + (avisoPlataformaFallo ? "" : avisoPlataforma);
   setTimeout(() => { btn.textContent = "Guardar"; btn.disabled = false; }, 1500);
+  if (avisoPlataformaFallo) alert("Guardado, pero" + avisoPlataforma.replace(/^ · /, " ") + ".\nHaz la desvinculación a mano en la plataforma.");
 }
 
 function renderFaltantes(faltantes) {

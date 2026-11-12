@@ -278,13 +278,15 @@ async function leerPorMc(mc) {
 }
 
 function interpretarEstado(estado, resp, accion) {
-  if (estado === 200 || estado === 201) return "✅ La API aceptó el cambio";
+  if (estado === 200 || estado === 201 || estado === 204) return "✅ La API aceptó el cambio";
   if (estado === 400 && resp?.code === "007") return `⚠️ 400 / código 007: el serial no está en el registro de preinstalación (${resp.description})`;
   if (estado === 400) return "⚠️ 400: petición mal formada " + JSON.stringify(resp);
   if (estado >= 500) return `⚠️ ${estado}: error interno de la API. OJO: puede haber aplicado el cambio igualmente (se comprueba abajo)`;
   if (estado === 401) return "⚠️ 401: sin sesión en la API";
   if (estado === 403) return "⚠️ 403: la cuenta de la API no tiene ROLE_MANAGER_OPERATIONS";
   if (estado === 404) return "⚠️ 404: no existe ese dispositivo";
+  if (estado === 409 && resp?.code === "012") return "ℹ️ 409 / código 012: el equipo ya estaba dado de baja (la desvinculación ya se había hecho)";
+  if (estado === 409 && resp?.code === "011") return "⚠️ 409 / código 011: el dispositivo sigue vinculado a un equipo (hay que desvincularlo antes de reciclar)";
   if (estado === 409 && resp?.code === "009") return "⚠️ 409 / código 009: el dispositivo sigue vinculado a un equipo (hay que desvincularlo antes de reciclar)";
   if (estado === 409 && resp?.code === "010") return "⚠️ 409 / código 010: ese serial de placa ya existe en otro dispositivo habilitado";
   if (estado === 415) return "⚠️ 415: tipo de contenido no válido";
@@ -305,6 +307,27 @@ document.getElementById("btn-escribir").addEventListener("click", async () => {
 
   if (!disp || !Number.isInteger(disp.deviceId) || disp.deviceId < 1) {
     salida.textContent = "Elige un dispositivo de la lista (pulsa \"Cargar dispositivos\") o escribe un deviceId válido.";
+    return;
+  }
+  if (accion === "desvincular") {
+    if (!disp.serialBoard) { salida.textContent = "Para desvincular elige un dispositivo de la lista (el puente busca el equipo por su MC)."; return; }
+    if (!confirm(`Se DARÁ DE BAJA en la API de PRUEBAS el equipo con el MC ${disp.serialBoard}.\nEl dispositivo quedará libre (desvinculado).\n\n¿Continuar?`)) return;
+    const b = document.getElementById("btn-escribir");
+    b.disabled = true; salida.textContent = "Enviando...";
+    try {
+      const antes = resumenDispositivo(disp);
+      const r = await enviarEscritura({ accion: "desvincular", mc: disp.serialBoard });
+      const texto = {
+        desvinculado: "✅ Equipo dado de baja: el MC queda desvinculado en la plataforma.",
+        ya_dado_de_baja: "ℹ️ El equipo ya estaba dado de baja (nada que hacer).",
+        no_esta_en_plataforma: "ℹ️ Ese MC no tiene equipo en la plataforma (ya estaba desvinculado).",
+        error: "⚠️ La API no aceptó la baja."
+      }[r.resultado] || "⚠️ Respuesta inesperada.";
+      salida.textContent = `${texto}\nHTTP ${r.estadoApi}${r.respuesta ? " — " + JSON.stringify(r.respuesta) : ""}\n` +
+        (r.registrado ? "Registrado en el historial.\n" : "⚠️ No se pudo registrar en el historial.\n") + `\nANTES: ${antes}`;
+      cargarLog();
+    } catch (e) { salida.textContent = "❌ " + e.message; }
+    finally { b.disabled = false; }
     return;
   }
   if (!valor) { salida.textContent = "Escribe el serial nuevo."; return; }

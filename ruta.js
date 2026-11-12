@@ -1062,8 +1062,15 @@ modalEnviarBtn.addEventListener("click", async () => {
   if (esVandalismo) await fijarVandalismoTicket(supabaseClient, idRegistro, true);
   else if (vandalismoPrefill) await fijarVandalismoTicket(supabaseClient, idRegistro, false);
   // El MC nuevo hereda la identidad del contenedor del MC al que sustituye
+  let avisoPlataforma = "";
+  let avisoPlataformaFallo = false;
   if (serialesNuevos.MC && codigosCambio.includes("MC") && String(serialesNuevos.MC).toUpperCase() !== equipoAbierto) {
     await registrarCambioMc(supabaseClient, equipoAbierto, serialesNuevos.MC, idOtActiva, "ruta");
+    // El MC viejo sale del contenedor: se desvincula también en la plataforma
+    const plat = await desvincularEnPlataforma(supabaseClient, equipoAbierto);
+    if (plat.resultado === "desvinculado") avisoPlataforma = `🔓 ${equipoAbierto} desvinculado en la plataforma.`;
+    else if (plat.ok) avisoPlataforma = `ℹ️ ${equipoAbierto} ya estaba desvinculado en la plataforma.`;
+    else { avisoPlataforma = `⚠️ No se pudo desvincular ${equipoAbierto} en la plataforma (${plat.mensaje || plat.resultado}): hazlo a mano.`; avisoPlataformaFallo = true; }
   }
   if (huboAlgunCambio) {
     // Sin esto, "Utilizados"/"Vuelven" en Materiales se quedan con el
@@ -1155,7 +1162,7 @@ modalEnviarBtn.addEventListener("click", async () => {
 
   modalEnviarBtn.disabled = false;
   modalEnviarBtn.textContent = "Enviar reporte";
-  mostrarMensaje(modalMsg, "✅ Reporte guardado.", false);
+  mostrarMensaje(modalMsg, "✅ Reporte guardado." + (avisoPlataforma ? " " + avisoPlataforma : ""), false);
 
   // Actualizamos el estado local y el color del punto en el mapa
   const ticketLocal = equiposPorMC[equipoAbierto].tickets.find(t => t.id_registro === idRegistro);
@@ -1163,7 +1170,7 @@ modalEnviarBtn.addEventListener("click", async () => {
   else equiposPorMC[equipoAbierto].tickets.push({ id_registro: idRegistro, ...datosFalla });
   actualizarColorMarcador(equipoAbierto);
 
-  setTimeout(cerrarModal, 1200);
+  setTimeout(cerrarModal, avisoPlataformaFallo ? 7000 : 1200);
 });
 
 function mostrarMensaje(el, texto, esError) {
