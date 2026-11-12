@@ -68,7 +68,10 @@ document.getElementById("btn-conexion").addEventListener("click", async () => {
     salida.textContent =
       `✅ Conexión correcta\nUsuario de la API: ${u.username}\nRoles: ${(u.roles || []).join(", ")}\n` +
       `idCustomer: ${u.idCustomer ?? "null (ve todos los clientes)"}\n` +
-      `Servidor: ${u.host} — escrituras ${u.escrituraPermitida ? "permitidas (preproducción)" : "BLOQUEADAS"}`;
+      `Servidor: ${u.host} (${u.preproduccion ? "preproducción" : "PRODUCCIÓN"})\n` +
+      `Cambios de batería / cierre / lector: ${u.escrituraPermitida ? "permitidos" : "BLOQUEADOS"}\n` +
+      `Baja de equipos (desvincular): ${u.desvincularPermitido ? "permitida" : "BLOQUEADA"}\n` +
+      `Reciclar dispositivos: ${u.reciclarPermitido ? "permitido" : "BLOQUEADO"}`;
   } catch (e) {
     salida.textContent = "❌ " + e.message;
   }
