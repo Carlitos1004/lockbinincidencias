@@ -17,10 +17,12 @@
 //   LOCKBIN_API_USER          usuario de la API (obligatoria)
 //   LOCKBIN_API_PASS          contraseña de la API (obligatoria)
 //   LOCKBIN_API_BASE          opcional, por defecto https://api.lockbin.dev
-//   LOCKBIN_API_ALLOW_WRITES  opcional: "1" permite escribir en un host que NO
-//                             sea el de preproducción (api.lockbin.dev).
-//                             Mientras no se ponga, las escrituras solo
-//                             funcionan contra preproducción.
+//   Interruptores de escritura. En preproducción (api.lockbin.dev) todo está
+//   permitido. En CUALQUIER OTRO host (producción), cada tipo de escritura
+//   está apagado hasta que se ponga su variable a "1":
+//   LOCKBIN_API_ALLOW_WRITES   cambios de batería, cierre y lector
+//   LOCKBIN_API_ALLOW_UNLINK   baja de equipos (desvincular un MC)
+//   LOCKBIN_API_ALLOW_RECYCLE  reciclar dispositivos (de momento sin uso)
 //
 // Quién puede llamarla: solo usuarios de LockBin con rol "manager"
 // (se comprueba el token de Supabase en cada petición). Cada escritura
@@ -226,10 +228,23 @@ const ESCRITURAS = {
   recycle: { metodo: "POST",  sufijo: "recycle", campo: "newSerialBoard" }
 };
 
-function escrituraPermitida() {
+function esPreproduccion() {
   let host = "";
   try { host = new URL(API_BASE).host; } catch (e) { /* host vacío */ }
-  return host === HOST_PREPRODUCCION || process.env.LOCKBIN_API_ALLOW_WRITES === "1";
+  return host === HOST_PREPRODUCCION;
+}
+
+// tipo: "componentes" (battery/lock/reader) | "desvincular" | "recycle"
+function escrituraPermitida(tipo = "componentes") {
+  if (esPreproduccion()) return true;
+  const variable = { componentes: "LOCKBIN_API_ALLOW_WRITES", desvincular: "LOCKBIN_API_ALLOW_UNLINK", recycle: "LOCKBIN_API_ALLOW_RECYCLE" }[tipo];
+  return process.env[variable] === "1";
+}
+
+function exigirEscritura(tipo) {
+  if (escrituraPermitida(tipo)) return;
+  const nombre = { componentes: "Los cambios de batería, cierre y lector", desvincular: "La baja de equipos (desvincular)", recycle: "El reciclado de dispositivos" }[tipo];
+  throw fallo(403, `${nombre} están desactivados en este servidor de la API (interruptor apagado en Vercel).`);
 }
 
 async function registrarOperacion(usuario, fila) {
@@ -292,17 +307,18 @@ async function manejarDesvinculacion(cuerpo, usuario) {
 }
 
 async function manejarEscritura(req, usuario) {
-  if (!escrituraPermitida()) {
-    throw fallo(403, "Las escrituras están desactivadas: la API configurada no es la de preproducción.");
-  }
   let cuerpo = req.body;
   if (typeof cuerpo === "string") { try { cuerpo = JSON.parse(cuerpo); } catch (e) { cuerpo = null; } }
   if (!cuerpo || typeof cuerpo !== "object") throw fallo(400, "Cuerpo de la petición no válido.");
 
-  if (cuerpo.accion === "desvincular") return await manejarDesvinculacion(cuerpo, usuario);
+  if (cuerpo.accion === "desvincular") {
+    exigirEscritura("desvincular");
+    return await manejarDesvinculacion(cuerpo, usuario);
+  }
 
   const def = ESCRITURAS[cuerpo.accion];
   if (!def) throw fallo(400, "Acción de escritura no permitida.");
+  exigirEscritura(cuerpo.accion === "recycle" ? "recycle" : "componentes");
   const deviceId = String(cuerpo.deviceId ?? "");
   if (!/^\d{1,10}$/.test(deviceId)) throw fallo(400, "deviceId no válido.");
   const valor = String(cuerpo.valor ?? "").trim();
@@ -362,7 +378,7 @@ module.exports = async (req, res) => {
       const r = await llamarApi("/api/auth/whoami");
       if (!r.ok) throw fallo(502, `La API respondió HTTP ${r.status} en whoami.`);
       const u = await r.json();
-      return res.status(200).json({ ...u, escrituraPermitida: escrituraPermitida(), host: API_BASE.replace(/^https?:\/\//, "") });
+      return res.status(200).json({ ...u, escrituraPermitida: escrituraPermitida("componentes"), desvincularPermitido: escrituraPermitida("desvincular"), reciclarPermitido: escrituraPermitida("recycle"), preproduccion: esPreproduccion(), host: API_BASE.replace(/^https?:\/\//, "") });
     }
 
     if (accion === "equipos") {
