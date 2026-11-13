@@ -73,7 +73,8 @@ function renderTabla() {
   const orden = document.getElementById("orden-registro").value;
 
   let filtrados = registroData.filter(r =>
-    (!fMc || (r.mc_actual || "").toLowerCase().includes(fMc) || (r.imei || "").toLowerCase().includes(fMc)) &&
+    (!fMc || (r.mc_actual || "").toLowerCase().includes(fMc) || (r.imei || "").toLowerCase().includes(fMc) ||
+      (r.mcs_historicos || []).some(mc => String(mc).toLowerCase().includes(fMc))) &&
     (!fCliente || r.cliente_actual === fCliente) &&
     (!fInstalado || (fInstalado === "si") === r.instalado) &&
     (!fReparado || (fReparado === "si") === r.ha_sido_reparado) &&
