@@ -8,6 +8,7 @@ let registroData = [];
 // registros (mismo criterio que Estadísticas Generales y el Registro
 // Maestro de Componentes) — la tabla registro_maestro_equipos en la base
 // no filtra esto sola, así que se hace aquí al mostrarla.
+// Excepción: si el equipo tiene algún evento de AMMI, sí se muestra.
 const CLIENTES_EXCLUIDOS_EXACTOS = ["comercial", "frutos", "interno", "carmen", "municipalia"];
 function esClienteExcluido(cliente) {
   const c = (cliente || "").toLowerCase();
@@ -39,7 +40,15 @@ async function cargarRegistro() {
     document.getElementById("tbody-registro").innerHTML = `<tr><td colspan="8">Error: ${err.message}</td></tr>`;
     return;
   }
-  registroData = registroData.filter(r => !esClienteExcluido(r.cliente_actual));
+  // Los clientes internos/de prueba se ocultan, SALVO los equipos que tengan algún evento de AMMI en su vida
+  let imeisConAmmi = new Set();
+  try {
+    const eventos = await traerTodasLasFilas("historial_equipo", "imei", (q) => q.in("tipo_evento", ["Enviado a AMMI", "Regresó de AMMI"]).not("imei", "is", null).order("id"));
+    imeisConAmmi = new Set(eventos.map(e => e.imei));
+  } catch (err) {
+    console.warn("No se pudieron leer los eventos de AMMI:", err.message);
+  }
+  registroData = registroData.filter(r => !esClienteExcluido(r.cliente_actual) || imeisConAmmi.has(r.imei));
   renderResumen();
   llenarFiltroCliente();
   renderTabla();
@@ -115,7 +124,7 @@ function renderTabla() {
       <td>${r.ha_sido_reparado ? "✅ Sí" : "— No"}</td>
       <td>${r.ultima_incidencia_fecha ? new Date(r.ultima_incidencia_fecha).toLocaleDateString("es-ES") : "—"}</td>
       <td>
-        ${r.mc_actual ? `<a href="buscar-serial.html" class="link-ver-incidencias" data-mc="${r.mc_actual}">Ver incidencias →</a>` : "—"}
+        ${r.mc_actual ? `<a href="buscar-serial.html" class="link-ver-incidencias" data-mc="${(r.mcs_historicos && r.mcs_historicos.length ? r.mcs_historicos : [r.mc_actual]).join(",")}">Ver incidencias →</a>` : "—"}
         ${r.imei ? `<br><a href="vida-equipo.html" class="link-ver-vida" data-imei="${r.imei}">Ver vida →</a>` : ""}
       </td>
     </tr>

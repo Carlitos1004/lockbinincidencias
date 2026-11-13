@@ -50,19 +50,22 @@ async function buscar() {
   buscarBtn.disabled = true;
   buscarBtn.textContent = "Buscando...";
 
+  // Se admiten varios MC/seriales separados por coma (ej. los MC que ha tenido un mismo IMEI)
+  const terminos = [...new Set(termino.split(/[\s,;]+/).map(t => t.trim()).filter(Boolean))].slice(0, 10);
+
   try {
     // 1. Tickets donde el MC coincide directo
     const { data: ticketsPorMc, error: errorTickets } = await supabaseClient
       .from("historial_fallas")
       .select("*")
-      .ilike("m_control", `%${termino}%`);
+      .or(terminos.map(t => `m_control.ilike.%${t}%`).join(","));
     if (errorTickets) throw errorTickets;
 
     // 2. Componentes donde coincide el MC, el serial retirado, o el serial nuevo
     const { data: componentes, error: errorComp } = await supabaseClient
       .from("componentes_retirados")
       .select("*")
-      .or(`m_control.ilike.%${termino}%,serial_retirado.ilike.%${termino}%,serial_nuevo.ilike.%${termino}%`);
+      .or(terminos.flatMap(t => [`m_control.ilike.%${t}%`, `serial_retirado.ilike.%${t}%`, `serial_nuevo.ilike.%${t}%`]).join(","));
     if (errorComp) throw errorComp;
 
     // 3. Completar con los tickets asociados a esos componentes (por si el
@@ -84,7 +87,7 @@ async function buscar() {
       .from("notas_equipo")
       .select("*")
       .eq("activa", true)
-      .ilike("mc", `%${termino}%`);
+      .or(terminos.map(t => `mc.ilike.%${t}%`).join(","));
 
     // Unimos y quitamos duplicados de tickets
     const mapaTickets = {};
