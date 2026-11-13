@@ -10,6 +10,8 @@ let registroData = [];
 // no filtra esto sola, así que se hace aquí al mostrarla.
 // Excepción: si el equipo tiene algún evento de AMMI, sí se muestra.
 const CLIENTES_EXCLUIDOS_EXACTOS = ["comercial", "frutos", "interno", "carmen", "municipalia"];
+// Equipos de los que no se pudo registrar el IMEI: la base los guarda con la clave "SIN-IMEI-<MC>"
+const esSinImei = r => String(r.imei || "").startsWith("SIN-IMEI-");
 function esClienteExcluido(cliente) {
   const c = (cliente || "").toLowerCase();
   return CLIENTES_EXCLUIDOS_EXACTOS.includes(c) || c.includes("villanueva");
@@ -113,7 +115,7 @@ function renderTabla() {
     return `
     <tr class="${!r.instalado ? 'fila-alerta' : ''}">
       <td>${r.mc_actual || "—"}</td>
-      <td class="celda-mono">${r.imei || "—"}</td>
+      <td class="celda-mono">${esSinImei(r) ? '<span title="No se pudo registrar el IMEI de este equipo; se muestra solo con su MC y lo que consta en Vida del Equipo">— <em>sin IMEI registrado</em></span>' : (r.imei || "—")}</td>
       <td>${r.cliente_actual || "—"}</td>
       <td>${r.instalado ? "✅ Instalado" : "❌ No instalado"}</td>
       <td>${tieneVarios
@@ -125,7 +127,7 @@ function renderTabla() {
       <td>${r.ultima_incidencia_fecha ? new Date(r.ultima_incidencia_fecha).toLocaleDateString("es-ES") : "—"}</td>
       <td>
         ${r.mc_actual ? `<a href="buscar-serial.html" class="link-ver-incidencias" data-mc="${(r.mcs_historicos && r.mcs_historicos.length ? r.mcs_historicos : [r.mc_actual]).join(",")}">Ver incidencias →</a>` : "—"}
-        ${r.imei ? `<br><a href="vida-equipo.html" class="link-ver-vida" data-imei="${r.imei}">Ver vida →</a>` : ""}
+        ${r.imei ? `<br><a href="vida-equipo.html" class="link-ver-vida" data-imei="${esSinImei(r) ? r.mc_actual : r.imei}">Ver vida →</a>` : ""}
       </td>
     </tr>
   `;
