@@ -621,7 +621,11 @@ function htmlMc(m) {
   const botonEntrega = esBat
     ? (m.estadoMc !== "Entregado" ? `<button type="button" class="btn-bat-entregada" data-mc="${esc(m.mc)}">🔋 Marcar batería entregada</button>` : "")
     : (m.estadoMc === "Listo para entregar"
-      ? `<button type="button" class="btn-entregar" data-mc="${esc(m.mc)}">📦 Marcar equipo entregado</button>` : "");
+      ? `<button type="button" class="btn-entregar" data-mc="${esc(m.mc)}">📦 Marcar equipo entregado</button>` : "")
+  const cambiaMc = esManager && !!planPlataforma(m.mc).nuevoMc;
+  const botonPlataforma = esManager ? (cambiaMc
+    ? `<button type="button" class="btn-plataforma" data-mc="${esc(m.mc)}" title="Comprueba que el MC nuevo tiene en la plataforma los componentes de esta reposición, y que el viejo está desvinculado (solo lectura)">🔎 Comprobar en la plataforma</button>`
+    : `<button type="button" class="btn-plataforma" data-mc="${esc(m.mc)}" title="Pone en la plataforma los seriales nuevos de batería, cierre o lector de este equipo">🌐 Aplicar en la plataforma</button>`) : "";
   const detalleFaltan = m.faltan.length ? ` · faltan: ${esc(m.faltan.join(", "))}` : "";
 
   const eqc = equiposCompletos[m.mc] || {};
@@ -670,7 +674,7 @@ function htmlMc(m) {
     <div class="scroll-x-tabla" style="max-height:none;"><table>
       <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th></tr></thead>
       <tbody>${filas}</tbody></table></div>
-    <div class="orep-acciones">${botonEntrega}</div>
+    <div class="orep-acciones">${botonPlataforma}${botonEntrega}</div>
   </div>`;
 }
 
@@ -761,6 +765,9 @@ function enlazarEventos() {
       await recargarOt(); cargarOts();
     }));
 
+  document.querySelectorAll(".btn-plataforma").forEach(btn =>
+    btn.addEventListener("click", () => aplicarEnPlataforma(btn.dataset.mc, btn)));
+
   document.querySelectorAll(".btn-entregar").forEach(btn =>
     btn.addEventListener("click", () => entregarEquipo(btn.dataset.mc)));
 
@@ -782,6 +789,123 @@ async function guardarComp(id, cambios, recargar = true) {
   if (c) Object.assign(c, cambios);
   if (recargar) { await recargarOt(); cargarOts(); }
   return true;
+}
+
+// ---------- Aplicar la reposición en la plataforma LockBin ----------
+const CLAVE_API = { "Batería": "battery", "Lector Electrónico": "reader", "Cierre Electrónico": "lock" };
+const SIGLA_API = { battery: "BA", lock: "CE", reader: "LE" };
+const SIN_CAMBIOS = new Set(["Listo (sin cambios)", "Reparado recibido", "Entregado"]);
+
+// Qué hay que hacer en la plataforma para este equipo de la orden:
+//  - Si cambia el MC: el setup (con sus componentes) se hace a mano en la plataforma; aquí solo se COMPRUEBA que el MC nuevo
+//    tiene BA/CE/LE esperados (los OK conservan su serial, los repuestos llevan el nuevo) y que el viejo ya está desvinculado.
+//  - Si no: poner solo los seriales nuevos en el mismo MC (cambio sencillo por API).
+function planPlataforma(mc) {
+  const g = agruparPorMc(compsOtActual, otActual).find(m => m.mc === mc);
+  if (!g) return { error: "No encuentro ese equipo en la orden." };
+  aplicarTipoBateria(g);
+  const porTipo = Object.fromEntries(g.casillas.map(x => [x.tipo, x]));
+  const compMc = porTipo["Módulo de Control"] && porTipo["Módulo de Control"].comp;
+  let nuevoMc = compMc && compMc.repo_serial_nuevo ? String(compMc.repo_serial_nuevo).trim().toUpperCase() : "";
+  if (nuevoMc && (nuevoMc === mc.toUpperCase())) nuevoMc = "";
+  if (nuevoMc && !/^MC\d{4,12}$/.test(nuevoMc)) return { error: `El serial a entregar del Módulo de Control («${nuevoMc}») no parece un MC válido.` };
+
+  const comps = {}, faltan = [], sinReposicion = [];
+  g.casillas.forEach(x => {
+    if (x.tipo === "Módulo de Control") {
+      if (x.comp && !nuevoMc && necesitaCambio(x.comp, estadoCasilla(x.comp))) faltan.push("Módulo de Control (sin serial a entregar)");
+      return;
+    }
+    const clave = CLAVE_API[x.tipo];
+    if (!clave) return;
+    let serial = "", nuevo = false;
+    if (x.comp) {
+      const c = x.comp, est = estadoCasilla(c);
+      if (c.repo_serial_nuevo) { serial = String(c.repo_serial_nuevo).trim(); nuevo = true; }
+      else if (necesitaCambio(c, est)) { faltan.push(`${x.tipo} (sin serial a entregar)`); return; }
+      else if (SIN_CAMBIOS.has(est) && c.serial_retirado) serial = String(c.serial_retirado).trim();
+      else if (nuevoMc) { faltan.push(`${x.tipo} (${est})`); return; }
+    } else if (x.falt && x.falt.decision === "Se repone desde stock") {
+      if (x.falt.serial_nuevo) { serial = String(x.falt.serial_nuevo).trim(); nuevo = true; }
+      else { faltan.push(`${x.tipo} (sin serial a entregar)`); return; }
+    } else if (x.falt && x.falt.decision) { sinReposicion.push(x.tipo); return; }
+    else if (nuevoMc) { faltan.push(`${x.tipo} (sin aclarar)`); return; }
+    if (!serial) return;
+    if (!/^[A-Za-z0-9_.\-]{1,40}$/.test(serial)) { faltan.push(`${x.tipo} (serial «${serial}» no válido)`); return; }
+    if (nuevoMc || nuevo) comps[clave] = serial;
+  });
+  return { mc, nuevoMc, comps, faltan, sinReposicion };
+}
+
+// Consulta (solo lectura) el equipo activo con ese MC en la plataforma. null si no está.
+async function equipoEnPlataforma(mc) {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) throw new Error("Sesión de LockBin vencida. Vuelve a entrar.");
+  const r = await fetch(`/api/lockbin-api?accion=equipos&serialBoard=${encodeURIComponent(mc)}&pageNo=0&pageSize=5`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Error HTTP ${r.status}`);
+  const coinc = (j.items || []).filter(x => String(x.serialBoard || "").toUpperCase() === mc.toUpperCase());
+  if (coinc.length > 1) throw new Error(`Hay ${coinc.length} equipos con el MC ${mc} en la plataforma.`);
+  return coinc[0] || null;
+}
+
+const CAMPO_PLAT = { battery: "serialBattery", lock: "serialLock", reader: "serialReader" };
+
+async function aplicarEnPlataforma(mc, btn) {
+  const plan = planPlataforma(mc);
+  if (plan.error) { alert(plan.error); return; }
+  const textoBtn = btn.textContent;
+
+  // ---- Cambia el MC: el setup (con sus componentes) ya se hizo a mano en la plataforma. Solo se COMPRUEBA. ----
+  if (plan.nuevoMc) {
+    btn.disabled = true; btn.textContent = "Comprobando…";
+    try {
+      const nuevo = await equipoEnPlataforma(plan.nuevoMc);
+      if (!nuevo) { alert(`El MC ${plan.nuevoMc} no está en la plataforma. Hazle primero el setup (con sus componentes) y vuelve a comprobar.`); return; }
+      const norm = v => String(v || "").trim().toUpperCase();
+      const lineas = Object.entries(plan.comps).map(([k, esperado]) => {
+        const real = nuevo[CAMPO_PLAT[k]];
+        return norm(real) === norm(esperado)
+          ? `✅ ${SIGLA_API[k]}: ${esperado}`
+          : `❌ ${SIGLA_API[k]}: en la reposición ${esperado} · en la plataforma ${real || "(vacío)"}`;
+      });
+      const hayError = lineas.some(l => l.startsWith("❌"));
+      const viejo = await equipoEnPlataforma(mc);
+      const lineaViejo = viejo
+        ? `⚠️ ${mc} sigue VINCULADO en la plataforma (debería estar ya desvinculado desde Revisión).`
+        : `✅ ${mc} ya está desvinculado.`;
+      const pendientes = plan.faltan.length ? `\n\nAún sin resolver en la orden:\n- ${plan.faltan.join("\n- ")}` : "";
+      const informe = `Comprobación de ${plan.nuevoMc} en la plataforma\n\n${lineas.join("\n") || "(sin componentes que comparar)"}\n\n${lineaViejo}${hayError ? "\n\n❌ Hay componentes que no coinciden: corrígelos en la plataforma o en la orden." : ""}${pendientes}`;
+      if (!viejo) { alert(informe); }
+      else if (confirm(`${informe}\n\n¿Quieres desvincular ${mc} de la plataforma ahora?\n(Aceptar = desvincular · Cancelar = dejarlo como está)`)) {
+        const d = await desvincularEnPlataforma(supabaseClient, mc);
+        alert(d.resultado === "desvinculado" ? `🔓 ${mc} desvinculado en la plataforma.`
+          : d.ok ? `${mc} ya estaba desvinculado.`
+          : `⚠️ No se pudo desvincular ${mc} (${d.mensaje || d.resultado}).`);
+      }
+    } catch (e) {
+      alert("No se pudo comprobar: " + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = textoBtn;
+    }
+    return;
+  }
+
+  // ---- No cambia el MC: cambio sencillo de componentes por la API ----
+  if (plan.faltan.length) { alert(`Todavía no se puede aplicar en ${mc}. Falta resolver:\n- ${plan.faltan.join("\n- ")}`); return; }
+  if (!Object.keys(plan.comps).length) { alert(`En ${mc} no hay seriales nuevos que aplicar.`); return; }
+  const lista = Object.entries(plan.comps).map(([k, v]) => `${SIGLA_API[k]}=${v}`).join(", ");
+  if (!confirm(`En la plataforma, en ${mc}, se pondrá: ${lista}\n\n¿Aplicar?`)) return;
+
+  btn.disabled = true; btn.textContent = "Aplicando…";
+  try {
+    const r = await componentesEnPlataforma(supabaseClient, mc, plan.comps);
+    if (r.resultado === "no_esta_en_plataforma") { alert(`El MC ${mc} no está activo en la plataforma. No se ha cambiado nada.`); return; }
+    const resumen = r.componentes.map(c => `${SIGLA_API[c.componente]}: ${{ cambiado: "✅ cambiado", sin_cambio: "ya estaba", error: "❌ error", no_intentado: "— no intentado" }[c.resultado] || c.resultado}`).join("\n");
+    alert(r.ok ? `✅ Listo en ${mc}\n\n${resumen}` : `❌ No se pudo completar en ${mc}${r.mensaje ? ": " + r.mensaje : ""}\n\n${resumen}\n\nPuedes volver a pulsar: lo ya aplicado no se repite.`);
+  } finally {
+    btn.disabled = false; btn.textContent = textoBtn;
+  }
 }
 
 async function entregarEquipo(mc) {

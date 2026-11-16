@@ -24,3 +24,24 @@ async function desvincularEnPlataforma(sb, mc) {
     return { ok: false, resultado: "error", mensaje: e.message };
   }
 }
+
+// Pone en un equipo de la plataforma (buscado por su MC) los seriales indicados.
+// comps: { battery, lock, reader } (solo los que se quieran fijar).
+// Devuelve { ok, resultado, componentes:[{componente, valor, resultado}], mensaje }
+// resultado: "ok" | "no_esta_en_plataforma" | "error"
+async function componentesEnPlataforma(sb, mc, comps) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return { ok: false, resultado: "error", componentes: [], mensaje: "Sesión de LockBin vencida." };
+    const r = await fetch("/api/lockbin-api", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ accion: "componentes_equipo", mc, ...comps })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, resultado: "error", componentes: [], mensaje: j.error || `HTTP ${r.status}` };
+    return { ok: j.resultado === "ok", resultado: j.resultado, componentes: j.componentes || [], mensaje: null };
+  } catch (e) {
+    return { ok: false, resultado: "error", componentes: [], mensaje: e.message };
+  }
+}
