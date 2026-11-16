@@ -582,6 +582,12 @@ function htmlBateriaSinMc(c) {
   </div>`;
 }
 
+// Fracción del equipo (informativa, para configurar bien el equipo nuevo)
+function fraccionMc(mc) {
+  const f = fraccionesEq[mc];
+  return `<span class="orep-badge orep-info" title="Fracción configurada en este equipo: el equipo nuevo debe configurarse igual">♻️ Fracción: ${f ? esc(f) : "sin dato"}</span>`;
+}
+
 function htmlMc(m) {
   const filas = m.casillas.map(x => {
     if (!x.comp) {
@@ -660,7 +666,7 @@ function htmlMc(m) {
       ${eqc.cambio_completo && !esBat ? '<span class="orep-badge orep-info">🔄 Equipo completo</span>' : ""}
       ${esBat ? chipCambiar : ""}
       ${eqc.lista ? `<span class="orep-badge orep-gris">📋 ${esc(eqc.lista)}</span>` : ""}
-      <span>${esc(m.cliente || "")}${detalleFaltan}${fechaEnt ? ` · entregado el ${esc(fechaEnt)}` : ""}</span>
+      <span>${esc(m.cliente || "")}</span>${fraccionMc(m.mc)}<span>${detalleFaltan.replace(/^ · /, "")}${fechaEnt ? ` · entregado el ${esc(fechaEnt)}` : ""}</span>
       <span class="orep-fecha-ent" title="Fecha real de entrega del equipo al cliente">📅 Entrega: ${esc(fEntTxt)}${fFac ? ` · <span title="Fecha de factura / inicio de contrato (la del Excel de Porto)">🧾 Factura: ${esc(fFac)}</span>` : ""}</span></div>
     ${esBat ? (esManager ? `<div class="orep-mc-sub">
       <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="chk-bok" data-mc="${esc(m.mc)}" ${eqc.bateria_ok ? "checked" : ""}> 🔁 Batería OK: reutilizar en otro equipo</label>
