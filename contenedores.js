@@ -43,6 +43,21 @@ async function cargar() {
 let pagina = 1;
 const POR_PAGINA = 50;
 let ultimaBusqueda = "";
+let modoCont = "cambios";      // "cambios" | "todos" (solo cuando hay un cliente elegido)
+const equiposDeCliente = {};   // CLIENTE -> [{m_control, cliente}]
+
+async function cargarEquiposDeCliente(cli) {
+  if (equiposDeCliente[cli]) return equiposDeCliente[cli];
+  let todas = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabaseClient.from("equipos").select("m_control, cliente").ilike("cliente", cli).order("m_control").range(desde, desde + 999);
+    if (error) throw error;
+    todas = todas.concat(data || []);
+    if (!data || data.length < 1000) break;
+  }
+  equiposDeCliente[cli] = todas;
+  return todas;
+}
 
 // Chips de clientes con contador (un contenedor con varios clientes cuenta en cada uno)
 function pintarChips(idsBase, g) {
@@ -54,6 +69,7 @@ function pintarChips(idsBase, g) {
   cont.innerHTML = chip("", "Todos", idsBase.length) + Object.keys(cuentas).sort((x, y) => x.localeCompare(y)).map(c => chip(c, c, cuentas[c])).join("");
   cont.querySelectorAll(".chip-cli").forEach(b => b.addEventListener("click", () => {
     document.getElementById("filtro-cliente").value = b.dataset.cli;
+    modoCont = "cambios";
     pagina = 1;
     pintarLista();
   }));
@@ -67,7 +83,11 @@ function gruposPorId() {
   return g;
 }
 const mcsDe = (g, id) => [...new Set((g[id] || []).map(r => r.m_control))].concat((g[id] || []).length ? [] : [id]);
-const clientesDe = (g, id) => [...new Set((g[id] || []).map(r => (r.cliente || "").trim()).filter(Boolean))];
+const clienteEq = {};   // MC sin estancias -> cliente (según la tabla equipos)
+const clientesDe = (g, id) => {
+  const l = [...new Set((g[id] || []).map(r => (r.cliente || "").trim()).filter(Boolean))];
+  return l.length ? l : (clienteEq[id] ? [clienteEq[id]] : []);
+};
 const distintosClientes = lista => new Set(lista.map(c => c.toLowerCase())).size > 1;
 
 async function pintarLista(textoBusqueda) {
@@ -82,7 +102,21 @@ async function pintarLista(textoBusqueda) {
   pintarChips(ids, g);
   let cli = document.getElementById("filtro-cliente").value;
   if (cli && !ids.some(id => clientesDe(g, id).some(c => c.toUpperCase() === cli))) { cli = ""; document.getElementById("filtro-cliente").value = ""; pintarChips(ids, g); }
-  if (cli) ids = ids.filter(id => clientesDe(g, id).some(c => c.toUpperCase() === cli));
+  const barra = document.getElementById("modo-cont");
+  barra.hidden = !cli;
+  if (cli) {
+    barra.querySelectorAll("button").forEach(b => b.classList.toggle("activo", b.dataset.modo === modoCont));
+    if (modoCont === "todos") {
+      try {
+        const eqs = await cargarEquiposDeCliente(cli);
+        eqs.forEach(e => { if (!g[e.m_control]) { g[e.m_control] = []; clienteEq[e.m_control] = (e.cliente || "").trim(); } });
+      } catch (err) { tbody.innerHTML = `<tr><td colspan="6">Error: ${esc(err.message)}</td></tr>`; return; }
+      ids = Object.keys(g).filter(id => clientesDe(g, id).some(c => c.toUpperCase() === cli));
+      if (q) ids = ids.filter(id => id.toUpperCase().includes(q) || String((datosCont[id] || {}).numero || "").toUpperCase() === q || mcsDe(g, id).some(m => m.toUpperCase().includes(q))
+        || g[id].some(r => String(r.id_ot_entrada || "").toUpperCase().includes(q) || String(r.id_ot_salida || "").toUpperCase().includes(q)));
+      if (document.getElementById("solo-mixtos").checked) ids = ids.filter(id => distintosClientes(clientesDe(g, id)));
+    } else ids = ids.filter(id => clientesDe(g, id).some(c => c.toUpperCase() === cli));
+  }
   ids.sort((a, b) => a.localeCompare(b));
   const pager = document.getElementById("pager-cont");
   if (!ids.length) {
@@ -332,3 +366,5 @@ document.getElementById("filtro-cliente").addEventListener("change", () => pinta
 cargar();
 
 document.getElementById("solo-mixtos").addEventListener("change", () => { pagina = 1; pintarLista(); });
+
+document.querySelectorAll("#modo-cont button").forEach(b => b.addEventListener("click", () => { modoCont = b.dataset.modo; pagina = 1; pintarLista(); }));

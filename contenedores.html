@@ -35,6 +35,9 @@
   .pager-cont { display:flex; align-items:center; gap:10px; margin:8px 0; font-size:.9rem; }
   .pager-cont button { border:0; border-radius:10px; padding:6px 12px; font-weight:600; cursor:pointer; background:var(--gris-200, #e3e8e4); color:#333; }
   .pager-cont button:disabled { opacity:.4; cursor:default; }
+  .modo-cont { display:flex; gap:6px; margin:4px 0 10px; }
+  .modo-cont button { border:1.5px solid var(--verde-medio, #4c8c2b); background:#fff; color:var(--verde-medio, #4c8c2b); border-radius:10px; padding:6px 12px; font:inherit; font-size:.88rem; font-weight:600; cursor:pointer; }
+  .modo-cont button.activo { background:var(--verde-medio, #4c8c2b); color:#fff; }
 </style>
 </head>
 <body>
@@ -59,6 +62,10 @@
   <p id="msg-lista" class="msg-cont"></p>
   <input type="hidden" id="filtro-cliente" value="">
   <div id="chips-clientes" class="chips-clientes"></div>
+  <div id="modo-cont" class="modo-cont" hidden>
+    <button type="button" data-modo="cambios">Solo los que han tenido cambio</button>
+    <button type="button" data-modo="todos">Todos los contenedores</button>
+  </div>
   <label style="font-size:.9rem;"><input type="checkbox" id="solo-mixtos"> Mostrar solo contenedores cuyas estancias figuran con clientes distintos (revisar)</label>
 
   <h2 style="margin-top:18px;">Contenedores con varios MC o con número</h2>
