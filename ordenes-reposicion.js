@@ -761,14 +761,20 @@ function enlazarEventos() {
 
   document.querySelectorAll(".btn-ok-pieza").forEach(btn =>
     btn.addEventListener("click", async () => {
-      if (await guardarComp(btn.dataset.id, { repo_estado: "Listo para entregar" }, true)) cargarOts();
+      const mcPieza = (compsOtActual.find(x => String(x.id) === String(btn.dataset.id)) || {}).m_control;
+      if (await guardarComp(btn.dataset.id, { repo_estado: "Listo para entregar" }, true)) {
+        if (mcPieza) await vinculacionSiCorresponde(mcPieza);
+        cargarOts();
+      }
     }));
   document.querySelectorAll(".btn-ok-equipo").forEach(btn =>
     btn.addEventListener("click", async () => {
       const grupo = agruparPorMc(compsOtActual, otActual).find(m => m.mc === btn.dataset.mc);
       const ids = (grupo ? grupo.casillas : []).filter(x => x.comp && x.comp.repo_serial_nuevo && estadoCasilla(x.comp) === "Repuesto desde stock").map(x => x.comp.id);
       for (const id of ids) { if (!(await guardarComp(id, { repo_estado: "Listo para entregar" }, false))) return; }
-      await recargarOt(); cargarOts();
+      await recargarOt();
+      await vinculacionSiCorresponde(btn.dataset.mc);
+      cargarOts();
     }));
 
   document.querySelectorAll(".btn-plataforma").forEach(btn =>
@@ -816,7 +822,7 @@ function planPlataforma(mc) {
   if (nuevoMc && (nuevoMc === mc.toUpperCase())) nuevoMc = "";
   if (nuevoMc && !/^MC\d{4,12}$/.test(nuevoMc)) return { error: `El serial a entregar del Módulo de Control («${nuevoMc}») no parece un MC válido.` };
 
-  const comps = {}, faltan = [], sinReposicion = [];
+  const comps = {}, anteriores = {}, faltan = [], sinReposicion = [];
   g.casillas.forEach(x => {
     if (x.tipo === "Módulo de Control") {
       if (x.comp && !nuevoMc && necesitaCambio(x.comp, estadoCasilla(x.comp))) faltan.push("Módulo de Control (sin serial a entregar)");
@@ -838,9 +844,75 @@ function planPlataforma(mc) {
     else if (nuevoMc) { faltan.push(`${x.tipo} (sin aclarar)`); return; }
     if (!serial) return;
     if (!/^[A-Za-z0-9_.\-]{1,40}$/.test(serial)) { faltan.push(`${x.tipo} (serial «${serial}» no válido)`); return; }
-    if (nuevoMc || nuevo) comps[clave] = serial;
+    if (nuevoMc || nuevo) { comps[clave] = serial; anteriores[clave] = (x.comp && x.comp.serial_retirado) || ""; }
   });
-  return { mc, nuevoMc, comps, faltan, sinReposicion };
+  return { mc, nuevoMc, comps, anteriores, faltan, sinReposicion };
+}
+
+// ---------- Historial de vida (historial_equipo) por reposición con cambio de MC ----------
+async function imeiDe(mc) {
+  const { data: eq } = await supabaseClient.from("equipos").select("imei, cliente").eq("m_control", mc).maybeSingle();
+  let imei = eq && eq.imei || null;
+  if (!imei) {
+    const { data: prev } = await supabaseClient.from("historial_equipo").select("imei").eq("mc", mc).not("imei", "is", null).order("fecha", { ascending: false }).limit(1).maybeSingle();
+    imei = prev && prev.imei || null;
+  }
+  return { imei, cliente: eq && eq.cliente || null };
+}
+
+// Al dar el OK a la pieza "Módulo de Control" con un MC nuevo: el MC nuevo se anota en Vida como una Vinculación.
+// Un solo evento por (MC nuevo + OT): si ya existe, se actualiza en vez de duplicar.
+async function vinculacionSiCorresponde(mc) {
+  try {
+    const g = agruparPorMc(compsOtActual, otActual).find(m => m.mc === mc);
+    const c = g && (g.casillas.find(x => x.tipo === "Módulo de Control") || {}).comp;
+    if (!c || !c.repo_serial_nuevo || estadoCasilla(c) !== "Listo para entregar") return;
+    const nuevo = String(c.repo_serial_nuevo).trim().toUpperCase();
+    if (!/^MC\d{4,12}$/.test(nuevo) || nuevo === mc.toUpperCase()) return;
+    const plan = planPlataforma(mc);
+    const { imei, cliente } = await imeiDe(nuevo);
+    const datos = {
+      imei, mc: nuevo, tipo_evento: "Vinculación", cliente: cliente || g.cliente || clienteOtActual || null,
+      serie_lector: (plan.comps && plan.comps.reader) || null, serie_cierre: (plan.comps && plan.comps.lock) || null, serie_bateria: (plan.comps && plan.comps.battery) || null,
+      mc_anterior: mc, id_ot: otActual, notas: `Reposición: sustituye al ${mc}`
+    };
+    const { data: ya } = await supabaseClient.from("historial_equipo").select("id").eq("mc", nuevo).eq("id_ot", otActual).eq("tipo_evento", "Vinculación").maybeSingle();
+    const { error } = ya ? await supabaseClient.from("historial_equipo").update(datos).eq("id", ya.id) : await supabaseClient.from("historial_equipo").insert(datos);
+    if (error) { console.warn("Vida (Vinculación):", error.message); return; }
+    if (imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imei });
+  } catch (e) { console.warn("Vida (Vinculación):", e.message); }
+}
+
+// Tras un cambio de componente aplicado en la plataforma (sin cambio de MC): un evento "Cambio de componente" por pieza cambiada.
+async function cambioComponenteHistorial(mc, plan, resultados) {
+  try {
+    const NOMBRE = { battery: "Batería", lock: "Cierre", reader: "Lector" };
+    const COL = { battery: "serie_bateria", lock: "serie_cierre", reader: "serie_lector" };
+    const { imei, cliente } = await imeiDe(mc);
+    let alguno = false;
+    for (const c of resultados.filter(x => x.resultado === "cambiado")) {
+      const anterior = (plan.anteriores && plan.anteriores[c.componente]) || "";
+      const notas = `${NOMBRE[c.componente]}: ${anterior || "—"} → ${c.valor} (reposición)`;
+      const { data: ya } = await supabaseClient.from("historial_equipo").select("id").eq("mc", mc).eq("id_ot", otActual).eq("tipo_evento", "Cambio de componente").eq("notas", notas).limit(1);
+      if (ya && ya.length) continue;
+      const { error } = await supabaseClient.from("historial_equipo").insert({ imei, mc, tipo_evento: "Cambio de componente", cliente: cliente || clienteOtActual || null, id_ot: otActual, [COL[c.componente]]: c.valor, notas });
+      if (error) { console.warn("Vida (Cambio de componente):", error.message); return; }
+      alguno = true;
+    }
+    if (alguno && imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imei });
+  } catch (e) { console.warn("Vida (Cambio de componente):", e.message); }
+}
+
+// Al desvincular el MC viejo desde el botón de comprobar: se anota la Desvinculación (si no consta ya para esa OT).
+async function desvinculacionHistorial(mc) {
+  try {
+    const { data: ya } = await supabaseClient.from("historial_equipo").select("id").eq("mc", mc).eq("id_ot", otActual).in("tipo_evento", ["Desvinculación", "Enviado a AMMI"]).limit(1);
+    if (ya && ya.length) return;
+    const { imei, cliente } = await imeiDe(mc);
+    const { error } = await supabaseClient.from("historial_equipo").insert({ imei, mc, tipo_evento: "Desvinculación", cliente: cliente || clienteOtActual || null, id_ot: otActual, notas: "Desvinculado desde la orden de reposición" });
+    if (error) { console.warn("Vida (Desvinculación):", error.message); return; }
+    if (imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imei });
+  } catch (e) { console.warn("Vida (Desvinculación):", e.message); }
 }
 
 // Consulta (solo lectura) el equipo activo con ese MC en la plataforma. null si no está.
@@ -885,6 +957,7 @@ async function aplicarEnPlataforma(mc, btn) {
       if (!viejo) { alert(informe); }
       else if (confirm(`${informe}\n\n¿Quieres desvincular ${mc} de la plataforma ahora?\n(Aceptar = desvincular · Cancelar = dejarlo como está)`)) {
         const d = await desvincularEnPlataforma(supabaseClient, mc);
+        if (d.ok) await desvinculacionHistorial(mc);
         alert(d.resultado === "desvinculado" ? `🔓 ${mc} desvinculado en la plataforma.`
           : d.ok ? `${mc} ya estaba desvinculado.`
           : `⚠️ No se pudo desvincular ${mc} (${d.mensaje || d.resultado}).`);
@@ -908,6 +981,7 @@ async function aplicarEnPlataforma(mc, btn) {
     const r = await componentesEnPlataforma(supabaseClient, mc, plan.comps);
     if (r.resultado === "no_esta_en_plataforma") { alert(`El MC ${mc} no está activo en la plataforma. No se ha cambiado nada.`); return; }
     const resumen = r.componentes.map(c => `${SIGLA_API[c.componente]}: ${{ cambiado: "✅ cambiado", sin_cambio: "ya estaba", error: "❌ error", no_intentado: "— no intentado" }[c.resultado] || c.resultado}`).join("\n");
+    await cambioComponenteHistorial(mc, plan, r.componentes);
     alert(r.ok ? `✅ Listo en ${mc}\n\n${resumen}` : `❌ No se pudo completar en ${mc}${r.mensaje ? ": " + r.mensaje : ""}\n\n${resumen}\n\nPuedes volver a pulsar: lo ya aplicado no se repite.`);
   } finally {
     btn.disabled = false; btn.textContent = textoBtn;

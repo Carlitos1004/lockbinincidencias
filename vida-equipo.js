@@ -4,6 +4,7 @@
 
 const ICONOS_EVENTO = {
   "Vinculación": "🔗",
+  "Cambio de componente": "🔧",
   "Desvinculación": "🔓",
   "Enviado a AMMI": "📦",
   "Regresó de AMMI": "↩️"

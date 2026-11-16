@@ -198,6 +198,7 @@ async function buscar() {
 
 const ICONOS_EVENTO_EQUIPO = {
   "Vinculación": "🔗",
+  "Cambio de componente": "🔧",
   "Desvinculación": "🔓",
   "Enviado a AMMI": "📦",
   "Regresó de AMMI": "↩️"
