@@ -306,6 +306,49 @@ async function manejarDesvinculacion(cuerpo, usuario) {
   return { estadoApi: r.status, resultado, respuesta, registrado, equipmentId: equipo.id, deviceId: equipo.deviceId ?? null };
 }
 
+// Pone los seriales de batería / cierre / lector de un equipo (buscado por MC EXACTO).
+// Solo cambia lo que difiere de lo que ya tiene la plataforma. Si no existe el MC
+// en la plataforma (falta el setup) no toca nada.
+async function manejarComponentesEquipo(cuerpo, usuario) {
+  exigirEscritura("componentes");
+  const mc = String(cuerpo.mc ?? "").trim().toUpperCase();
+  if (!/^MC\d{4,12}$/.test(mc)) throw fallo(400, "MC no válido.");
+  const pedidos = [["battery", "serialBattery"], ["lock", "serialLock"], ["reader", "serialReader"]]
+    .filter(([k]) => cuerpo[k] != null && String(cuerpo[k]).trim() !== "");
+  if (!pedidos.length) throw fallo(400, "No se indicó ningún componente.");
+  pedidos.forEach(([k]) => { if (!/^[A-Za-z0-9_.\-]{1,40}$/.test(String(cuerpo[k]).trim())) throw fallo(400, `Serial de ${k} no válido.`); });
+
+  const rl = await llamarApi("/api/operations/v1/equipment/?serialBoard=" + encodeURIComponent(mc) + "&pageNo=0&pageSize=5");
+  let equipo = null;
+  if (rl.status !== 204) {
+    if (!rl.ok) throw fallo(502, `La API respondió HTTP ${rl.status} al buscar el equipo.`);
+    const coincidencias = (await rl.json()).map(aplanarEquipo).filter(x => String(x.serialBoard || "").toUpperCase() === mc);
+    if (coincidencias.length > 1) throw fallo(409, `Hay ${coincidencias.length} equipos con el MC ${mc} en la plataforma: no se cambia ninguno.`);
+    equipo = coincidencias[0] || null;
+  }
+  if (!equipo) return { resultado: "no_esta_en_plataforma", mc, componentes: [] };
+  if (!Number.isInteger(equipo.deviceId)) throw fallo(409, `El equipo ${mc} no tiene dispositivo asociado en la plataforma.`);
+
+  const componentes = [];
+  let fallado = false;
+  for (const [k, campoActual] of pedidos) {
+    const valor = String(cuerpo[k]).trim();
+    if (fallado) { componentes.push({ componente: k, valor, resultado: "no_intentado" }); continue; }
+    if (String(equipo[campoActual] || "").trim().toUpperCase() === valor.toUpperCase()) { componentes.push({ componente: k, valor, resultado: "sin_cambio" }); continue; }
+    const def = ESCRITURAS[k];
+    const datosApi = { [def.campo]: valor };
+    const r = await llamarApi(`/api/operations/v1/device/${equipo.deviceId}/${def.sufijo}`, { method: def.metodo, body: datosApi });
+    const texto = await r.text();
+    let respuesta = null;
+    try { respuesta = texto ? JSON.parse(texto) : null; } catch (e) { respuesta = { texto: texto.slice(0, 300) }; }
+    await registrarOperacion(usuario, { accion: k, device_id: equipo.deviceId, datos: { ...datosApi, mc, origen: "reposicion" }, estado_api: r.status, respuesta });
+    const ok = r.status >= 200 && r.status < 300;
+    if (!ok) fallado = true;
+    componentes.push({ componente: k, valor, resultado: ok ? "cambiado" : "error", estadoApi: r.status, respuesta: ok ? null : respuesta });
+  }
+  return { resultado: fallado ? "error" : "ok", mc, deviceId: equipo.deviceId, componentes };
+}
+
 async function manejarEscritura(req, usuario) {
   let cuerpo = req.body;
   if (typeof cuerpo === "string") { try { cuerpo = JSON.parse(cuerpo); } catch (e) { cuerpo = null; } }
@@ -315,6 +358,8 @@ async function manejarEscritura(req, usuario) {
     exigirEscritura("desvincular");
     return await manejarDesvinculacion(cuerpo, usuario);
   }
+
+  if (cuerpo.accion === "componentes_equipo") return await manejarComponentesEquipo(cuerpo, usuario);
 
   const def = ESCRITURAS[cuerpo.accion];
   if (!def) throw fallo(400, "Acción de escritura no permitida.");
