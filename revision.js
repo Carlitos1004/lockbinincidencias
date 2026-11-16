@@ -463,6 +463,18 @@ async function guardarFila(btn) {
     return;
   }
 
+  // Doble check: mandar un Módulo de Control a Stock o AMMI lo desvincula también en la plataforma.
+  // Solo se pregunta cuando el destino cambia respecto a lo ya guardado.
+  const esStock = destino === "✓ Equipo OK - Stock (1ra categoría)" || destino === "✓ Equipo OK - Stock (2da categoría)";
+  if (esStock || destino === DESTINO_AMMI) {
+    const { data: previo } = await supabaseClient.from("componentes_retirados").select("tipo_componente, destino, m_control").eq("id", componenteId).maybeSingle();
+    if (previo && previo.tipo_componente === "Módulo de Control" && previo.destino !== destino) {
+      const mcConfirm = mcEditado || previo.m_control;
+      const textoDestino = esStock ? "STOCK" : "AMMI (equipo dañado)";
+      if (!confirm(`Vas a mandar el MC ${mcConfirm} a ${textoDestino}.\n\nSe DESVINCULARÁ también en la plataforma LockBin.\n\n¿Es correcto?`)) return;
+    }
+  }
+
   btn.disabled = true;
   btn.textContent = "Guardando...";
 

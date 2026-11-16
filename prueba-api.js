@@ -59,12 +59,15 @@ async function enviarEscritura(cuerpo) {
   return resp;
 }
 
+let nombreApi = "la plataforma";   // se completa al pulsar "Probar conexión"
+
 // ---------- 1. Probar conexión ----------
 document.getElementById("btn-conexion").addEventListener("click", async () => {
   const salida = document.getElementById("salida-conexion");
   salida.textContent = "Probando...";
   try {
     const u = await llamarPuente({ accion: "whoami" });
+    nombreApi = u.preproduccion ? "PRUEBAS (preproducción)" : "PRODUCCIÓN";
     salida.textContent =
       `✅ Conexión correcta\nUsuario de la API: ${u.username}\nRoles: ${(u.roles || []).join(", ")}\n` +
       `idCustomer: ${u.idCustomer ?? "null (ve todos los clientes)"}\n` +
@@ -314,7 +317,7 @@ document.getElementById("btn-escribir").addEventListener("click", async () => {
   }
   if (accion === "desvincular") {
     if (!disp.serialBoard) { salida.textContent = "Para desvincular elige un dispositivo de la lista (el puente busca el equipo por su MC)."; return; }
-    if (!confirm(`Se DARÁ DE BAJA en la API de PRUEBAS el equipo con el MC ${disp.serialBoard}.\nEl dispositivo quedará libre (desvinculado).\n\n¿Continuar?`)) return;
+    if (!confirm(`Se DARÁ DE BAJA en la API de ${nombreApi} el equipo con el MC ${disp.serialBoard}.\nEl dispositivo quedará libre (desvinculado).\n\n¿Continuar?`)) return;
     const b = document.getElementById("btn-escribir");
     b.disabled = true; salida.textContent = "Enviando...";
     try {
@@ -334,7 +337,7 @@ document.getElementById("btn-escribir").addEventListener("click", async () => {
     return;
   }
   if (!valor) { salida.textContent = "Escribe el serial nuevo."; return; }
-  if (!confirm(`Se enviará a la API de PRUEBAS:\n\n${accion} → ${valor}\nDispositivo ${disp.deviceId}${disp.serialBoard ? " (MC " + disp.serialBoard + ")" : " (deviceId manual)"}\n\n¿Continuar?`)) return;
+  if (!confirm(`Se enviará a la API de ${nombreApi}:\n\n${accion} → ${valor}\nDispositivo ${disp.deviceId}${disp.serialBoard ? " (MC " + disp.serialBoard + ")" : " (deviceId manual)"}\n\n¿Continuar?`)) return;
 
   const boton = document.getElementById("btn-escribir");
   boton.disabled = true;
