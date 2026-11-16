@@ -27,6 +27,14 @@
   .fila-form label { font-size:.9rem; display:inline-flex; align-items:center; gap:6px; }
   .tabla-revision button.btn-quitar { border:1.5px solid #e0b4ae; background:#fff5f4; color:#b3372b; border-radius:8px; padding:4px 10px; font-weight:600; font-size:.82rem; cursor:pointer; }
   .tabla-revision button.btn-quitar:hover { background:#fde3e0; }
+  .chips-clientes { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+  .chip-cli { border:1.5px solid var(--gris-200, #d5ddd6); background:#fff; color:#333; border-radius:999px; padding:5px 12px; font:inherit; font-size:.88rem; font-weight:600; cursor:pointer; }
+  .chip-cli small { opacity:.7; margin-left:4px; font-weight:700; }
+  .chip-cli:hover { background:#f1f6ef; }
+  .chip-cli.activo { background:var(--verde-medio, #4c8c2b); border-color:var(--verde-medio, #4c8c2b); color:#fff; }
+  .pager-cont { display:flex; align-items:center; gap:10px; margin:8px 0; font-size:.9rem; }
+  .pager-cont button { border:0; border-radius:10px; padding:6px 12px; font-weight:600; cursor:pointer; background:var(--gris-200, #e3e8e4); color:#333; }
+  .pager-cont button:disabled { opacity:.4; cursor:default; }
 </style>
 </head>
 <body>
@@ -46,10 +54,11 @@
 
   <div class="fila-form">
     <input type="text" id="buscar-cont" placeholder="Buscar por MC, nº de contenedor u OT..." style="min-width:300px;">
-    <select id="filtro-cliente" title="Filtrar por cliente"><option value="">Todos los clientes</option></select>
-    <button type="button" id="buscar-btn">Buscar</button>
+        <button type="button" id="buscar-btn">Buscar</button>
   </div>
   <p id="msg-lista" class="msg-cont"></p>
+  <input type="hidden" id="filtro-cliente" value="">
+  <div id="chips-clientes" class="chips-clientes"></div>
   <label style="font-size:.9rem;"><input type="checkbox" id="solo-mixtos"> Mostrar solo contenedores cuyas estancias figuran con clientes distintos (revisar)</label>
 
   <h2 style="margin-top:18px;">Contenedores con varios MC o con número</h2>
@@ -59,6 +68,7 @@
       <tbody id="tbody-cont"><tr><td colspan="6">Cargando...</td></tr></tbody>
     </table>
   </div>
+  <div id="pager-cont" class="pager-cont"></div>
 
   <h2 style="margin-top:26px;">Cambios de MC registrados en OT que faltan por registrar en contenedores</h2>
   <p style="font-size:.88rem;color:#555;">Se buscan en las OT los cambios donde se anotó un MC nuevo (campo "serial nuevo") y que todavía no tienen su estancia en un contenedor. Al enlazar, el MC retirado termina su estancia en esa fecha y el nuevo continúa el contenedor.</p>

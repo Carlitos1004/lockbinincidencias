@@ -36,19 +36,27 @@ async function cargar() {
     tbody.innerHTML = `<tr><td colspan="6">Error: ${esc(err.message)} (¿Corriste el SQL 97?)</td></tr>`;
     return;
   }
-  llenarFiltroCliente();
   await pintarLista();
   cargarPendientes();
 }
 
-// Lista de clientes (según las OT de las estancias) para el filtro
-function llenarFiltroCliente() {
-  const sel = document.getElementById("filtro-cliente");
-  const actual = sel.value;
-  const mapa = {};
-  filasEst.forEach(r => { const c = (r.cliente || "").trim(); if (c) mapa[c.toUpperCase()] = c.toUpperCase(); });
-  sel.innerHTML = `<option value="">Todos los clientes</option>` + Object.keys(mapa).sort((a, b) => a.localeCompare(b)).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
-  sel.value = actual;
+let pagina = 1;
+const POR_PAGINA = 50;
+let ultimaBusqueda = "";
+
+// Chips de clientes con contador (un contenedor con varios clientes cuenta en cada uno)
+function pintarChips(idsBase, g) {
+  const cont = document.getElementById("chips-clientes");
+  const actual = document.getElementById("filtro-cliente").value;
+  const cuentas = {};
+  idsBase.forEach(id => { new Set(clientesDe(g, id).map(c => c.toUpperCase())).forEach(c => { cuentas[c] = (cuentas[c] || 0) + 1; }); });
+  const chip = (val, txt, n) => `<button type="button" class="chip-cli${actual === val ? " activo" : ""}" data-cli="${esc(val)}">${esc(txt)}<small>${n}</small></button>`;
+  cont.innerHTML = chip("", "Todos", idsBase.length) + Object.keys(cuentas).sort((x, y) => x.localeCompare(y)).map(c => chip(c, c, cuentas[c])).join("");
+  cont.querySelectorAll(".chip-cli").forEach(b => b.addEventListener("click", () => {
+    document.getElementById("filtro-cliente").value = b.dataset.cli;
+    pagina = 1;
+    pintarLista();
+  }));
 }
 
 function gruposPorId() {
@@ -64,21 +72,37 @@ const distintosClientes = lista => new Set(lista.map(c => c.toLowerCase())).size
 
 async function pintarLista(textoBusqueda) {
   const tbody = document.getElementById("tbody-cont");
-  const q = (textoBusqueda || "").trim().toUpperCase();
+  if (textoBusqueda !== undefined) ultimaBusqueda = textoBusqueda;
+  const q = (ultimaBusqueda || "").trim().toUpperCase();
   const g = gruposPorId();
   let ids = Object.keys(g).filter(id => mcsDe(g, id).length > 1 || (datosCont[id] && datosCont[id].numero));
   if (q) ids = ids.filter(id => id.toUpperCase().includes(q) || String((datosCont[id] || {}).numero || "").toUpperCase() === q || mcsDe(g, id).some(m => m.toUpperCase().includes(q))
     || g[id].some(r => String(r.id_ot_entrada || "").toUpperCase().includes(q) || String(r.id_ot_salida || "").toUpperCase().includes(q)));
-  const cli = document.getElementById("filtro-cliente").value;
-  if (cli) ids = ids.filter(id => clientesDe(g, id).some(c => c.toUpperCase() === cli));
   if (document.getElementById("solo-mixtos").checked) ids = ids.filter(id => distintosClientes(clientesDe(g, id)));
+  pintarChips(ids, g);
+  let cli = document.getElementById("filtro-cliente").value;
+  if (cli && !ids.some(id => clientesDe(g, id).some(c => c.toUpperCase() === cli))) { cli = ""; document.getElementById("filtro-cliente").value = ""; pintarChips(ids, g); }
+  if (cli) ids = ids.filter(id => clientesDe(g, id).some(c => c.toUpperCase() === cli));
   ids.sort((a, b) => a.localeCompare(b));
+  const pager = document.getElementById("pager-cont");
   if (!ids.length) {
+    pager.innerHTML = "";
     tbody.innerHTML = `<tr><td colspan="6">${q || cli || document.getElementById("solo-mixtos").checked ? "Ningún contenedor coincide." : "Todavía no hay contenedores con varios MC. Corre el SQL 97 o se irán creando al cambiar MC en Ruta."}</td></tr>`;
     return;
   }
+  const total = ids.length;
+  const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+  if (pagina > paginas) pagina = paginas;
+  if (pagina < 1) pagina = 1;
+  ids = ids.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
   const info = { estancias: g, miembros: Object.fromEntries(ids.map(id => [id, mcsDe(g, id)])) };
   const visitas = await visitasDeContenedores(supabaseClient, info, ids);
+  pager.innerHTML = paginas > 1
+    ? `<button type="button" id="pg-ant" ${pagina <= 1 ? "disabled" : ""}>← Anterior</button><span>Página ${pagina} de ${paginas} · ${total} contenedores</span><button type="button" id="pg-sig" ${pagina >= paginas ? "disabled" : ""}>Siguiente →</button>`
+    : `<span>${total} contenedor${total === 1 ? "" : "es"}</span>`;
+  const ant = document.getElementById("pg-ant"), sig = document.getElementById("pg-sig");
+  if (ant) ant.onclick = () => { pagina--; pintarLista(); };
+  if (sig) sig.onclick = () => { pagina++; pintarLista(); };
   tbody.innerHTML = ids.map(id => {
     const ult = (visitas[id] || [])[0];
     const cls = clientesDe(g, id);
@@ -101,6 +125,7 @@ async function buscar() {
   const q = document.getElementById("buscar-cont").value.trim().toUpperCase();
   const msg = document.getElementById("msg-lista");
   msg.textContent = "";
+  pagina = 1;
   await pintarLista(q);
   if (!q) return;
   const porNum = Object.values(datosCont).find(d => String(d.numero || "").toUpperCase() === q);
@@ -303,6 +328,7 @@ document.getElementById("enlazar-todos").addEventListener("click", async () => {
 });
 
 document.getElementById("filtro-cliente").addEventListener("change", () => pintarLista(document.getElementById("buscar-cont").value));
-document.getElementById("solo-mixtos").addEventListener("change", () => pintarLista(document.getElementById("buscar-cont").value));
 
 cargar();
+
+document.getElementById("solo-mixtos").addEventListener("change", () => { pagina = 1; pintarLista(); });
