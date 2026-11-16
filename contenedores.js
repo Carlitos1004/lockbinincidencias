@@ -162,8 +162,9 @@ async function buscar() {
   pagina = 1;
   await pintarLista(q);
   if (!q) return;
-  const porNum = Object.values(datosCont).find(d => String(d.numero || "").toUpperCase() === q);
-  if (porNum) { abrirContenedor(porNum.contenedor_id); return; }
+  const porNum = Object.values(datosCont).filter(d => String(d.numero || "").toUpperCase() === q);
+  if (porNum.length === 1) { abrirContenedor(porNum[0].contenedor_id); return; }
+  if (porNum.length > 1) { msg.textContent = `Hay ${porNum.length} contenedores con el Nº ${q} (de distintos clientes). Elige uno de la lista.`; return; }
   if (/^MC\d+/.test(q)) {
     const r = await resolverContenedores(supabaseClient, [q]);
     abrirContenedor(r.contenedorDe[q]);
@@ -249,6 +250,13 @@ function mensaje(texto, error) {
 async function guardarDatos(id) {
   const numero = document.getElementById("cont-numero").value.trim() || null;
   const nota = document.getElementById("cont-nota").value.trim() || null;
+  if (numero) {
+    const g = gruposPorId();
+    const misClientes = clientesDe(g, id).map(c => c.toUpperCase());
+    const choque = Object.values(datosCont).find(d => d.contenedor_id !== id && String(d.numero || "").trim().toUpperCase() === numero.toUpperCase()
+      && (misClientes.length ? clientesDe(g, d.contenedor_id).some(c => misClientes.includes(c.toUpperCase())) : !clientesDe(g, d.contenedor_id).length));
+    if (choque) { mensaje(`⚠️ El Nº ${numero} ya lo tiene otro contenedor del mismo cliente (${choque.contenedor_id}). No se guardó.`, true); return; }
+  }
   const { error } = await supabaseClient.from("contenedores").upsert({ contenedor_id: id, numero, nota, actualizado_en: new Date().toISOString() }, { onConflict: "contenedor_id" });
   if (error) { mensaje("No se pudo guardar: " + error.message + " (¿Corriste el SQL 95?)", true); return; }
   datosCont[id] = { contenedor_id: id, numero, nota };
