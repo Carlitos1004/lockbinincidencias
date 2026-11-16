@@ -25,7 +25,16 @@
 <div class="panel-body">
   <a href="datos-inventario.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Datos e Inventario</a>
 
-  <h2>Actualizar lista de equipos</h2>
+  <h2>Sincronizar desde la plataforma</h2>
+  <p>Trae los equipos <strong>activos</strong> directamente de la plataforma LockBin (sin Excel). Primero pulsa «Revisar» para ver qué cambiaría; no se escribe nada hasta que pulses «Aplicar cambios». Se crean los equipos nuevos y se corrigen IMEI, cliente, seriales de batería, cierre y lector y estado; nunca se borra nada ni se pisa un dato con uno vacío.</p>
+  <div class="import-box">
+    <button id="sync-revisar-btn" type="button">Revisar con la plataforma</button>
+    <button id="sync-aplicar-btn" type="button" disabled>Aplicar cambios</button>
+  </div>
+  <p id="sync-estado" class="resultado-msg"></p>
+  <div id="sync-resumen"></div>
+
+  <h2 style="margin-top:34px;">Actualizar lista de equipos con Excel (alternativa)</h2>
   <p>Sube el archivo Excel que descargas de la plataforma principal. Cada equipo se identifica por su Módulo de Control — si ya existe, se actualiza; si es nuevo, se agrega. Nada se borra.</p>
 
   <div class="import-box">
@@ -50,6 +59,7 @@
 <script>const ROL_ESPERADO = "manager";</script>
 <script src="sesion.js"></script>
 <script src="importar-equipos.js"></script>
+<script src="sincronizar-equipos.js"></script>
 
 <footer class="footer-fv">
   <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="footer-fv-logo">
