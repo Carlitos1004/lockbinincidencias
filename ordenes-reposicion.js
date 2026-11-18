@@ -1703,7 +1703,6 @@ function abrirMaterialesUsados() {
   m.innerHTML = `<div class="modal-resumen-caja">
     <div class="modal-resumen-cab"><h3>🔧 Materiales usados en la reposición</h3><button type="button" class="modal-x">✕</button></div>
     <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla) · piezas de <strong>${mcsContados.size}</strong> equipos con MC${nSinMc ? ` y <strong>${nSinMc}</strong> baterías sin MC` : ""}</p>
-    ${fueraDeListas.size ? `<p class="modal-nota">ℹ️ No se cuentan ${fueraDeListas.size} equipos con piezas en la orden que no están en ninguna lista de reposición: ${esc([...fueraDeListas].sort().slice(0, 30).join(", "))}${fueraDeListas.size > 30 ? "…" : ""}</p>` : ""}
     ${lineas.length ? tabla(cab, [...resumen, tot], true) : "<p>Todavía no hay materiales a reponer en esta orden.</p>"}
     ${filasAlb.length ? `<h4>📄 Por albarán</h4>${tabla(["Albarán", ...tipos, "Total"], filasAlb)}` : ""}
     ${sinAlb ? `<p class="modal-nota">⚠️ ${sinAlb} piezas entregadas todavía sin albarán.</p>` : ""}
