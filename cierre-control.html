@@ -25,41 +25,48 @@
 <div class="panel-body panel-body-ancho">
   <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
 
-  <div class="grid-tarjetas" style="margin-top:20px;">
+  <style>
+    .fila-tarjetas { grid-template-columns: repeat(4, 1fr); }
+    @media (max-width: 900px) { .fila-tarjetas { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) { .fila-tarjetas { grid-template-columns: 1fr; } }
+  </style>
+  <div class="grid-tarjetas fila-tarjetas" style="margin-top:20px;">
     <a class="tarjeta-nav" href="revision.html">
       <span class="tarjeta-nav-icono">🔍</span>
       <span class="tarjeta-nav-titulo">Revisión de Taller</span>
       <span class="tarjeta-nav-desc">Asignar Destino a componentes</span>
-    </a>
-    <a class="tarjeta-nav" href="sims.html">
-      <span class="tarjeta-nav-icono">📶</span>
-      <span class="tarjeta-nav-titulo">SIMs guardadas</span>
-      <span class="tarjeta-nav-desc">SIMs del cliente retiradas en el taller</span>
-    </a>
-    <a class="tarjeta-nav" href="garantias.html">
-      <span class="tarjeta-nav-icono">🛡️</span>
-      <span class="tarjeta-nav-titulo">Garantías</span>
-      <span class="tarjeta-nav-desc">Consultar y editar</span>
-    </a>
-    <a class="tarjeta-nav" href="ordenes-reposicion.html">
-      <span class="tarjeta-nav-icono">📦</span>
-      <span class="tarjeta-nav-titulo">Órdenes de Reposición</span>
-      <span class="tarjeta-nav-desc">REP-001 histórica y una orden por cada OT manual</span>
-    </a>
-    <a class="tarjeta-nav" href="ordenes-presupuesto.html">
-      <span class="tarjeta-nav-icono">💰</span>
-      <span class="tarjeta-nav-titulo">Órdenes de Presupuesto</span>
-      <span class="tarjeta-nav-desc">Equipos con vandalismo: oferta, aprobación y reposición</span>
     </a>
     <a class="tarjeta-nav" href="reporte-ot.html">
       <span class="tarjeta-nav-icono">🧾</span>
       <span class="tarjeta-nav-titulo">Reporte de Cierre de OT</span>
       <span class="tarjeta-nav-desc">Descarga en PDF o Excel</span>
     </a>
+    <a class="tarjeta-nav" href="ordenes-reposicion.html">
+      <span class="tarjeta-nav-icono">📦</span>
+      <span class="tarjeta-nav-titulo">Órdenes de Reposición</span>
+      <span class="tarjeta-nav-desc">REP-001 histórica y una orden por cada OT manual</span>
+    </a>
     <a class="tarjeta-nav" href="ammi.html">
       <span class="tarjeta-nav-icono">🔁</span>
       <span class="tarjeta-nav-titulo">AMMI</span>
       <span class="tarjeta-nav-desc">Envíos, regresos y clasificación para Operaciones</span>
+    </a>
+  </div>
+  <div class="grid-tarjetas fila-tarjetas" style="margin-top:14px;">
+    <a class="tarjeta-nav" href="garantias.html">
+      <span class="tarjeta-nav-icono">🛡️</span>
+      <span class="tarjeta-nav-titulo">Garantías</span>
+      <span class="tarjeta-nav-desc">Consultar y editar</span>
+    </a>
+    <a class="tarjeta-nav" href="ordenes-presupuesto.html">
+      <span class="tarjeta-nav-icono">💰</span>
+      <span class="tarjeta-nav-titulo">Órdenes de Presupuesto</span>
+      <span class="tarjeta-nav-desc">Equipos con vandalismo: oferta, aprobación y reposición</span>
+    </a>
+    <a class="tarjeta-nav" href="sims.html">
+      <span class="tarjeta-nav-icono">📶</span>
+      <span class="tarjeta-nav-titulo">SIMs guardadas</span>
+      <span class="tarjeta-nav-desc">SIMs del cliente retiradas en el taller</span>
     </a>
   </div>
 </div>

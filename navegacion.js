@@ -57,16 +57,6 @@
     "t": "Fechas de Entrega",
     "d": "Subir el Excel de entregas: compara y añade solo lo nuevo"
   },
-  "comparar-ammi.html": {
-    "i": "🛠️",
-    "t": "Historial AMMI (Excel)",
-    "d": "Comparar el control de envíos/informes de AMMI e importar lo que falte"
-  },
-  "comparar-cambios.html": {
-    "i": "🔁",
-    "t": "Cambios de módulos (Excel)",
-    "d": "Comparar cambios de componentes y de MC con el sistema e importar lo que falte"
-  },
   "inventario.html": {
     "i": "🗃️",
     "t": "Inventario por Destino",
