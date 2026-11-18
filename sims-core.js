@@ -32,3 +32,14 @@ function simPais(iccid) {
   if (d.startsWith("8930")) return "Grecia";
   return "";
 }
+
+// Operador según el inicio (7 cifras) del ICCID. Solo lo confirmado; se amplía añadiendo líneas.
+// Pendientes de confirmar: 8934076 (¿Movistar?), 8935677 (¿Melita?)
+const SIM_PREFIJOS_OPERADOR = {
+  "8935103": "NOS",
+  "8934013": "Orange",
+  "8934012": "Orange",
+  "8988228": "DT",
+  "8988239": "DT"
+};
+function simOperador(iccid) { return SIM_PREFIJOS_OPERADOR[simDigitos(iccid).slice(0, 7)] || ""; }

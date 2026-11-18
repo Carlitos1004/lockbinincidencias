@@ -40,14 +40,14 @@ async function renderSimsOt(idOt, comps, ot) {
         <td colspan="2">✅ ${escS(r.operador || "")} ${escS(simCorta(r.iccid))} · <em>${escS(r.estado)}</em>${r.ubicacion ? " · 📍 " + escS(r.ubicacion) : ""}${r.mc_destino ? " → " + escS(r.mc_destino) : ""}</td>
         <td><button type="button" class="btn-secundario sim-quitar" data-id="${r.id}" title="Borrar este registro (por error)">✕</button></td></tr>`;
     }
-    return `<tr data-mc="${escS(mc)}" data-dev="${devuelve[mc] ? 1 : 0}"><td><strong>${escS(mc)}</strong></td><td><small title="ICCID que tiene Equipos (puede ser la SIM de pruebas)">${escS(simCorta(plat[mc]))}${simPais(plat[mc]) ? " · " + escS(simPais(plat[mc])) : ""}</small>${devuelve[mc] ? ' <span class="orep-badge" title="Se devuelve al cliente: su SIM va pegada al equipo">↩ se devuelve</span>' : ""}</td>
+    return `<tr data-mc="${escS(mc)}" data-dev="${devuelve[mc] ? 1 : 0}"><td><strong>${escS(mc)}</strong></td><td><small title="ICCID que tiene Equipos (puede ser la SIM de pruebas)">${escS(simCorta(plat[mc]))}${(simOperador(plat[mc]) || simPais(plat[mc])) ? " · " + escS(simOperador(plat[mc]) || simPais(plat[mc])) : ""}</small>${devuelve[mc] ? ' <span class="orep-badge" title="Se devuelve al cliente: su SIM va pegada al equipo">↩ se devuelve</span>' : ""}</td>
       <td><input type="text" class="sim-iccid" placeholder="${plat[mc] ? "vacío = la de la plataforma" : "ICCID o últimas cifras"}" style="width:200px;"></td>
       <td></td><td><button type="button" class="btn-primario sim-guardar">📶 Guardar SIM</button></td></tr>`;
   }).join("");
   document.getElementById("sims-cont").innerHTML = `
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;">
       <label>Operador <input type="text" id="sim-operador" list="sim-operadores" placeholder="NOS" value="${escS(op0)}" style="width:120px;"></label>
-      <datalist id="sim-operadores"><option value="NOS"><option value="Vodafone"><option value="Movistar"><option value="Orange"><option value="TIM"><option value="Cosmote"></datalist>
+      <datalist id="sim-operadores"><option value="NOS"><option value="Orange"><option value="DT"><option value="Movistar"><option value="Melita"></datalist>
       <label>Guardada en <input type="text" id="sim-ubicacion" placeholder="Caja / bolsa" value="${escS(ub0)}" style="width:150px;"></label>
       <input type="text" id="sim-filtro" placeholder="Filtrar MC…" style="width:130px;">
       <label><input type="checkbox" id="sim-solo-no-dev" checked> Ocultar los que se devuelven</label>
@@ -89,7 +89,7 @@ async function renderSimsOt(idOt, comps, ot) {
       if (e.length < 6) { problemas.push(`${mc}: serial de SIM demasiado corto.`); return; }
       vistos.add(mc);
       const res = simResolverIccid(e, plat[mc]);
-      nuevas.push({ iccid: res.iccid, operador, mc_origen: mc, id_ot: idOt, cliente: cliente || null, ubicacion, creada_por: usuario });
+      nuevas.push({ iccid: res.iccid, operador: simOperador(res.iccid) || operador, mc_origen: mc, id_ot: idOt, cliente: cliente || null, ubicacion, creada_por: usuario });
     });
     if (!nuevas.length) { msg(problemas.length ? "⚠️ Nada que guardar. " + problemas.join(" ") : "⚠️ Pega primero la lista."); return; }
     if (!confirm(`¿Guardar ${nuevas.length} SIM${problemas.length ? ` (se saltan ${problemas.length} líneas con problemas)` : ""}?`)) return;
@@ -103,11 +103,14 @@ async function renderSimsOt(idOt, comps, ot) {
     const tr = btn.closest("tr"), mc = tr.dataset.mc;
     const res = simResolverIccid(tr.querySelector(".sim-iccid").value, plat[mc]);
     if (res.error) { msg("⚠️ " + res.error); return; }
-    if (!tr.querySelector(".sim-iccid").value.trim() && simPais(plat[mc]) === "España" && !confirm(`El ICCID de la plataforma para ${mc} parece de una SIM española, no la del cliente. ¿Guardarlo igualmente? (Si la SIM retirada es otra, cancela y escribe su ICCID.)`)) return;
+    { const opEsc = document.getElementById("sim-operador").value.trim(), opPlat = simOperador(plat[mc]);
+      if (!tr.querySelector(".sim-iccid").value.trim() && opEsc && opPlat && opPlat.toLowerCase() !== opEsc.toLowerCase() &&
+          !confirm(`El ICCID de la plataforma para ${mc} parece de ${opPlat}, y el operador que indicas es ${opEsc}. ¿Guardarlo igualmente? (Si la SIM retirada es otra, cancela y escribe su ICCID.)`)) return; }
     if (!res.coincide && plat[mc] && !confirm(`El ICCID que escribiste (${simCorta(res.iccid)}) no coincide con el de la plataforma para ${mc} (${simCorta(plat[mc])}). ¿Guardarlo igualmente?`)) return;
-    const operador = document.getElementById("sim-operador").value.trim() || null;
+    const operadorEscrito = document.getElementById("sim-operador").value.trim();
+    const operador = simOperador(res.iccid) || operadorEscrito || null;
     const ubicacion = document.getElementById("sim-ubicacion").value.trim() || null;
-    localStorage.setItem("lb_sim_operador", operador || ""); localStorage.setItem("lb_sim_ubicacion", ubicacion || "");
+    localStorage.setItem("lb_sim_operador", operadorEscrito); localStorage.setItem("lb_sim_ubicacion", ubicacion || "");
     btn.disabled = true;
     const { error: e2 } = await supabaseClient.from("sims_custodia").insert({ iccid: res.iccid, operador, mc_origen: mc, id_ot: idOt, cliente: cliente || null, ubicacion, creada_por: await simUsuario() });
     if (e2) { msg(e2.code === "23505" ? `⚠️ Esa SIM (${simCorta(res.iccid)}) ya está guardada para otro equipo.` : "❌ " + e2.message); btn.disabled = false; return; }

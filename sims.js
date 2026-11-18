@@ -26,7 +26,7 @@ function pintar() {
   document.getElementById("sims-tbody").innerHTML = lista.length ? lista.map(s => {
     const guardada = s.estado === "Guardada";
     return `<tr data-id="${s.id}">
-      <td title="${escH(s.iccid)}">${escH(simCorta(s.iccid))}</td><td>${escH(s.operador || "")}</td><td><strong>${escH(s.mc_origen || "—")}</strong></td>
+      <td title="${escH(s.iccid)}">${escH(simCorta(s.iccid))}</td><td>${escH(s.operador || simOperador(s.iccid) || "")}</td><td><strong>${escH(s.mc_origen || "—")}</strong></td>
       <td>${escH(s.id_ot || "")}</td><td>${escH(s.cliente || "")}</td><td>${escH(s.ubicacion || "")}</td>
       <td>${guardada ? "📶 Guardada" : escH(s.estado) + (s.mc_destino ? " → <strong>" + escH(s.mc_destino) + "</strong>" : "")}</td>
       <td>${new Date(s.resuelta_en || s.creada_en).toLocaleDateString("es-ES")}</td>
@@ -68,7 +68,7 @@ document.getElementById("n-guardar").addEventListener("click", async () => {
   if (res.error) { mensaje("⚠️ " + res.error); return; }
   const mc = document.getElementById("n-mc").value.trim().toUpperCase() || null;
   const { error } = await supabaseClient.from("sims_custodia").insert({
-    iccid: res.iccid, operador: document.getElementById("n-operador").value.trim() || null, mc_origen: mc,
+    iccid: res.iccid, operador: simOperador(res.iccid) || document.getElementById("n-operador").value.trim() || null, mc_origen: mc,
     ubicacion: document.getElementById("n-ubic").value.trim() || null, creada_por: await simUsuario() });
   if (error) { mensaje(error.code === "23505" ? "⚠️ Esa SIM ya está guardada." : "❌ " + error.message); return; }
   mensaje("");
