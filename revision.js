@@ -129,6 +129,7 @@ async function verTodosPendientes() {
   document.getElementById("guardar-todo-btn").hidden = true;
   document.getElementById("faltantes-box").hidden = true;
   modoTodosPendientes = true;
+  { const sb = document.getElementById("sims-box"); if (sb) sb.hidden = true; }
 
   const { data, error } = await supabaseClient
     .from("componentes_retirados")
@@ -170,6 +171,7 @@ async function buscarComponentes() {
   tabla.hidden = true;
   document.getElementById("guardar-todo-btn").hidden = true;
   modoTodosPendientes = false;
+  { const sb = document.getElementById("sims-box"); if (sb) sb.hidden = true; }
 
   if (!idOt) {
     mostrarMensaje("⚠️ Escribe un número de OT.", true);
@@ -204,6 +206,7 @@ async function buscarComponentes() {
   await cargarFotosRevision(normales);
   await cargarPresupuestosRevision(normales);
   renderTabla(normales);
+  if (typeof renderSimsOt === "function") renderSimsOt(idOt, normales, ot);
   tabla.hidden = normales.length === 0;
   document.getElementById("guardar-todo-btn").hidden = normales.length === 0;
   if (normales.length === 0 && faltantes.length > 0) {

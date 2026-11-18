@@ -51,6 +51,7 @@ let fechasFactura = {};    // mc -> fecha de factura / inicio de contrato (la qu
 let fechasEntrega = {};    // mc -> fecha de entrega del equipo al cliente (para ordenar)
 let listaSel = "";         // lista seleccionada en pantalla ("" = todas, "__sin" = sin lista)
 let equiposCompletos = {}; // mc -> fila de reposicion_equipos (cambio de equipo completo + nota)
+let simsPorMc = {};            // mc -> [registros de sims_custodia] (SIMs del cliente retiradas en el taller)
 let seleccion = new Set();      // piezas marcadas: "mc:MC123" o "id:<componente>"
 let elegiblesVista = [];       // [{clave, modo}] visibles ahora ("entregar" | "albaran")
 let ordenBateriasVista = [];   // baterías de la pestaña Baterías, en el orden en que salen
@@ -389,6 +390,14 @@ async function recargarOt() {
       (fr || []).forEach(f => { fraccionesEq[f.m_control] = f.fraccion || ""; });
     }
   } catch (err) { console.error("No se pudieron cargar las fracciones:", err); }
+  simsPorMc = {};
+  try {
+    const mcsSim = [...new Set(compsOtActual.map(c => c.m_control).filter(Boolean))];
+    for (let i = 0; i < mcsSim.length; i += 100) {
+      const { data: sm } = await supabaseClient.from("sims_custodia").select("*").in("mc_origen", mcsSim.slice(i, i + 100));
+      (sm || []).forEach(s => { (simsPorMc[s.mc_origen] = simsPorMc[s.mc_origen] || []).push(s); });
+    }
+  } catch (err) { console.error("SIMs no disponibles:", err); }
   try { await cargarSerialesBok(); } catch (err) { console.error(err); }
   presPorComp = {};
   try {
@@ -705,7 +714,7 @@ function htmlMc(m) {
     <div class="scroll-x-tabla" style="max-height:none;"><table>
       <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th></tr></thead>
       <tbody>${filas}</tbody></table></div>
-    <div class="orep-acciones">${botonPlataforma}${botonEntrega}</div>
+    <div class="orep-acciones">${htmlSimsMc(m.mc)}${botonPlataforma}${botonEntrega}</div>
   </div>`;
 }
 
@@ -1017,7 +1026,9 @@ async function entregarEquipo(mc) {
   const grupo = agruparPorMc(compsOtActual, otActual).find(m => m.mc === mc);
   if (grupo) aplicarTipoBateria(grupo);
   if (!grupo || grupo.estadoMc !== "Listo para entregar") return;
-  if (!confirm(`¿Marcar ${mc} como entregado al cliente? Se marcarán sus 4 componentes.`)) return;
+  const simsPend = simsPendientes(mc);
+  const avisoSim = simsPend.length ? `\n\n⚠️ Tiene ${simsPend.length} SIM del cliente guardada sin colocar (${simsPend.map(s => (s.operador || "SIM") + " " + simCorta(s.iccid)).join(", ")}). ¿Entregar igualmente?` : "";
+  if (!confirm(`¿Marcar ${mc} como entregado al cliente? Se marcarán sus 4 componentes.${avisoSim}`)) return;
   const fecha = hoy();
   for (const x of grupo.casillas) {
     if (!x.comp) {
@@ -1535,12 +1546,13 @@ function abrirDialogoAlbaran() {
   const r = resolverSeleccion();
   if (!seleccion.size) return;
   const previos = [...new Set(r.comps.map(x => x.c.repo_albaran).filter(Boolean))];
+  const mcsSimPend = [...new Set(r.comps.filter(x => x.entregar && x.c.m_control && simsPendientes(x.c.m_control).length).map(x => x.c.m_control))];
   cerrarModal("modal-albaran");
   const m = document.createElement("div");
   m.id = "modal-albaran"; m.className = "modal-resumen";
   m.innerHTML = `<div class="modal-resumen-caja" style="max-width:520px;">
     <div class="modal-resumen-cab"><h3>📄 Entregar con albarán</h3><button type="button" class="modal-x">✕</button></div>
-    <p class="modal-sub">${r.nEntregar} para marcar como entregados${r.nSoloAlb ? ` · ${r.nSoloAlb} ya entregados (solo se anota el albarán)` : ""}.${previos.length ? `<br>⚠️ Algunas piezas ya tienen albarán (${esc(previos.join(", "))}); se sustituirá.` : ""}</p>
+    <p class="modal-sub">${r.nEntregar} para marcar como entregados${r.nSoloAlb ? ` · ${r.nSoloAlb} ya entregados (solo se anota el albarán)` : ""}.${mcsSimPend.length ? `<br>📶 ${mcsSimPend.length} equipos tienen una SIM del cliente guardada sin colocar: ${esc(mcsSimPend.slice(0, 12).join(", "))}${mcsSimPend.length > 12 ? "…" : ""}` : ""}${previos.length ? `<br>⚠️ Algunas piezas ya tienen albarán (${esc(previos.join(", "))}); se sustituirá.` : ""}</p>
     <p><label>Nº de albarán<br><input type="text" id="alb-num" placeholder="Ej. ALB-2026-0123" style="width:100%;"></label></p>
     <p><label>Fecha de entrega<br><input type="date" id="alb-fecha" value="${hoy()}"></label></p>
     <div class="modal-acciones"><button type="button" class="btn-prim" id="alb-guardar">Guardar</button> <button type="button" class="btn-sec modal-cerrar">Cancelar</button></div>
@@ -1757,3 +1769,34 @@ async function abrirMaterialesUsados() {
   });
 }
 (function () { const b = document.getElementById("btn-materiales"); if (b) b.addEventListener("click", abrirMaterialesUsados); })();
+
+
+// =====================================================================
+// SIMs del cliente (p. ej. NOS) retiradas en el taller: pasan al MC nuevo o vuelven al mismo equipo
+// =====================================================================
+const simsPendientes = mc => (simsPorMc[mc] || []).filter(s => s.estado === "Guardada");
+function htmlSimsMc(mc) {
+  const todas = simsPorMc[mc] || [];
+  if (!todas.length) return "";
+  const nuevoMc = planPlataforma(mc).nuevoMc || "";
+  return todas.map(s => {
+    const etiqueta = `${esc(s.operador || "SIM")} ${esc(simCorta(s.iccid))}`;
+    if (s.estado === "Guardada") {
+      return `<span class="orep-badge orep-reponer" title="SIM del cliente retirada en el taller${s.ubicacion ? " · guardada en " + esc(s.ubicacion) : ""}">📶 ${etiqueta} pendiente</span>` +
+        (esManager ? ` <button type="button" class="btn-sim-lista" data-id="${s.id}" data-mc="${esc(mc)}" data-nuevo="${esc(nuevoMc)}">${nuevoMc ? `📶 SIM colocada en ${esc(nuevoMc)}` : "📶 SIM devuelta al equipo"}</button>` : "");
+    }
+    return `<span class="orep-badge orep-gris">📶 ${etiqueta} · ${esc(s.estado)}${s.mc_destino ? " → " + esc(s.mc_destino) : ""}</span>`;
+  }).join(" ");
+}
+document.addEventListener("click", async e => {
+  const btn = e.target.closest(".btn-sim-lista");
+  if (!btn) return;
+  const nuevo = btn.dataset.nuevo;
+  btn.disabled = true;
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  const { error } = await supabaseClient.from("sims_custodia").update({
+    estado: nuevo ? "Pasada a MC nuevo" : "Devuelta al mismo equipo", mc_destino: nuevo || null,
+    resuelta_por: user ? user.email : null, resuelta_en: new Date().toISOString() }).eq("id", btn.dataset.id);
+  if (error) { alert("No se pudo guardar: " + error.message); btn.disabled = false; return; }
+  await recargarOt();
+});

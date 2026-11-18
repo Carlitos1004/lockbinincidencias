@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — SIMs guardadas</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .panel-body-ancho { max-width: 98vw; }
+  .sims-filtros { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:14px 0; }
+  .sims-filtros input, .sims-filtros select { padding:8px 10px; border:1.5px solid #d5ddd6; border-radius:10px; font:inherit; }
+  .sims-nueva { border:1.5px solid #d5ddd6; border-radius:12px; padding:8px 14px; margin-bottom:14px; background:#fff; }
+</style>
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>SIMs guardadas</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="cierre-control.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Cierre y Control</a>
+  <p style="color:var(--gris-700);">SIMs del cliente (p. ej. NOS) retiradas en el taller para probar con otra SIM. Cada una debe volver a su equipo o pasar al MC nuevo.</p>
+
+  <details class="sims-nueva">
+    <summary style="cursor:pointer;font-weight:600;">➕ Añadir una SIM a mano</summary>
+    <div class="sims-filtros">
+      <input type="text" id="n-iccid" placeholder="ICCID" style="width:210px;">
+      <input type="text" id="n-operador" list="ops" placeholder="Operador (NOS…)" style="width:140px;">
+      <datalist id="ops"><option value="NOS"><option value="Vodafone"><option value="Movistar"><option value="Orange"><option value="TIM"><option value="Cosmote"></datalist>
+      <input type="text" id="n-mc" placeholder="MC del que salió" style="width:150px;">
+      <input type="text" id="n-ubic" placeholder="Caja / bolsa" style="width:130px;">
+      <button type="button" id="n-guardar" class="btn-primario">Guardar</button>
+    </div>
+  </details>
+
+  <div class="sims-filtros">
+    <input type="text" id="f-buscar" placeholder="Buscar MC, ICCID, OT, cliente…" style="width:260px;">
+    <select id="f-estado">
+      <option value="Guardada">Guardadas (pendientes)</option>
+      <option value="">Todas</option>
+      <option value="Devuelta al mismo equipo">Devueltas al mismo equipo</option>
+      <option value="Pasada a MC nuevo">Pasadas a MC nuevo</option>
+    </select>
+    <span id="sims-contador" style="font-size:.9rem;"></span>
+  </div>
+  <p id="sims-msg" class="resultado-msg" hidden></p>
+  <div class="scroll-x-tabla" style="overflow:auto;">
+    <table class="tabla-revision">
+      <thead><tr><th>ICCID</th><th>Operador</th><th>MC origen</th><th>OT</th><th>Cliente</th><th>Guardada en</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+      <tbody id="sims-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="sims-core.js"></script>
+<script src="sims.js"></script>
+
+<footer class="footer-fv">
+  <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="footer-fv-logo">
+  <span>Un producto de Formato Verde</span>
+</footer>
+</body>
+</html>

@@ -132,6 +132,11 @@
     "t": "Gestión de Materiales",
     "d": "Llevados / utilizados / vuelven por OT"
   },
+  "sims.html": {
+    "i": "📶",
+    "t": "SIMs guardadas",
+    "d": "SIMs del cliente retiradas en el taller"
+  },
   "materiales-serializados.html": {
     "i": "🔖",
     "t": "Serialización de Materiales",
