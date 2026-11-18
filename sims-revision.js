@@ -7,7 +7,8 @@ const escS = t => { const d = document.createElement("div"); d.textContent = t =
 async function renderSimsOt(idOt, comps, ot) {
   const box = document.getElementById("sims-box");
   if (!box) return;
-  const mcs = [...new Set((comps || []).map(c => c.m_control).filter(Boolean))].sort();
+  // Solo los MC que llegan a revisión como "Módulo de Control" (los equipos que solo traen batería u otras piezas no se anotan)
+  const mcs = [...new Set((comps || []).filter(c => /m[oó]dulo/i.test(c.tipo_componente || "")).map(c => c.m_control).filter(Boolean))].sort();
   if (!mcs.length) { box.hidden = true; return; }
   const cliente = (ot && ot.cliente) || "";
   // ¿Se devuelve al cliente? (su SIM va pegada al equipo: no hace falta registrarla)
@@ -53,6 +54,12 @@ async function renderSimsOt(idOt, comps, ot) {
       <label><input type="checkbox" id="sim-solo-no-dev" checked> Ocultar los que se devuelven</label>
       <a href="sims.html" class="btn-secundario" style="text-decoration:none;padding:6px 12px;">📋 Ver todas las SIMs guardadas</a>
     </div>
+    <details style="margin:6px 0;"><summary style="cursor:pointer;font-weight:600;">📥 Cargar SIMs desde un Excel de equipos (anterior a la OT)</summary>
+      <p style="font-size:.85rem;margin:6px 0;">Usa una exportación de la plataforma hecha <strong>antes</strong> de cambiar las SIM (lleva las columnas «M. de Control» y «SIM»). Se rellenan los equipos de esta lista que aún no tienen SIM registrada.</p>
+      <input type="file" id="sim-excel" accept=".xlsx,.xls">
+      <label style="display:block;margin:6px 0;"><input type="checkbox" id="sim-excel-devueltas" checked> Registrarlas ya como «Devuelta al mismo equipo» (la SIM va pegada al equipo)</label>
+      <div id="sim-excel-prev"></div>
+    </details>
     <details style="margin:6px 0;"><summary style="cursor:pointer;font-weight:600;">📋 Pegar lista (MC y serial de SIM)</summary>
       <p style="font-size:.85rem;margin:6px 0;">Una línea por equipo: el MC y el ICCID (o sus últimas cifras), separados por espacio, coma o tabulador. Puedes pegar directamente dos columnas de Excel.</p>
       <textarea id="sim-pegar" rows="6" style="width:100%;max-width:520px;font-family:monospace;" placeholder="MC2400056  8935106100000518707"></textarea>
@@ -71,6 +78,61 @@ async function renderSimsOt(idOt, comps, ot) {
   document.getElementById("sim-filtro").addEventListener("input", aplicarFiltro);
   document.getElementById("sim-solo-no-dev").addEventListener("change", aplicarFiltro);
   aplicarFiltro();
+  let planExcel = [];
+  document.getElementById("sim-excel").addEventListener("change", async ev => {
+    const prev = document.getElementById("sim-excel-prev");
+    const f = ev.target.files[0];
+    if (!f) return;
+    if (typeof XLSX === "undefined") { prev.textContent = "No se cargó el lector de Excel; recarga la página."; return; }
+    prev.textContent = "Leyendo…";
+    try {
+      const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+      const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true });
+      const cab = (filas[0] || []).map(x => String(x || "").trim().toLowerCase());
+      const iMc = cab.findIndex(x => x.includes("control") || x === "mc");
+      const iSim = cab.findIndex(x => x === "sim" || x.includes("iccid"));
+      if (iMc < 0 || iSim < 0) { prev.textContent = "⚠️ No encuentro las columnas «M. de Control» y «SIM» en la primera fila."; return; }
+      const delExcel = {}; let numericos = 0;
+      filas.slice(1).forEach(r => {
+        const mc = String(r[iMc] || "").trim().toUpperCase();
+        if (!mc) return;
+        if (typeof r[iSim] === "number") { numericos++; return; }   // un número largo pierde cifras en Excel: no se fía
+        const d = simDigitos(r[iSim]);
+        if (d.length >= 15) delExcel[mc] = d;
+      });
+      planExcel = []; const sinDato = [], rarosOp = [];
+      const opEsc = document.getElementById("sim-operador").value.trim();
+      mcs.forEach(mc => {
+        if (porMc[mc]) return;
+        const d = delExcel[mc];
+        if (!d) { sinDato.push(mc); return; }
+        const op = simOperador(d);
+        if (opEsc && op && op.toLowerCase() !== opEsc.toLowerCase()) rarosOp.push(`${mc} (${op})`);
+        planExcel.push({ mc, iccid: d, op });
+      });
+      const resumenOp = {}; planExcel.forEach(p => { const k = p.op || "operador sin identificar"; resumenOp[k] = (resumenOp[k] || 0) + 1; });
+      prev.innerHTML = `<p style="margin:6px 0;"><strong>${planExcel.length}</strong> equipos con SIM encontrada (${Object.entries(resumenOp).map(([k, v]) => v + " " + escS(k)).join(", ") || "—"}).` +
+        `${sinDato.length ? `<br>⚠️ Sin dato en el Excel: ${escS(sinDato.slice(0, 15).join(", "))}${sinDato.length > 15 ? "…" : ""}` : ""}` +
+        `${rarosOp.length ? `<br>⚠️ Operador distinto del que indicas arriba: ${escS(rarosOp.slice(0, 10).join(", "))}${rarosOp.length > 10 ? "…" : ""}` : ""}` +
+        `${numericos ? `<br>⚠️ ${numericos} SIM del Excel estaban guardadas como número (pierden cifras) y se ignoraron.` : ""}</p>` +
+        (planExcel.length ? `<button type="button" class="btn-primario" id="sim-excel-aplicar">✅ Registrar ${planExcel.length} SIM</button>` : "");
+      const ap = document.getElementById("sim-excel-aplicar");
+      if (ap) ap.addEventListener("click", async () => {
+        const devueltas = document.getElementById("sim-excel-devueltas").checked;
+        const ubic = document.getElementById("sim-ubicacion").value.trim() || null;
+        const usuario = await simUsuario(), ahora = new Date().toISOString();
+        const filasIns = planExcel.map(p => ({ iccid: p.iccid, operador: p.op || opEsc || null, mc_origen: p.mc, id_ot: idOt, cliente: cliente || null,
+          ubicacion: devueltas ? null : ubic, creada_por: usuario, nota: "Cargada desde Excel anterior a la OT",
+          ...(devueltas ? { estado: "Devuelta al mismo equipo", resuelta_por: usuario, resuelta_en: ahora } : {}) }));
+        ap.disabled = true; ap.textContent = "Guardando…";
+        for (let i = 0; i < filasIns.length; i += 100) {
+          const { error: ei } = await supabaseClient.from("sims_custodia").insert(filasIns.slice(i, i + 100));
+          if (ei) { msg(ei.code === "23505" ? "❌ Alguna SIM del Excel ya está guardada en otro equipo; revisa «SIMs guardadas». Se guardó hasta el lote anterior." : "❌ " + ei.message); await renderSimsOt(idOt, comps, ot); return; }
+        }
+        await renderSimsOt(idOt, comps, ot);
+      });
+    } catch (err) { prev.textContent = "❌ No pude leer el Excel: " + err.message; }
+  });
   document.getElementById("sim-pegar-btn").addEventListener("click", async () => {
     const operador = document.getElementById("sim-operador").value.trim() || null;
     const ubicacion = document.getElementById("sim-ubicacion").value.trim() || null;
