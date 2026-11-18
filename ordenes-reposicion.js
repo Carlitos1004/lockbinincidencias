@@ -1646,17 +1646,34 @@ document.getElementById("bat-pegar-prev").addEventListener("click", previsualiza
 function abrirMaterialesUsados() {
   const grupos = agruparPorMc(compsOtActual, otActual);
   const lineas = [];
-  compsOtActual.forEach(c => {
+  const listaDe = mc => (equiposCompletos[mc] && equiposCompletos[mc].lista) || "";
+  // Misma regla que la pantalla: una pieza por equipo y tipo (si hay dos del mismo tipo, la que no se desechó)
+  const mcsContados = new Set();
+  grupos.forEach(g => {
+    aplicarTipoBateria(g);
+    g.casillas.forEach(x => {
+      if (x.comp) {
+        const est = estadoCasilla(x.comp);
+        if (!cuentaComoReposicion(x.comp, est)) return;
+        mcsContados.add(g.mc);
+        lineas.push({ tipo: tipoCanonico(x.comp.tipo_componente || x.tipo), mc: g.mc, lista: listaDe(g.mc), retirado: x.comp.serial_retirado || "", nuevo: x.comp.repo_serial_nuevo || "",
+          cat: x.comp.repo_categoria || 0, estado: est, albaran: x.comp.repo_albaran || "", fecha: x.comp.repo_fecha_entrega || "" });
+      } else if (x.falt && x.falt.decision === "Se repone desde stock") {
+        mcsContados.add(g.mc);
+        lineas.push({ tipo: x.tipo, mc: g.mc, lista: listaDe(g.mc), retirado: "(no llegó)", nuevo: x.falt.serial_nuevo || "", cat: 0, estado: estadoFalt(x.falt) || "", albaran: x.falt.albaran || "", fecha: x.falt.fecha_entrega || "" });
+      }
+    });
+  });
+  // Baterías sin MC que están en alguna lista
+  let nSinMc = 0;
+  compsOtActual.filter(c => !c.m_control && tipoCanonico(c.tipo_componente) === "Batería" && c.repo_lista).forEach(c => {
     const est = estadoCasilla(c);
     if (!cuentaComoReposicion(c, est)) return;
-    lineas.push({ tipo: tipoCanonico(c.tipo_componente), mc: c.m_control || "Sin MC", retirado: c.serial_retirado || "", nuevo: c.repo_serial_nuevo || "",
+    nSinMc++;
+    lineas.push({ tipo: "Batería", mc: "Sin MC", lista: c.repo_lista, retirado: c.serial_retirado || "", nuevo: c.repo_serial_nuevo || "",
       cat: c.repo_categoria || 0, estado: est, albaran: c.repo_albaran || "", fecha: c.repo_fecha_entrega || "" });
   });
-  grupos.forEach(g => g.casillas.forEach(x => {
-    if (!x.comp && x.falt && x.falt.decision === "Se repone desde stock") {
-      lineas.push({ tipo: x.tipo, mc: g.mc, retirado: "(no llegó)", nuevo: x.falt.serial_nuevo || "", cat: 0, estado: estadoFalt(x.falt) || "", albaran: x.falt.albaran || "", fecha: x.falt.fecha_entrega || "" });
-    }
-  }));
+  const nSinLista = [...mcsContados].filter(mc => !listaDe(mc)).length;
   const tipos = [...TIPOS, ...[...new Set(lineas.map(l => l.tipo))].filter(t => !TIPOS.includes(t))].filter(t => lineas.some(l => l.tipo === t));
   const entregada = l => l.estado === "Entregado";
   const fila = t => {
@@ -1670,9 +1687,9 @@ function abrirMaterialesUsados() {
   lineas.filter(l => l.albaran).forEach(l => { const a = (albs[l.albaran] = albs[l.albaran] || {}); a[l.tipo] = (a[l.tipo] || 0) + 1; });
   const filasAlb = Object.keys(albs).sort().map(a => [a, ...tipos.map(t => albs[a][t] || 0), Object.values(albs[a]).reduce((x, y) => x + y, 0)]);
   const sinAlb = lineas.filter(l => entregada(l) && !l.albaran).length;
-  const cabDet = ["Material", "MC", "Retirado", "Nuevo", "Cat.", "Estado", "Albarán", "Fecha entrega"];
+  const cabDet = ["Material", "MC", "Lista", "Retirado", "Nuevo", "Cat.", "Estado", "Albarán", "Fecha entrega"];
   const det = lineas.slice().sort((a, b) => a.tipo.localeCompare(b.tipo) || a.mc.localeCompare(b.mc))
-    .map(l => [l.tipo, l.mc, l.retirado, l.nuevo, l.cat || "", l.estado, l.albaran, l.fecha]);
+    .map(l => [l.tipo, l.mc, l.lista, l.retirado, l.nuevo, l.cat || "", l.estado, l.albaran, l.fecha]);
   const tabla = (c, d, extra) => `<div class="scroll-x-tabla" style="max-height:none;"><table class="tabla-resumen-comp"><thead><tr>${c.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${d.map(r => `<tr class="${extra && r[0] === "TOTAL" ? "res-total" : ""}">${r.map(v => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   const plano = [cab, ...resumen, tot].map(r => r.join("\t")).join("\n") + "\n\n" + [cabDet, ...det].map(r => r.join("\t")).join("\n");
   cerrarModal("modal-materiales");
@@ -1680,7 +1697,7 @@ function abrirMaterialesUsados() {
   m.id = "modal-materiales"; m.className = "modal-resumen";
   m.innerHTML = `<div class="modal-resumen-caja">
     <div class="modal-resumen-cab"><h3>🔧 Materiales usados en la reposición</h3><button type="button" class="modal-x">✕</button></div>
-    <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla)</p>
+    <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla) · piezas de <strong>${mcsContados.size}</strong> equipos con MC${nSinMc ? ` y <strong>${nSinMc}</strong> baterías sin MC` : ""}${nSinLista ? ` · ⚠️ ${nSinLista} de esos equipos no están en ninguna lista` : ""}</p>
     ${lineas.length ? tabla(cab, [...resumen, tot], true) : "<p>Todavía no hay materiales a reponer en esta orden.</p>"}
     ${filasAlb.length ? `<h4>📄 Por albarán</h4>${tabla(["Albarán", ...tipos, "Total"], filasAlb)}` : ""}
     ${sinAlb ? `<p class="modal-nota">⚠️ ${sinAlb} piezas entregadas todavía sin albarán.</p>` : ""}
