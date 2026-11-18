@@ -154,6 +154,19 @@ function renderPendientesBateria(pendientes) {
     </tr>
   `).join("");
 
+  // Preselecciona el tipo si se conoce (exacto) o se deduce del lote (sugerido; hay que confirmar con Guardar)
+  clasificarBateriasAuto(supabaseClient, pendientes.map(s => s.serial)).then(({ exacto, sugerido }) => {
+    tbody.querySelectorAll("tr").forEach(tr => {
+      const serial = tr.children[0].textContent.trim().toUpperCase();
+      const st = exacto[serial] || sugerido[serial];
+      if (!st) return;
+      const sel = tr.querySelector(".input-subtipo-bateria");
+      if (!sel.value) sel.value = st;
+      if (!exacto[serial]) sel.title = "Sugerido por el lote: casi todas las baterías con este inicio son de este tipo. Confirma con Guardar.";
+      sel.insertAdjacentHTML("afterend", ` <small>${exacto[serial] ? "✓ según modelo en Equipos" : "💡 sugerido por lote"}</small>`);
+    });
+  });
+
   tbody.querySelectorAll(".btn-clasificar-bateria").forEach(btn => {
     btn.addEventListener("click", async () => {
       const fila = btn.closest("tr");
@@ -213,6 +226,20 @@ async function registrarLote(filas) {
     return;
   }
 
+  // Baterías: si el tipo ya se conoce (Equipos u otra OT), se clasifica sola
+  let autoBat = 0;
+  const pendBat = buenas.filter(b => b.tipo_componente.includes("(pendiente subtipo)"));
+  if (pendBat.length) {
+    const { exacto } = await clasificarBateriasAuto(supabaseClient, pendBat.map(b => b.serial));
+    pendBat.forEach(b => {
+      const st = exacto[b.serial];
+      if (!st) return;
+      const cat = b.tipo_componente.includes("1ra") ? "1ra categoría" : "2da categoría";
+      b.tipo_componente = `${st} - ${cat}`;
+      autoBat++;
+    });
+  }
+
   const { data: { user } } = await supabaseClient.auth.getUser();
   const conRegistrador = buenas.map(b => ({ ...b, registrado_por: user.email }));
 
@@ -228,7 +255,8 @@ async function registrarLote(filas) {
   const bateriasPendientes = buenas.filter(b => b.tipo_componente.includes("(pendiente subtipo)")).length;
   mostrarMensaje(msg,
     `✅ ${buenas.length} serial(es) registrado(s).` +
-    (bateriasPendientes > 0 ? ` ${bateriasPendientes} batería(s) quedaron pendientes de clasificar Recargable/No Recargable/PKCELL, más abajo.` : "") +
+    (autoBat > 0 ? ` 🔋 ${autoBat} batería(s) clasificadas solas según su modelo.` : "") +
+    (bateriasPendientes > 0 ? ` ${bateriasPendientes} batería(s) quedaron pendientes de clasificar Recargable/No Recargable/PKCELL, más abajo (con sugerencia por lote si la hay).` : "") +
     (errores.length > 0 ? `<br>⚠️ ${errores.length} línea(s) con error:<br>` + errores.join("<br>") : ""),
     false);
   cargarTabla();

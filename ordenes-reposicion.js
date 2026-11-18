@@ -1588,7 +1588,7 @@ function abrirDialogoAlbaran() {
 // =====================================================================
 // BATERÍAS: pegar la columna de seriales nuevos y asignarlos por orden
 // =====================================================================
-function previsualizarBaterias() {
+async function previsualizarBaterias() {
   const texto = document.getElementById("bat-pegar-texto").value;
   const seriales = texto.split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
   const out = document.getElementById("bat-pegar-resultado");
@@ -1600,14 +1600,24 @@ function previsualizarBaterias() {
   planPegarBat = [];
   const n = Math.min(seriales.length, pendientes.length);
   for (let i = 0; i < n; i++) planPegarBat.push({ comp: pendientes[i], serial: seriales[i] });
+  // Tipo de batería (recargable / no recargable / PKCELL): por modelo en Equipos, o sugerido por lote
+  out.innerHTML = "<p>Comprobando tipos de batería…</p>";
+  let tipos = { exacto: {}, sugerido: {} };
+  try { tipos = await clasificarBateriasAuto(supabaseClient, planPegarBat.map(p => p.serial)); } catch (e) { /* sin tipo: no bloquea */ }
+  const nombreTipo = s => (tipos.exacto[s] || tipos.sugerido[s] || "").replace("Batería ", "");
+  planPegarBat.forEach(p => { p.tipo = tipos.exacto[p.serial] || tipos.sugerido[p.serial] || ""; p.tipoSeguro = !!tipos.exacto[p.serial]; });
+  const resumenTipos = {};
+  planPegarBat.forEach(p => { const k = p.tipo ? p.tipo.replace("Batería ", "") + (p.tipoSeguro ? "" : " (sugerido)") : "Sin tipo"; resumenTipos[k] = (resumenTipos[k] || 0) + 1; });
+  const mezcla = Object.keys(resumenTipos).length > 1;
   const avisos = [];
   if (dup.size) avisos.push(`⚠️ Repetidos en lo pegado: ${[...dup].slice(0, 8).join(", ")}${dup.size > 8 ? "…" : ""}`);
   if (yaUsados.length) avisos.push(`⚠️ Ya asignados en esta orden: ${yaUsados.slice(0, 8).join(", ")}${yaUsados.length > 8 ? "…" : ""}`);
   if (seriales.length > pendientes.length) avisos.push(`⚠️ Hay ${seriales.length} seriales y solo ${pendientes.length} baterías pendientes en pantalla: sobran ${seriales.length - pendientes.length} (no se usarán).`);
   if (seriales.length < pendientes.length) avisos.push(`ℹ️ Quedarán ${pendientes.length - seriales.length} baterías sin serial.`);
-  const filas = planPegarBat.slice(0, 200).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.comp.m_control || "Sin MC")}</td><td>${esc(p.comp.serial_retirado || "—")}</td><td><strong>${esc(p.serial)}</strong></td></tr>`).join("");
+  const filas = planPegarBat.slice(0, 200).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.comp.m_control || "Sin MC")}</td><td>${esc(p.comp.serial_retirado || "—")}</td><td><strong>${esc(p.serial)}</strong></td><td>${p.tipo ? esc(nombreTipo(p.serial)) + (p.tipoSeguro ? "" : " 💡") : "—"}</td></tr>`).join("");
+  if (planPegarBat.length) avisos.push((mezcla ? "⚠️ Hay tipos mezclados. " : "") + "ℹ️ Tipos detectados: " + Object.entries(resumenTipos).map(([k, v]) => `${v} ${k}`).join(" · "));
   out.innerHTML = `${avisos.map(a => `<p class="modal-nota">${a}</p>`).join("")}
-    ${planPegarBat.length ? `<div class="scroll-x-tabla" style="max-height:260px;"><table><thead><tr><th>#</th><th>MC</th><th>Batería retirada</th><th>Serial nuevo</th></tr></thead><tbody>${filas}</tbody></table></div>
+    ${planPegarBat.length ? `<div class="scroll-x-tabla" style="max-height:260px;"><table><thead><tr><th>#</th><th>MC</th><th>Batería retirada</th><th>Serial nuevo</th><th>Tipo</th></tr></thead><tbody>${filas}</tbody></table></div>
       ${planPegarBat.length > 200 ? `<p class="modal-nota">Se muestran las 200 primeras de ${planPegarBat.length}.</p>` : ""}
       <p><button type="button" id="bat-pegar-aplicar">✅ Asignar ${planPegarBat.length} seriales</button></p>` : "<p>No hay nada que asignar.</p>"}`;
   const ap = document.getElementById("bat-pegar-aplicar");
