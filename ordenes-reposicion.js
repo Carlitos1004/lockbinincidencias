@@ -1653,7 +1653,7 @@ document.getElementById("bat-pegar-prev").addEventListener("click", previsualiza
 // =====================================================================
 // MATERIALES USADOS: resumen de lo que se ha repuesto en la orden
 // =====================================================================
-function abrirMaterialesUsados() {
+async function abrirMaterialesUsados() {
   const grupos = agruparPorMc(compsOtActual, otActual);
   const lineas = [];
   const listaDe = mc => (equiposCompletos[mc] && equiposCompletos[mc].lista) || "";
@@ -1689,22 +1689,36 @@ function abrirMaterialesUsados() {
     lineas.push({ tipo: "Batería", mc: "Sin MC", lista: c.repo_lista, retirado: c.serial_retirado || "", nuevo: c.repo_serial_nuevo || "",
       cat: c.repo_categoria || 0, estado: est, albaran: c.repo_albaran || "", fecha: c.repo_fecha_entrega || "" });
   });
-  const tipos = [...TIPOS, ...[...new Set(lineas.map(l => l.tipo))].filter(t => !TIPOS.includes(t))].filter(t => lineas.some(l => l.tipo === t));
+  // Las baterías se separan por tipo (recargable / no recargable / PKCELL), deducido del serial entregado
+  let tiposBat = { exacto: {}, sugerido: {} };
+  const serialesBat = lineas.filter(l => l.tipo === "Batería" && l.nuevo).map(l => String(l.nuevo).trim().toUpperCase());
+  if (serialesBat.length) { try { tiposBat = await clasificarBateriasAuto(supabaseClient, serialesBat); } catch (e) { /* sin tipo */ } }
+  let nSugeridas = 0;
+  lineas.forEach(l => {
+    l.clave = l.tipo;
+    if (l.tipo !== "Batería") return;
+    const s = String(l.nuevo || "").trim().toUpperCase();
+    const st = s && (tiposBat.exacto[s] || tiposBat.sugerido[s]);
+    if (st && !tiposBat.exacto[s]) nSugeridas++;
+    l.clave = "Batería · " + (st ? st.replace("Batería ", "") + (tiposBat.exacto[s] ? "" : " 💡") : (s ? "Sin tipo" : "Sin serial aún"));
+  });
+  const ordenClave = c => { const i = TIPOS.indexOf(c.split(" · ")[0]); return (i < 0 ? 99 : i) + c; };
+  const tipos = [...new Set(lineas.map(l => l.clave))].sort((a, b) => ordenClave(a).localeCompare(ordenClave(b)));
   const entregada = l => l.estado === "Entregado";
   const fila = t => {
-    const L = lineas.filter(l => l.tipo === t);
+    const L = lineas.filter(l => l.clave === t);
     return [t, L.length, L.filter(entregada).length, L.length - L.filter(entregada).length, L.filter(l => l.cat === 1).length, L.filter(l => l.cat === 2).length, L.filter(l => !l.cat).length];
   };
   const resumen = tipos.map(fila);
   const tot = resumen.reduce((a, f) => a.map((v, i) => i ? v + f[i] : "TOTAL"), ["TOTAL", 0, 0, 0, 0, 0, 0]);
   const cab = ["Material", "Piezas", "Entregadas", "Pendientes", "1ª cat.", "2ª cat.", "Sin cat."];
   const albs = {};
-  lineas.filter(l => l.albaran).forEach(l => { const a = (albs[l.albaran] = albs[l.albaran] || {}); a[l.tipo] = (a[l.tipo] || 0) + 1; });
+  lineas.filter(l => l.albaran).forEach(l => { const a = (albs[l.albaran] = albs[l.albaran] || {}); a[l.clave] = (a[l.clave] || 0) + 1; });
   const filasAlb = Object.keys(albs).sort().map(a => [a, ...tipos.map(t => albs[a][t] || 0), Object.values(albs[a]).reduce((x, y) => x + y, 0)]);
   const sinAlb = lineas.filter(l => entregada(l) && !l.albaran).length;
   const cabDet = ["Material", "MC", "Lista", "Retirado", "Nuevo", "Cat.", "Estado", "Albarán", "Fecha entrega"];
-  const det = lineas.slice().sort((a, b) => a.tipo.localeCompare(b.tipo) || a.mc.localeCompare(b.mc))
-    .map(l => [l.tipo, l.mc, l.lista, l.retirado, l.nuevo, l.cat || "", l.estado, l.albaran, l.fecha]);
+  const det = lineas.slice().sort((a, b) => a.clave.localeCompare(b.clave) || a.mc.localeCompare(b.mc))
+    .map(l => [l.clave, l.mc, l.lista, l.retirado, l.nuevo, l.cat || "", l.estado, l.albaran, l.fecha]);
   const tabla = (c, d, extra) => `<div class="scroll-x-tabla" style="max-height:none;"><table class="tabla-resumen-comp"><thead><tr>${c.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${d.map(r => `<tr class="${extra && r[0] === "TOTAL" ? "res-total" : ""}">${r.map(v => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   const plano = [cab, ...resumen, tot].map(r => r.join("\t")).join("\n") + "\n\n" + [cabDet, ...det].map(r => r.join("\t")).join("\n");
   cerrarModal("modal-materiales");
@@ -1715,6 +1729,7 @@ function abrirMaterialesUsados() {
     <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla) · piezas repuestas en <strong>${mcsContados.size}</strong> equipos con MC${nSinMc ? ` y <strong>${nSinMc}</strong> baterías sin MC` : ""}</p>
     ${lineas.length ? tabla(cab, [...resumen, tot], true) : "<p>Todavía no hay materiales a reponer en esta orden.</p>"}
     ${filasAlb.length ? `<h4>📄 Por albarán</h4>${tabla(["Albarán", ...tipos, "Total"], filasAlb)}` : ""}
+    ${nSugeridas ? `<p class="modal-nota">💡 ${nSugeridas} baterías con tipo sugerido por lote (aún no verificado con un equipo instalado).</p>` : ""}
     ${sinAlb ? `<p class="modal-nota">⚠️ ${sinAlb} piezas entregadas todavía sin albarán.</p>` : ""}
     ${lineas.length ? `<details><summary>Ver detalle pieza a pieza (${det.length})</summary>${tabla(cabDet, det)}</details>` : ""}
     <div class="modal-acciones"><button type="button" class="modal-copiar">📋 Copiar (resumen + detalle)</button> <button type="button" class="modal-cerrar btn-sec">Cerrar</button></div></div>`;
