@@ -101,6 +101,7 @@ async function buscar() {
   contenedor.innerHTML = "";
   document.getElementById("lista-todos").hidden = true;
   msg.hidden = true;
+  if (window.montarPanelPlataforma) montarPanelPlataforma(document.getElementById("panel-plataforma"), supabaseClient, [termino.startsWith("MC") ? { mc: termino } : { imei: termino }]);
 
   // Si buscan por MC, primero resolvemos su IMEI actual (si lo tiene) para
   // poder traer TODA su vida, no solo los eventos con ese MC puntual.

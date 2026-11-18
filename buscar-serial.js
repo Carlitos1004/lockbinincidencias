@@ -52,6 +52,7 @@ async function buscar() {
 
   // Se admiten varios MC/seriales separados por coma (ej. los MC que ha tenido un mismo IMEI)
   const terminos = [...new Set(termino.split(/[\s,;]+/).map(t => t.trim()).filter(Boolean))].slice(0, 10);
+  if (window.montarPanelPlataforma) montarPanelPlataforma(document.getElementById("panel-plataforma"), supabaseClient, terminos.filter(t => /^MC\d{4,12}$/i.test(t)).slice(0, 3).map(t => ({ mc: t.toUpperCase() })));
 
   try {
     // 1. Tickets donde el MC coincide directo
