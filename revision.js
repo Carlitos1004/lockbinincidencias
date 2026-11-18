@@ -589,6 +589,13 @@ async function guardarFila(btn) {
     }
   }
 
+  // 3b. Si antes estaba para AMMI y se corrigió a otro destino, se retira su fila de garantías,
+  //     salvo que AMMI ya tenga movimiento con esa pieza (albarán, envío, regreso...), que no se toca.
+  if (destino !== DESTINO_AMMI) {
+    const conSeguimiento = ["ammi_albaran", "ammi_codigo_envio", "ammi_accion", "ammi_fecha_regreso", "ammi_origen_excel"].some(k => componente[k]);
+    if (!conSeguimiento) await supabaseClient.from("garantias").delete().eq("componente_id", componenteId);
+  }
+
   // 4. Reflejamos el resultado de la revisión en el ticket de historial_fallas
   //    correspondiente (antes esto no se estaba guardando ahí, solo en
   //    componentes_retirados).
@@ -687,6 +694,26 @@ async function guardarFila(btn) {
         }
       }
       // si ya existía uno del mismo tipo para esta misma OT, no se toca
+    } else {
+      // El destino ya no es Stock ni AMMI (se corrigió, p. ej. a "Sigue en revisión"). Si antes Revisión anotó "Enviado a AMMI"
+      // en esta OT, ese evento era falso, pero el equipo SÍ salió de la calle (se desvinculó), así que pasa a ser una
+      // Desvinculación. Un evento "Desvinculación" automático no se toca.
+      const mcs = [...new Set([mcEditado, componente.m_control].filter(Boolean))];
+      const { data: autos } = await supabaseClient
+        .from("historial_equipo")
+        .select("id, imei")
+        .in("mc", mcs)
+        .eq("id_ot", componente.id_ot)
+        .eq("tipo_evento", "Enviado a AMMI")
+        .eq("notas", "Módulo de Control enviado a AMMI");
+      for (const ev of (autos || [])) {
+        const { error: errUpd } = await supabaseClient.from("historial_equipo")
+          .update({ tipo_evento: "Desvinculación", notas: "Desvinculado; el Módulo de Control sigue en revisión (se corrigió el destino)" })
+          .eq("id", ev.id);
+        if (errUpd) { console.warn("No se pudo corregir el evento de Vida:", errUpd.message); continue; }
+        if (ev.imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: ev.imei });
+        avisoPlataforma = " · evento de Vida corregido a Desvinculación";
+      }
     }
   }
 
