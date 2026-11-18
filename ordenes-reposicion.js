@@ -496,7 +496,18 @@ let ctxResumen = { nombre: "", equipos: [], sinMc: [] };
 // Una pieza cuenta como "a reponer / repuesta" salvo que esté bien, rechazada o reparada
 function cuentaComoReposicion(c, est) {
   if (["Listo (sin cambios)", "Sin reposición (acordado)", "Presupuesto rechazado", "Reparado recibido"].includes(est)) return false;
-  if (est === "Entregado") return !!c.repo_serial_nuevo || !!c.repo_estado;
+  if (est === "Entregado") {
+    // Entregado cuenta como material solo si se cambió la pieza: lleva serial nuevo, o su destino implicaba cambio.
+    // Una pieza OK que se devuelve tal cual también acaba "Entregado" (se marcan las 4 piezas), pero no es material usado.
+    if (c.repo_serial_nuevo) return true;
+    const auto = estadoAutomatico(c);
+    if (auto === "Listo (sin cambios)" || auto === "Entregado") {
+      // Excepción: batería de un equipo de lista "solo batería" o con batería OK reutilizada: se entrega una nueva igualmente
+      const eq = c.m_control && equiposCompletos[c.m_control];
+      return !!(eq && tipoCanonico(c.tipo_componente) === "Batería" && (eq.tipo_reposicion === "Batería" || eq.bateria_ok));
+    }
+    return true;
+  }
   return true;
 }
 
