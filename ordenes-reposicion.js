@@ -1687,7 +1687,7 @@ function abrirMaterialesUsados() {
   };
   const resumen = tipos.map(fila);
   const tot = resumen.reduce((a, f) => a.map((v, i) => i ? v + f[i] : "TOTAL"), ["TOTAL", 0, 0, 0, 0, 0, 0]);
-  const cab = ["Material", "Total", "Entregados", "Pendientes", "1ª cat.", "2ª cat.", "Sin cat."];
+  const cab = ["Material", "Piezas", "Entregadas", "Pendientes", "1ª cat.", "2ª cat.", "Sin cat."];
   const albs = {};
   lineas.filter(l => l.albaran).forEach(l => { const a = (albs[l.albaran] = albs[l.albaran] || {}); a[l.tipo] = (a[l.tipo] || 0) + 1; });
   const filasAlb = Object.keys(albs).sort().map(a => [a, ...tipos.map(t => albs[a][t] || 0), Object.values(albs[a]).reduce((x, y) => x + y, 0)]);
@@ -1702,7 +1702,7 @@ function abrirMaterialesUsados() {
   m.id = "modal-materiales"; m.className = "modal-resumen";
   m.innerHTML = `<div class="modal-resumen-caja">
     <div class="modal-resumen-cab"><h3>🔧 Materiales usados en la reposición</h3><button type="button" class="modal-x">✕</button></div>
-    <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla) · piezas de <strong>${mcsContados.size}</strong> equipos con MC${nSinMc ? ` y <strong>${nSinMc}</strong> baterías sin MC` : ""}</p>
+    <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla) · piezas repuestas en <strong>${mcsContados.size}</strong> equipos con MC${nSinMc ? ` y <strong>${nSinMc}</strong> baterías sin MC` : ""}</p>
     ${lineas.length ? tabla(cab, [...resumen, tot], true) : "<p>Todavía no hay materiales a reponer en esta orden.</p>"}
     ${filasAlb.length ? `<h4>📄 Por albarán</h4>${tabla(["Albarán", ...tipos, "Total"], filasAlb)}` : ""}
     ${sinAlb ? `<p class="modal-nota">⚠️ ${sinAlb} piezas entregadas todavía sin albarán.</p>` : ""}
