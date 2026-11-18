@@ -67,7 +67,7 @@ function codigoOrden(numero) { return "REP-" + String(numero).padStart(3, "0"); 
 
 const CAMPOS = "id, m_control, tipo_componente, serial_retirado, id_ot, cliente, estado, destino, " +
   "vandalismo, garantia_cliente, devuelto, devuelto_en, repo_estado, repo_serial_nuevo, " +
-  "repo_fecha_entrega, orden_reposicion_ot, repo_nota, cliente_original, repo_lista, repo_categoria, repo_albaran";
+  "repo_fecha_entrega, orden_reposicion_ot, repo_nota, cliente_original, repo_lista, repo_categoria, repo_albaran, repo_bateria_tipo";
 
 // Un "MC" que no tiene forma de MC (p. ej. "NO ENCONTRADO", "desconocido") significa que la pieza no tiene equipo identificado
 const esMcValido = v => /^MC\d+$/i.test(String(v || "").trim());
@@ -1603,9 +1603,10 @@ async function previsualizarBaterias() {
   // Tipo de batería (recargable / no recargable / PKCELL): por modelo en Equipos, o sugerido por lote
   out.innerHTML = "<p>Comprobando tipos de batería…</p>";
   let tipos = { exacto: {}, sugerido: {} };
-  try { tipos = await clasificarBateriasAuto(supabaseClient, planPegarBat.map(p => p.serial)); } catch (e) { /* sin tipo: no bloquea */ }
-  const nombreTipo = s => (tipos.exacto[s] || tipos.sugerido[s] || "").replace("Batería ", "");
-  planPegarBat.forEach(p => { p.tipo = tipos.exacto[p.serial] || tipos.sugerido[p.serial] || ""; p.tipoSeguro = !!tipos.exacto[p.serial]; });
+  try { tipos = await clasificarBateriasAuto(supabaseClient, planPegarBat.map(p => p.serial)); tipos.sugerido = {}; } catch (e) { /* sin tipo: no bloquea */ }
+  const tipoElegidoPrev = document.getElementById("bat-pegar-tipo").value;
+  const nombreTipo = s => tipoElegidoPrev || (tipos.exacto[s] || tipos.sugerido[s] || "").replace("Batería ", "");
+  planPegarBat.forEach(p => { p.tipo = tipoElegidoPrev ? "Batería " + tipoElegidoPrev : (tipos.exacto[p.serial] || ""); p.tipoSeguro = !!p.tipo; });
   const resumenTipos = {};
   planPegarBat.forEach(p => { const k = p.tipo ? p.tipo.replace("Batería ", "") + (p.tipoSeguro ? "" : " (sugerido)") : "Sin tipo"; resumenTipos[k] = (resumenTipos[k] || 0) + 1; });
   const mezcla = Object.keys(resumenTipos).length > 1;
@@ -1614,7 +1615,7 @@ async function previsualizarBaterias() {
   if (yaUsados.length) avisos.push(`⚠️ Ya asignados en esta orden: ${yaUsados.slice(0, 8).join(", ")}${yaUsados.length > 8 ? "…" : ""}`);
   if (seriales.length > pendientes.length) avisos.push(`⚠️ Hay ${seriales.length} seriales y solo ${pendientes.length} baterías pendientes en pantalla: sobran ${seriales.length - pendientes.length} (no se usarán).`);
   if (seriales.length < pendientes.length) avisos.push(`ℹ️ Quedarán ${pendientes.length - seriales.length} baterías sin serial.`);
-  const filas = planPegarBat.slice(0, 200).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.comp.m_control || "Sin MC")}</td><td>${esc(p.comp.serial_retirado || "—")}</td><td><strong>${esc(p.serial)}</strong></td><td>${p.tipo ? esc(nombreTipo(p.serial)) + (p.tipoSeguro ? "" : " 💡") : "—"}</td></tr>`).join("");
+  const filas = planPegarBat.slice(0, 200).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.comp.m_control || "Sin MC")}</td><td>${esc(p.comp.serial_retirado || "—")}</td><td><strong>${esc(p.serial)}</strong></td><td>${p.tipo ? esc(nombreTipo(p.serial)) : "—"}</td></tr>`).join("");
   if (planPegarBat.length) avisos.push((mezcla ? "⚠️ Hay tipos mezclados. " : "") + "ℹ️ Tipos detectados: " + Object.entries(resumenTipos).map(([k, v]) => `${v} ${k}`).join(" · "));
   out.innerHTML = `${avisos.map(a => `<p class="modal-nota">${a}</p>`).join("")}
     ${planPegarBat.length ? `<div class="scroll-x-tabla" style="max-height:260px;"><table><thead><tr><th>#</th><th>MC</th><th>Batería retirada</th><th>Serial nuevo</th><th>Tipo</th></tr></thead><tbody>${filas}</tbody></table></div>
@@ -1625,6 +1626,7 @@ async function previsualizarBaterias() {
 }
 async function aplicarBaterias() {
   const cat = document.getElementById("bat-pegar-cat").value;
+  const tipoElegido = document.getElementById("bat-pegar-tipo").value;
   const ok = document.getElementById("bat-pegar-ok").checked;
   if (!planPegarBat.length) return;
   if (!confirm(`¿Asignar ${planPegarBat.length} seriales de batería${ok ? " y darles OK (listas para entregar)" : ""}?`)) return;
@@ -1632,6 +1634,8 @@ async function aplicarBaterias() {
   const tareas = planPegarBat.map(p => () => {
     const cambios = { repo_serial_nuevo: p.serial };
     if (cat) cambios.repo_categoria = Number(cat);
+    const tipoFinal = tipoElegido || (p.tipoSeguro && p.tipo ? p.tipo.replace("Batería ", "") : "");
+    if (tipoFinal) cambios.repo_bateria_tipo = tipoFinal;
     if (ok) cambios.repo_estado = "Listo para entregar";
     return supabaseClient.from("componentes_retirados").update(cambios).eq("id", p.comp.id);
   });
@@ -1673,7 +1677,7 @@ async function abrirMaterialesUsados() {
         if (!cuentaComoReposicion(x.comp, est)) return;
         mcsContados.add(g.mc);
         lineas.push({ tipo: tipoCanonico(x.comp.tipo_componente || x.tipo), mc: g.mc, lista: listaDe(g.mc), retirado: x.comp.serial_retirado || "", nuevo: x.comp.repo_serial_nuevo || "",
-          cat: x.comp.repo_categoria || 0, estado: est, albaran: x.comp.repo_albaran || "", fecha: x.comp.repo_fecha_entrega || "" });
+          cat: x.comp.repo_categoria || 0, estado: est, albaran: x.comp.repo_albaran || "", fecha: x.comp.repo_fecha_entrega || "", id: x.comp.id, bt: x.comp.repo_bateria_tipo || "" });
       } else if (x.falt && x.falt.decision === "Se repone desde stock") {
         mcsContados.add(g.mc);
         lineas.push({ tipo: x.tipo, mc: g.mc, lista: listaDe(g.mc), retirado: "(no llegó)", nuevo: x.falt.serial_nuevo || "", cat: 0, estado: estadoFalt(x.falt) || "", albaran: x.falt.albaran || "", fecha: x.falt.fecha_entrega || "" });
@@ -1687,20 +1691,19 @@ async function abrirMaterialesUsados() {
     if (!cuentaComoReposicion(c, est)) return;
     nSinMc++;
     lineas.push({ tipo: "Batería", mc: "Sin MC", lista: c.repo_lista, retirado: c.serial_retirado || "", nuevo: c.repo_serial_nuevo || "",
-      cat: c.repo_categoria || 0, estado: est, albaran: c.repo_albaran || "", fecha: c.repo_fecha_entrega || "" });
+      cat: c.repo_categoria || 0, estado: est, albaran: c.repo_albaran || "", fecha: c.repo_fecha_entrega || "", id: c.id, bt: c.repo_bateria_tipo || "" });
   });
   // Las baterías se separan por tipo (recargable / no recargable / PKCELL), deducido del serial entregado
   let tiposBat = { exacto: {}, sugerido: {} };
   const serialesBat = lineas.filter(l => l.tipo === "Batería" && l.nuevo).map(l => String(l.nuevo).trim().toUpperCase());
   if (serialesBat.length) { try { tiposBat = await clasificarBateriasAuto(supabaseClient, serialesBat); } catch (e) { /* sin tipo */ } }
-  let nSugeridas = 0;
   lineas.forEach(l => {
     l.clave = l.tipo;
     if (l.tipo !== "Batería") return;
     const s = String(l.nuevo || "").trim().toUpperCase();
-    const st = s && (tiposBat.exacto[s] || tiposBat.sugerido[s]);
-    if (st && !tiposBat.exacto[s]) nSugeridas++;
-    l.clave = "Batería · " + (st ? st.replace("Batería ", "") + (tiposBat.exacto[s] ? "" : " 💡") : (s ? "Sin tipo" : "Sin serial aún"));
+    // Prioridad: tipo guardado en la reposición > modelo en Equipos (por serial)
+    const st = l.bt ? "Batería " + l.bt : (s && tiposBat.exacto[s]);
+    l.clave = "Batería · " + (st ? st.replace("Batería ", "") : (s ? "Sin tipo" : "Sin serial aún"));
   });
   const ordenClave = c => { const i = TIPOS.indexOf(c.split(" · ")[0]); return (i < 0 ? 99 : i) + c; };
   const tipos = [...new Set(lineas.map(l => l.clave))].sort((a, b) => ordenClave(a).localeCompare(ordenClave(b)));
@@ -1729,12 +1732,26 @@ async function abrirMaterialesUsados() {
     <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla) · piezas repuestas en <strong>${mcsContados.size}</strong> equipos con MC${nSinMc ? ` y <strong>${nSinMc}</strong> baterías sin MC` : ""}</p>
     ${lineas.length ? tabla(cab, [...resumen, tot], true) : "<p>Todavía no hay materiales a reponer en esta orden.</p>"}
     ${filasAlb.length ? `<h4>📄 Por albarán</h4>${tabla(["Albarán", ...tipos, "Total"], filasAlb)}` : ""}
-    ${nSugeridas ? `<p class="modal-nota">💡 ${nSugeridas} baterías con tipo sugerido por lote (aún no verificado con un equipo instalado).</p>` : ""}
+    ${lineas.some(l => l.clave === "Batería · Sin tipo" && l.id) ? `<div class="modal-nota" id="mat-asignar-tipo">🔋 ${lineas.filter(l => l.clave === "Batería · Sin tipo" && l.id).length} baterías sin tipo. Asignar a todas: <select id="mat-tipo-sel"><option value="">— elige —</option><option>No Recargable</option><option>Recargable</option><option>PKCELL</option></select> <button type="button" class="btn-prim" id="mat-tipo-btn">Aplicar</button></div>` : ""}
     ${sinAlb ? `<p class="modal-nota">⚠️ ${sinAlb} piezas entregadas todavía sin albarán.</p>` : ""}
     ${lineas.length ? `<details><summary>Ver detalle pieza a pieza (${det.length})</summary>${tabla(cabDet, det)}</details>` : ""}
     <div class="modal-acciones"><button type="button" class="modal-copiar">📋 Copiar (resumen + detalle)</button> <button type="button" class="modal-cerrar btn-sec">Cerrar</button></div></div>`;
   document.body.appendChild(m);
   m.addEventListener("click", e => { if (e.target === m || e.target.closest(".modal-x, .modal-cerrar")) m.remove(); });
+  const btnTipo = m.querySelector("#mat-tipo-btn");
+  if (btnTipo) btnTipo.addEventListener("click", async () => {
+    const tipo = m.querySelector("#mat-tipo-sel").value;
+    if (!tipo) { alert("Elige el tipo de batería."); return; }
+    const ids = lineas.filter(l => l.clave === "Batería · Sin tipo" && l.id).map(l => l.id);
+    if (!confirm(`¿Marcar ${ids.length} baterías como ${tipo}?`)) return;
+    btnTipo.disabled = true; btnTipo.textContent = "Guardando…";
+    for (let i = 0; i < ids.length; i += 60) {
+      const { error } = await supabaseClient.from("componentes_retirados").update({ repo_bateria_tipo: tipo }).in("id", ids.slice(i, i + 60));
+      if (error) { alert("No se pudo guardar: " + error.message + " (¿corriste el SQL 106?)"); btnTipo.disabled = false; btnTipo.textContent = "Aplicar"; return; }
+    }
+    await recargarOt();
+    abrirMaterialesUsados();
+  });
   m.querySelector(".modal-copiar").addEventListener("click", async e => {
     try { await navigator.clipboard.writeText(plano); e.target.textContent = "✅ Copiado"; } catch { e.target.textContent = "No se pudo copiar"; }
   });

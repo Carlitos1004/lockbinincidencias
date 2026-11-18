@@ -58,8 +58,18 @@
     <div id="pendientes-bateria-box" hidden style="margin-top:28px;">
       <h2>🔋 Baterías pendientes de clasificar</h2>
       <p style="font-size:0.85rem; color:var(--gris-700); margin-top:-8px;">El serial no dice el tipo de batería (Recargable, No Recargable o PKCELL) — elige para cada una.</p>
+      <div id="bat-masivo" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;padding:8px 12px;background:#f3f7f4;border:1.5px solid #cfe0d2;border-radius:12px;">
+        <span><strong id="bat-sel-n">0</strong> seleccionadas</span>
+        <select id="bat-masivo-tipo">
+          <option value="">— Tipo para las seleccionadas —</option>
+          <option value="Batería Recargable">Recargable</option>
+          <option value="Batería No Recargable">No Recargable</option>
+          <option value="Batería PKCELL">PKCELL</option>
+        </select>
+        <button type="button" class="btn-primario" id="bat-masivo-btn" disabled>Aplicar a las seleccionadas</button>
+      </div>
       <table class="tabla-revision">
-        <thead><tr><th>Serial</th><th>Categoría</th><th>Subtipo</th><th></th></tr></thead>
+        <thead><tr><th><input type="checkbox" id="bat-sel-todas" title="Seleccionar todas"></th><th>Serial</th><th>Categoría</th><th>Subtipo</th><th></th></tr></thead>
         <tbody id="pendientes-bateria-tbody"></tbody>
       </table>
     </div>

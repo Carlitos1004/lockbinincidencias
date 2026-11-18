@@ -64,7 +64,7 @@ const subtipoDeModelo = m => {
 };
 const subtipoDeTipo = t => { const m = String(t || "").match(/^(Batería (?:Recargable|No Recargable|PKCELL))/); return m ? m[1] : null; };
 
-async function clasificarBateriasAuto(sb, seriales) {
+async function clasificarBateriasAuto(sb, seriales, usarLote = false) {
   const lista = [...new Set(seriales.map(s => String(s).trim().toUpperCase()).filter(Boolean))];
   const exacto = {}, sugerido = {};
   if (!lista.length) return { exacto, sugerido };
@@ -77,7 +77,7 @@ async function clasificarBateriasAuto(sb, seriales) {
   }
   // Sugerencia por lote para los que siguen sin tipo
   const pendientes = lista.filter(s => !exacto[s]);
-  const lotes = [...new Set(pendientes.map(s => s.slice(0, 6)))];
+  const lotes = usarLote ? [...new Set(pendientes.map(s => s.slice(0, 6)))] : [];   // la deducción por lote se probó y no es fiable: desactivada
   for (const lote of lotes) {
     const cuenta = {};
     const { data: eq } = await sb.from("equipos").select("modelo_bateria").ilike("serie_bateria", lote + "%").limit(400);

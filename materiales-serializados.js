@@ -140,6 +140,7 @@ function renderPendientesBateria(pendientes) {
   box.hidden = false;
   tbody.innerHTML = pendientes.map(s => `
     <tr data-id="${s.id}">
+      <td><input type="checkbox" class="chk-bat-sel"></td>
       <td class="celda-mono">${s.serial}</td>
       <td>${s.tipo_componente.includes("1ra") ? "1ra categoría" : "2da categoría"}</td>
       <td>
@@ -154,10 +155,43 @@ function renderPendientesBateria(pendientes) {
     </tr>
   `).join("");
 
+  // Selección múltiple + tipo en bloque
+  const chks = () => [...tbody.querySelectorAll(".chk-bat-sel")];
+  const refrescarSel = () => {
+    const n = chks().filter(c => c.checked).length;
+    document.getElementById("bat-sel-n").textContent = n;
+    document.getElementById("bat-masivo-btn").disabled = !n;
+    document.getElementById("bat-sel-todas").checked = n > 0 && n === chks().length;
+  };
+  chks().forEach(c => c.addEventListener("change", refrescarSel));
+  document.getElementById("bat-sel-todas").onchange = e => { chks().forEach(c => { c.checked = e.target.checked; }); refrescarSel(); };
+  refrescarSel();
+  document.getElementById("bat-masivo-btn").onclick = async () => {
+    const subtipo = document.getElementById("bat-masivo-tipo").value;
+    const marcadas = chks().filter(c => c.checked).map(c => c.closest("tr"));
+    if (!subtipo) { alert("Elige primero el tipo (Recargable, No Recargable o PKCELL)."); return; }
+    if (!marcadas.length) return;
+    if (!confirm(`¿Marcar ${marcadas.length} baterías como ${subtipo.replace("Batería ", "")}?`)) return;
+    const btnM = document.getElementById("bat-masivo-btn");
+    btnM.disabled = true; btnM.textContent = "Guardando…";
+    const tareas = marcadas.map(tr => () => supabaseClient.from("materiales_serializados")
+      .update({ tipo_componente: `${subtipo} - ${tr.children[2].textContent.trim()}` }).eq("id", tr.dataset.id));
+    let fallos = 0, primero = "";
+    for (let i = 0; i < tareas.length; i += 10) {
+      const res = await Promise.all(tareas.slice(i, i + 10).map(t => t()));
+      res.forEach(r => { if (r.error) { fallos++; primero = primero || r.error.message; } });
+      btnM.textContent = `Guardando… ${Math.min(i + 10, tareas.length)}/${tareas.length}`;
+    }
+    btnM.textContent = "Aplicar a las seleccionadas";
+    if (fallos) alert(`${fallos} no se pudieron guardar: ${primero}`);
+    cargarTabla();
+    sincronizarLlevados(otActual);
+  };
+
   // Preselecciona el tipo si se conoce (exacto) o se deduce del lote (sugerido; hay que confirmar con Guardar)
   clasificarBateriasAuto(supabaseClient, pendientes.map(s => s.serial)).then(({ exacto, sugerido }) => {
     tbody.querySelectorAll("tr").forEach(tr => {
-      const serial = tr.children[0].textContent.trim().toUpperCase();
+      const serial = tr.children[1].textContent.trim().toUpperCase();
       const st = exacto[serial] || sugerido[serial];
       if (!st) return;
       const sel = tr.querySelector(".input-subtipo-bateria");
@@ -173,7 +207,7 @@ function renderPendientesBateria(pendientes) {
       const subtipo = fila.querySelector(".input-subtipo-bateria").value;
       if (!subtipo) { alert("Elige Recargable, No Recargable o PKCELL."); return; }
 
-      const categoriaTexto = fila.children[1].textContent.trim();
+      const categoriaTexto = fila.children[2].textContent.trim();
       const nuevoTipo = `${subtipo} - ${categoriaTexto}`;
 
       btn.disabled = true;
