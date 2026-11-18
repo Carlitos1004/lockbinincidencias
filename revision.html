@@ -15,6 +15,16 @@
   .panel-body-ancho { max-width: 98vw; }
   /* La tabla scrollea dentro de su propia caja: así la barra horizontal queda
      siempre visible abajo en pantalla y los encabezados/filtros no se pierden */
+  /* Cajas de Módulo y Serial en la tabla de revisión */
+  .tabla-revision .input-mc-fila, .tabla-revision .input-serial-fila {
+    width: 100%; min-width: 135px; padding: 8px 11px; border: 1.5px solid #d5ddd6; border-radius: 10px;
+    background: #fff; font: inherit; font-size: .92rem; color: inherit; box-sizing: border-box;
+  }
+  .tabla-revision .input-serial-fila { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88rem; }
+  .tabla-revision .input-mc-fila:focus, .tabla-revision .input-serial-fila:focus {
+    outline: none; border-color: #4c8c2b; box-shadow: 0 0 0 3px rgba(76,140,43,.15);
+  }
+  .tabla-revision .input-mc-fila::placeholder, .tabla-revision .input-serial-fila::placeholder { color: #9aa59c; }
   /* Bloque de SIMs retiradas */
   #sims-box input[type=text], #sims-box textarea, #sims-box select {
     padding: 8px 11px; border: 1.5px solid #d5ddd6; border-radius: 10px; background: #fff;
