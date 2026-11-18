@@ -97,16 +97,21 @@
     return cuerpo;
   }
 
+  // No nos fiamos de las cabeceras de total/páginas (en producción no llegan): se piden páginas hasta que una venga vacía o incompleta.
   async function traerEquiposApi() {
-    let items = [], pagina = 0, totalPaginas = 1, total = 0;
-    while (pagina < totalPaginas && pagina < 1000) {
-      const r = await llamarPuente({ accion: "equipos", pageNo: pagina, pageSize: 120, sort: "id,asc" });
-      total = r.total; totalPaginas = r.totalPaginas;
-      items = items.concat(r.items || []);
+    const TAM = 120;
+    let items = [], pagina = 0, totalCabecera = 0;
+    while (pagina < 1000) {
+      const r = await llamarPuente({ accion: "equipos", pageNo: pagina, pageSize: TAM, sort: "id,asc" });
+      const lote = r.items || [];
+      if (pagina === 0) totalCabecera = Number(r.total) || 0;
+      items = items.concat(lote);
       pagina++;
-      estadoEl.textContent = `Leyendo la plataforma: página ${pagina} de ${Math.max(totalPaginas, 1)} (${items.length} de ${total})...`;
+      estadoEl.textContent = `Leyendo la plataforma: página ${pagina} (${items.length} equipos${totalCabecera > TAM ? " de " + totalCabecera : ""})...`;
+      if (lote.length < TAM) break;
     }
-    items.totalDeclarado = total;
+    items.totalDeclarado = totalCabecera > TAM ? totalCabecera : 0;
+    items.paginas = pagina;
     return items;
   }
 
@@ -190,7 +195,7 @@
 
       const muestra = cambios.slice(0, 40).map(c => `<tr><td>${esc(c.mc)}</td><td>${Object.entries(c.dif).map(([k, [b, a]]) => `${esc(k)}: <s>${esc(b ?? "—")}</s> → <strong>${esc(a ?? "—")}</strong>`).join("<br>")}</td></tr>`).join("");
       resumenEl.innerHTML = `
-        <p><strong>${api.length}</strong> equipos activos en la plataforma · <strong>${nuestros.length}</strong> en nuestra tabla.</p>
+        <p><strong>${api.length}</strong> equipos activos en la plataforma (${api.paginas} páginas leídas) · <strong>${nuestros.length}</strong> en nuestra tabla.</p>
         <ul>
           <li>🆕 Equipos nuevos que se crearían: <strong>${nuevos.length}</strong></li>
           <li>✏️ Equipos existentes con datos de ficha distintos: <strong>${cambios.length}</strong>${Object.keys(porColumna).length ? " (" + Object.entries(porColumna).map(([k, n]) => `${esc(k)}: ${n}`).join(", ") + ")" : ""}</li>

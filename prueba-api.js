@@ -95,18 +95,20 @@ function fechaCorta(v) { return v ? new Date(v).toLocaleString("es-ES", { dateSt
 
 // ---------- 2. Comparar ----------
 async function traerEquiposApi(filtro, customerId, estado) {
-  let items = [], pagina = 0, totalPaginas = 1, total = 0;
-  while (pagina < totalPaginas) {
-    const params = { accion: "equipos", pageNo: pagina, pageSize: 120, sort: "id,asc" };
+  // Las cabeceras de total/páginas no llegan en producción: se piden páginas hasta que una venga incompleta.
+  const TAM = 120;
+  let items = [], pagina = 0, total = 0;
+  while (pagina < 1000) {
+    const params = { accion: "equipos", pageNo: pagina, pageSize: TAM, sort: "id,asc" };
     if (filtro) params.serialBoard = filtro;
     if (customerId) params.customerId = customerId;
     const r = await llamarPuente(params);
-    total = r.total;
-    totalPaginas = r.totalPaginas;
-    items = items.concat(r.items || []);
+    const lote = r.items || [];
+    items = items.concat(lote);
     pagina++;
-    estado(`API: página ${pagina} de ${Math.max(totalPaginas, 1)} (${items.length} de ${total})...`);
-    if (pagina >= 1000) break;
+    total = items.length;
+    estado(`API: página ${pagina} (${items.length} equipos)...`);
+    if (lote.length < TAM) break;
   }
   return { items, total };
 }
