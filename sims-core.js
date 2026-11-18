@@ -22,3 +22,13 @@ async function simUsuario() {
   const { data: { user } } = await supabaseClient.auth.getUser();
   return user ? user.email : null;
 }
+
+// País del emisor según el ICCID (89 + código de país): 351 Portugal, 34 España, 39 Italia, 30 Grecia
+function simPais(iccid) {
+  const d = simDigitos(iccid);
+  if (d.startsWith("89351")) return "Portugal";
+  if (d.startsWith("8934")) return "España";
+  if (d.startsWith("8939")) return "Italia";
+  if (d.startsWith("8930")) return "Grecia";
+  return "";
+}
