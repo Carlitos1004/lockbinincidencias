@@ -1649,9 +1649,15 @@ function abrirMaterialesUsados() {
   const listaDe = mc => (equiposCompletos[mc] && equiposCompletos[mc].lista) || "";
   // Misma regla que la pantalla: una pieza por equipo y tipo (si hay dos del mismo tipo, la que no se desechó)
   const mcsContados = new Set();
+  const fueraDeListas = new Set();   // equipos con material pero sin lista: no salen en la pantalla, no se cuentan
   grupos.forEach(g => {
     aplicarTipoBateria(g);
+    const enLista = !!listaDe(g.mc);
     g.casillas.forEach(x => {
+      if (!enLista) {
+        if ((x.comp && cuentaComoReposicion(x.comp, estadoCasilla(x.comp))) || (x.falt && x.falt.decision === "Se repone desde stock")) fueraDeListas.add(g.mc);
+        return;
+      }
       if (x.comp) {
         const est = estadoCasilla(x.comp);
         if (!cuentaComoReposicion(x.comp, est)) return;
@@ -1673,7 +1679,6 @@ function abrirMaterialesUsados() {
     lineas.push({ tipo: "Batería", mc: "Sin MC", lista: c.repo_lista, retirado: c.serial_retirado || "", nuevo: c.repo_serial_nuevo || "",
       cat: c.repo_categoria || 0, estado: est, albaran: c.repo_albaran || "", fecha: c.repo_fecha_entrega || "" });
   });
-  const nSinLista = [...mcsContados].filter(mc => !listaDe(mc)).length;
   const tipos = [...TIPOS, ...[...new Set(lineas.map(l => l.tipo))].filter(t => !TIPOS.includes(t))].filter(t => lineas.some(l => l.tipo === t));
   const entregada = l => l.estado === "Entregado";
   const fila = t => {
@@ -1697,7 +1702,8 @@ function abrirMaterialesUsados() {
   m.id = "modal-materiales"; m.className = "modal-resumen";
   m.innerHTML = `<div class="modal-resumen-caja">
     <div class="modal-resumen-cab"><h3>🔧 Materiales usados en la reposición</h3><button type="button" class="modal-x">✕</button></div>
-    <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla) · piezas de <strong>${mcsContados.size}</strong> equipos con MC${nSinMc ? ` y <strong>${nSinMc}</strong> baterías sin MC` : ""}${nSinLista ? ` · ⚠️ ${nSinLista} de esos equipos no están en ninguna lista` : ""}</p>
+    <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla) · piezas de <strong>${mcsContados.size}</strong> equipos con MC${nSinMc ? ` y <strong>${nSinMc}</strong> baterías sin MC` : ""}</p>
+    ${fueraDeListas.size ? `<p class="modal-nota">ℹ️ No se cuentan ${fueraDeListas.size} equipos con piezas en la orden que no están en ninguna lista de reposición: ${esc([...fueraDeListas].sort().slice(0, 30).join(", "))}${fueraDeListas.size > 30 ? "…" : ""}</p>` : ""}
     ${lineas.length ? tabla(cab, [...resumen, tot], true) : "<p>Todavía no hay materiales a reponer en esta orden.</p>"}
     ${filasAlb.length ? `<h4>📄 Por albarán</h4>${tabla(["Albarán", ...tipos, "Total"], filasAlb)}` : ""}
     ${sinAlb ? `<p class="modal-nota">⚠️ ${sinAlb} piezas entregadas todavía sin albarán.</p>` : ""}
