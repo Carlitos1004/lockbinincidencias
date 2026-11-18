@@ -53,6 +53,16 @@
   .orep-mc table { width:100%; border-collapse:collapse; }
   .orep-mc th, .orep-mc td { padding:6px 10px; border-top:1px solid #e8eee9; text-align:left; font-size:.92em; }
   .orep-mc input[type=text], .orep-mc select { max-width:190px; }
+  .barra-seleccion { position:sticky; top:0; z-index:20; display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:#f3f7f4; border:1.5px solid #cfe0d2; border-radius:12px; padding:8px 12px; margin:10px 0; font-size:.92em; }
+  .barra-seleccion button, .panel-bat-pegar button, .modal-resumen-caja .btn-prim { border:0; border-radius:10px; padding:7px 13px; font:inherit; font-weight:600; cursor:pointer; background:var(--verde-medio, #4c8c2b); color:#fff; }
+  .barra-seleccion button.sec, .modal-resumen-caja .btn-sec { background:#e3e8e4; color:#333; }
+  .barra-seleccion button:disabled, .panel-bat-pegar button:disabled { opacity:.45; cursor:default; }
+  .chk-sel-ent { width:18px; height:18px; margin-right:6px; cursor:pointer; vertical-align:middle; }
+  .panel-bat-pegar { margin:10px 0; border:1.5px solid #d5ddd6; border-radius:12px; padding:8px 14px; background:#fff; }
+  .panel-bat-pegar summary { cursor:pointer; font-weight:600; }
+  .panel-bat-pegar textarea { width:100%; max-width:420px; font-family:monospace; padding:8px; border:1.5px solid #d5ddd6; border-radius:10px; }
+  .bat-pegar-fila { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:8px 0; font-size:.92em; }
+  .modal-resumen-caja input[type=text], .modal-resumen-caja input[type=date] { padding:8px 10px; border:1.5px solid #d5ddd6; border-radius:10px; font:inherit; }
   .orep-acciones { padding:8px 14px 12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   .btn-usar-bok { border:1.5px solid #1f4e8c; background:#fff; color:#1f4e8c; border-radius:10px; padding:3px 10px; font:inherit; font-size:.85em; font-weight:600; cursor:pointer; }
   .btn-usar-bok:hover { background:#e3edf9; }
@@ -132,7 +142,7 @@
   <div id="detalle" hidden>
     <h2 id="detalle-titulo" style="margin-top:26px;"></h2>
     <div id="detalle-resumen" class="resumen-cliente"></div>
-    <div style="margin:10px 0;"><button type="button" id="btn-resumen-comp" class="btn-resumen-comp">📊 Resumen de componentes</button></div>
+    <div style="margin:10px 0;"><button type="button" id="btn-resumen-comp" class="btn-resumen-comp">📊 Resumen de componentes</button> <button type="button" id="btn-materiales" class="btn-resumen-comp">🔧 Materiales usados</button></div>
 
     <div id="orep-tabs" class="orep-tabs">
       <button type="button" data-tab="equipos" class="orep-tab-activa">📦 Equipos</button>
@@ -147,7 +157,7 @@
         <button type="button" id="sub-bat">🔋 Baterías</button>
       </div>
     <div class="materiales-controles">
-      <input type="text" id="filtro-mc" placeholder="Filtrar por MC...">
+      <input type="text" id="filtro-mc" placeholder="Filtrar por MC, serial o albarán...">
       <select id="filtro-estado-mc">
         <option value="">Todos los equipos</option>
         <option value="Incompleto">Incompletos</option>
@@ -174,6 +184,20 @@
       </select>
     </div>
 
+    <div id="barra-seleccion" class="barra-seleccion" hidden></div>
+    <div id="panel-bat-pegar" class="panel-bat-pegar" hidden>
+      <details>
+        <summary>📥 Pegar seriales nuevos de baterías (asignar en bloque)</summary>
+        <p class="modal-sub">Pega la columna del Excel, un serial por línea. Se asignan <strong>por orden</strong> a las baterías pendientes tal como salen en pantalla (cambia el orden arriba si hace falta). Antes de guardar verás una vista previa.</p>
+        <textarea id="bat-pegar-texto" rows="6" placeholder="Un serial por línea"></textarea>
+        <div class="bat-pegar-fila">
+          <label>Categoría: <select id="bat-pegar-cat"><option value="">Sin categoría</option><option value="1">1ª categoría</option><option value="2">2ª categoría</option></select></label>
+          <label><input type="checkbox" id="bat-pegar-ok" checked> Dar OK (quedan listas para entregar)</label>
+          <button type="button" id="bat-pegar-prev">Vista previa</button>
+        </div>
+        <div id="bat-pegar-resultado"></div>
+      </details>
+    </div>
     <div id="lista-mc"></div>
     </div>
 

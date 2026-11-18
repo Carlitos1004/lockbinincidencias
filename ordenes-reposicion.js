@@ -51,6 +51,10 @@ let fechasFactura = {};    // mc -> fecha de factura / inicio de contrato (la qu
 let fechasEntrega = {};    // mc -> fecha de entrega del equipo al cliente (para ordenar)
 let listaSel = "";         // lista seleccionada en pantalla ("" = todas, "__sin" = sin lista)
 let equiposCompletos = {}; // mc -> fila de reposicion_equipos (cambio de equipo completo + nota)
+let seleccion = new Set();      // piezas marcadas: "mc:MC123" o "id:<componente>"
+let elegiblesVista = [];       // [{clave, modo}] visibles ahora ("entregar" | "albaran")
+let ordenBateriasVista = [];   // baterías de la pestaña Baterías, en el orden en que salen
+let planPegarBat = [];         // asignación calculada en la vista previa de "pegar seriales"
 let presPorComp = {};      // componente_id -> {numero, oferta, estado, aprobada}
 
 function esc(t) {
@@ -63,7 +67,7 @@ function codigoOrden(numero) { return "REP-" + String(numero).padStart(3, "0"); 
 
 const CAMPOS = "id, m_control, tipo_componente, serial_retirado, id_ot, cliente, estado, destino, " +
   "vandalismo, garantia_cliente, devuelto, devuelto_en, repo_estado, repo_serial_nuevo, " +
-  "repo_fecha_entrega, orden_reposicion_ot, repo_nota, cliente_original, repo_lista, repo_categoria";
+  "repo_fecha_entrega, orden_reposicion_ot, repo_nota, cliente_original, repo_lista, repo_categoria, repo_albaran";
 
 // Un "MC" que no tiene forma de MC (p. ej. "NO ENCONTRADO", "desconocido") significa que la pieza no tiene equipo identificado
 const esMcValido = v => /^MC\d+$/i.test(String(v || "").trim());
@@ -325,6 +329,7 @@ function enlazarFilas(tbody) {
 
 // ---------- Detalle de una OT ----------
 async function abrirOt(idOt) {
+  seleccion = new Set();
   if (!ordenesPorOt[idOt]) {
     if (!esManager) { alert("Esta OT todavía no tiene orden de reposición. Pídele al manager que la cree."); return; }
     if (!confirm(`La OT ${idOt} todavía no tiene orden de reposición. ¿Crearla ahora? Se le asignará el siguiente número.`)) return;
@@ -449,7 +454,7 @@ function renderDetalle() {
   document.getElementById("lista-banner").innerHTML = sinListaActiva
     ? "Esta orden todavía no tiene una lista de reposición activa."
     : `Mostrando: <strong>${esc(nombreMostrado)}</strong> · ${nPiezas} equipos y ${nBat} baterías` + (esManager && activa && listaSel !== activa ? ` · <em>la lista activa para el operario es "${esc(activa)}"</em>` : "");
-  const visibles = sinListaActiva ? [] : mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc)) && (!fEst || m.estadoMc === fEst) && cumpleCat(m) && cumpleLista(m) && cumpleTipo(m));
+  const visibles = sinListaActiva ? [] : mcs.filter(m => (!fMc || m.mc.toLowerCase().includes(fMc) || albaranesDe(m).some(a => a.toLowerCase().includes(fMc))) && (!fEst || m.estadoMc === fEst) && cumpleCat(m) && cumpleLista(m) && cumpleTipo(m));
   // Orden: por fecha de entrega al cliente, de la más antigua a la más reciente (sin fecha, al final)
   const modoOrden = document.getElementById("orden-mc").value;
   if (modoOrden === "factura") {
@@ -464,7 +469,7 @@ function renderDetalle() {
     });
   }
 
-  const visSinMc = sinMcBat.filter(c => (!fMc || (c.serial_retirado || "").toLowerCase().includes(fMc)) && (!fEst || estSinMc(c) === fEst || (fEst === "Incompleto" && false)));
+  const visSinMc = sinMcBat.filter(c => (!fMc || (c.serial_retirado || "").toLowerCase().includes(fMc) || (c.repo_albaran || "").toLowerCase().includes(fMc)) && (!fEst || estSinMc(c) === fEst || (fEst === "Incompleto" && false)));
   const htmlLista = subTab === "Batería" ? visibles.map(htmlMc).join("") + visSinMc.map(htmlBateriaSinMc).join("") : visibles.map(htmlMc).join("");
   document.getElementById("lista-mc").innerHTML = (visibles.length || (subTab === "Batería" && visSinMc.length))
     ? htmlLista
@@ -474,6 +479,13 @@ function renderDetalle() {
   const btnRes = document.getElementById("btn-resumen-comp");
   if (btnRes) btnRes.onclick = abrirResumenComponentes;
 
+  elegiblesVista = [...visibles.map(m => ({ clave: "mc:" + m.mc, modo: modoSel(m) })),
+    ...(subTab === "Batería" ? visSinMc.map(c => ({ clave: "id:" + c.id, modo: modoSelComp(c) })) : [])].filter(x => x.modo);
+  ordenBateriasVista = subTab === "Batería"
+    ? [...visibles.map(m => (m.casillas.find(x => x.tipo === "Batería") || {}).comp).filter(Boolean), ...visSinMc] : [];
+  const panelPegar = document.getElementById("panel-bat-pegar");
+  if (panelPegar) panelPegar.hidden = !(esManager && subTab === "Batería");
+  actualizarBarra();
   enlazarEventos();
   if (esManager) { renderListas(); renderBok(); }
 }
@@ -563,9 +575,10 @@ function htmlBateriaSinMc(c) {
     .concat(ESTADOS_MANUALES.map(e => `<option value="${e}" ${(c.repo_estado || (est === "Repuesto desde stock" ? "Repuesto desde stock" : "")) === e ? "selected" : ""}>${nombreEstado(e)}</option>`)).join("");
   const boton = est !== "Entregado" ? `<button type="button" class="btn-bat-entregada-id" data-id="${c.id}">🔋 Marcar batería entregada</button>` : "";
   return `<div class="orep-mc">
-    <div class="orep-mc-cab"><strong>Sin MC</strong>
+    <div class="orep-mc-cab">${chkSel("id:" + c.id, modoSelComp(c))}<strong>Sin MC</strong>
       <span class="orep-badge orep-info">🔋 Solo batería</span>
       <span class="orep-badge ${claseEstado(est)}">${esc(est)}</span>
+      ${badgeAlbaran(c.repo_albaran ? [c.repo_albaran] : [])}
       <span>${esc(c.cliente || "")} · batería retirada ${esc(c.serial_retirado || "—")}${c.repo_lista ? " · 📋 " + esc(c.repo_lista) : ""}</span></div>
     <div class="scroll-x-tabla" style="max-height:none;"><table>
       <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th><th>Nota</th></tr></thead>
@@ -657,9 +670,10 @@ function htmlMc(m) {
   const fEntTxt = fEnt ? new Date(fEnt + "T00:00:00").toLocaleDateString("es-ES") : "sin fecha de entrega";
   return `<div class="orep-mc">
     <div class="orep-mc-cab">
-      <strong>${esc(m.mc)}</strong>
+      ${chkSel("mc:" + m.mc, modoSel(m))}<strong>${esc(m.mc)}</strong>
       ${otsOrigen.length ? `<span class="orep-badge orep-gris" title="OT de la que vienen las piezas">📍 ${esc(otsOrigen.join(" · "))}</span>` : ""}
       <span class="orep-badge ${claseMc(m.estadoMc)}">${esc(m.estadoMc)}</span>
+      ${badgeAlbaran(albaranesDe(m))}
       ${esBat ? '<span class="orep-badge orep-info">🔋 Solo batería</span>' : ""}
       ${eqc.bateria_ok ? `<span class="orep-badge orep-ok">🔁 Batería OK: se usa en ${esc(eqc.bateria_ok_destino || "otro equipo")} · este equipo recibe una nueva</span>` : ""}
       ${bloqueRecibe}
@@ -1419,3 +1433,252 @@ document.getElementById("tbody-listas").addEventListener("click", async (e) => {
     await procesarPegado(nombre, detalle.querySelector(".txt-anadir").value, detalle.querySelector(".sel-anadir-tipo").value, false, msg);
   }
 });
+
+
+// =====================================================================
+// ALBARÁN: seleccionar piezas y entregarlas con un número de albarán
+// =====================================================================
+function albaranesDe(m) {
+  return [...new Set(m.casillas.map(x => x.comp && x.comp.repo_albaran).filter(Boolean))];
+}
+function badgeAlbaran(lista) {
+  return lista.length ? `<span class="orep-badge orep-gris" title="Albarán de entrega">📄 ${esc(lista.join(", "))}</span>` : "";
+}
+// "entregar": aún no entregado (se marca entregado + albarán). "albaran": ya entregado (solo se anota/corrige el albarán).
+function modoSel(m) {
+  if (!esManager) return null;
+  if (m.estadoMc === "Entregado") return "albaran";
+  if (tipoRep(m.mc) === "Batería") return "entregar";
+  return m.estadoMc === "Listo para entregar" ? "entregar" : null;
+}
+function modoSelComp(c) {
+  if (!esManager) return null;
+  return estadoCasilla(c) === "Entregado" ? "albaran" : "entregar";
+}
+function chkSel(clave, modo) {
+  if (!modo) return "";
+  return `<input type="checkbox" class="chk-sel-ent" data-clave="${esc(clave)}" ${seleccion.has(clave) ? "checked" : ""} title="${modo === "entregar" ? "Seleccionar para entregar con albarán" : "Ya entregado: seleccionar para anotar/corregir el albarán"}">`;
+}
+function actualizarBarra() {
+  const b = document.getElementById("barra-seleccion");
+  if (!b) return;
+  if (!esManager || !elegiblesVista.length) { b.hidden = true; return; }
+  const vis = new Set(elegiblesVista.map(x => x.clave));
+  [...seleccion].forEach(k => { if (!vis.has(k)) seleccion.delete(k); });
+  b.hidden = false;
+  const nEnt = elegiblesVista.filter(x => x.modo === "entregar").length;
+  b.innerHTML = `<span><strong>${seleccion.size}</strong> seleccionados</span>
+    <button type="button" class="sec" id="sel-todos-ent" ${nEnt ? "" : "disabled"}>Seleccionar todos los pendientes de entrega (${nEnt})</button>
+    <button type="button" class="sec" id="sel-limpiar" ${seleccion.size ? "" : "disabled"}>Limpiar</button>
+    <button type="button" id="sel-albaran" ${seleccion.size ? "" : "disabled"}>📄 Entregar con albarán…</button>
+    <button type="button" class="sec" id="sel-resumen-alb">🧾 Resumen por albarán</button>`;
+  document.getElementById("sel-todos-ent").onclick = () => {
+    elegiblesVista.filter(x => x.modo === "entregar").forEach(x => seleccion.add(x.clave));
+    document.querySelectorAll(".chk-sel-ent").forEach(c => { c.checked = seleccion.has(c.dataset.clave); });
+    actualizarBarra();
+  };
+  document.getElementById("sel-limpiar").onclick = () => {
+    seleccion.clear();
+    document.querySelectorAll(".chk-sel-ent").forEach(c => { c.checked = false; });
+    actualizarBarra();
+  };
+  document.getElementById("sel-albaran").onclick = abrirDialogoAlbaran;
+  document.getElementById("sel-resumen-alb").onclick = abrirMaterialesUsados;
+}
+document.addEventListener("change", e => {
+  const c = e.target.closest && e.target.closest(".chk-sel-ent");
+  if (!c) return;
+  if (c.checked) seleccion.add(c.dataset.clave); else seleccion.delete(c.dataset.clave);
+  actualizarBarra();
+});
+
+// Piezas (componentes y faltantes) de lo seleccionado
+function resolverSeleccion() {
+  const grupos = agruparPorMc(compsOtActual, otActual);
+  const comps = [], faltsEnt = [];
+  let nEntregar = 0, nSoloAlb = 0;
+  seleccion.forEach(k => {
+    if (k.startsWith("mc:")) {
+      const g = grupos.find(x => x.mc === k.slice(3));
+      if (!g) return;
+      aplicarTipoBateria(g);
+      const modo = modoSel(g);
+      if (!modo) return;
+      modo === "entregar" ? nEntregar++ : nSoloAlb++;
+      g.casillas.forEach(x => {
+        if (x.comp) comps.push({ c: x.comp, entregar: modo === "entregar" });
+        else if (x.falt && estadoFalt(x.falt) && modo === "entregar") faltsEnt.push(x.falt);
+      });
+    } else {
+      const c = compsOtActual.find(x => String(x.id) === k.slice(3));
+      if (!c) return;
+      const modo = modoSelComp(c);
+      modo === "entregar" ? nEntregar++ : nSoloAlb++;
+      comps.push({ c, entregar: modo === "entregar" });
+    }
+  });
+  return { comps, faltsEnt, nEntregar, nSoloAlb };
+}
+function cerrarModal(id) { document.getElementById(id)?.remove(); }
+function abrirDialogoAlbaran() {
+  const r = resolverSeleccion();
+  if (!seleccion.size) return;
+  const previos = [...new Set(r.comps.map(x => x.c.repo_albaran).filter(Boolean))];
+  cerrarModal("modal-albaran");
+  const m = document.createElement("div");
+  m.id = "modal-albaran"; m.className = "modal-resumen";
+  m.innerHTML = `<div class="modal-resumen-caja" style="max-width:520px;">
+    <div class="modal-resumen-cab"><h3>📄 Entregar con albarán</h3><button type="button" class="modal-x">✕</button></div>
+    <p class="modal-sub">${r.nEntregar} para marcar como entregados${r.nSoloAlb ? ` · ${r.nSoloAlb} ya entregados (solo se anota el albarán)` : ""}.${previos.length ? `<br>⚠️ Algunas piezas ya tienen albarán (${esc(previos.join(", "))}); se sustituirá.` : ""}</p>
+    <p><label>Nº de albarán<br><input type="text" id="alb-num" placeholder="Ej. ALB-2026-0123" style="width:100%;"></label></p>
+    <p><label>Fecha de entrega<br><input type="date" id="alb-fecha" value="${hoy()}"></label></p>
+    <div class="modal-acciones"><button type="button" class="btn-prim" id="alb-guardar">Guardar</button> <button type="button" class="btn-sec modal-cerrar">Cancelar</button></div>
+    <p id="alb-msg" class="modal-nota"></p></div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click", e => { if (e.target === m || e.target.closest(".modal-x, .modal-cerrar")) m.remove(); });
+  m.querySelector("#alb-num").focus();
+  m.querySelector("#alb-guardar").addEventListener("click", async () => {
+    const num = m.querySelector("#alb-num").value.trim();
+    const fecha = m.querySelector("#alb-fecha").value || hoy();
+    if (!num) { m.querySelector("#alb-msg").textContent = "Escribe el número de albarán."; return; }
+    const btn = m.querySelector("#alb-guardar"); btn.disabled = true;
+    const msg = m.querySelector("#alb-msg"); msg.textContent = "Guardando…";
+    const ids = { alb: [], ent: [], entDev: [] };
+    r.comps.forEach(({ c, entregar }) => {
+      if (!entregar) ids.alb.push(c.id);
+      else if ((c.destino || "").includes("Devolver al cliente")) ids.entDev.push(c.id);
+      else ids.ent.push(c.id);
+    });
+    const lotes = [
+      [ids.alb, { repo_albaran: num }],
+      [ids.ent, { repo_albaran: num, repo_estado: "Entregado", repo_fecha_entrega: fecha }],
+      [ids.entDev, { repo_albaran: num, repo_estado: "Entregado", repo_fecha_entrega: fecha, devuelto: true, devuelto_en: new Date().toISOString() }]
+    ];
+    let fallo = null;
+    for (const [lista, cambios] of lotes) {
+      for (let i = 0; i < lista.length && !fallo; i += 60) {
+        const { error } = await supabaseClient.from("componentes_retirados").update(cambios).in("id", lista.slice(i, i + 60));
+        if (error) fallo = error.message;
+      }
+    }
+    for (let i = 0; i < r.faltsEnt.length && !fallo; i += 60) {
+      const { error } = await supabaseClient.from("reposicion_faltantes")
+        .update({ entregado: true, fecha_entrega: fecha, albaran: num }).in("id", r.faltsEnt.slice(i, i + 60).map(f => f.id));
+      if (error) fallo = error.message;
+    }
+    if (fallo) { msg.textContent = "No se pudo guardar todo: " + fallo + " (¿corriste el SQL 105?)"; btn.disabled = false; return; }
+    seleccion.clear();
+    m.remove();
+    await recargarOt();
+    cargarOts();
+  });
+}
+
+// =====================================================================
+// BATERÍAS: pegar la columna de seriales nuevos y asignarlos por orden
+// =====================================================================
+function previsualizarBaterias() {
+  const texto = document.getElementById("bat-pegar-texto").value;
+  const seriales = texto.split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+  const out = document.getElementById("bat-pegar-resultado");
+  const vistos = new Set(), dup = new Set();
+  seriales.forEach(s => { if (vistos.has(s)) dup.add(s); vistos.add(s); });
+  const enUso = new Set(compsOtActual.map(c => String(c.repo_serial_nuevo || "").toUpperCase()).filter(Boolean));
+  const yaUsados = [...vistos].filter(s => enUso.has(s));
+  const pendientes = ordenBateriasVista.filter(c => !c.repo_serial_nuevo && necesitaCambio(c, estadoCasilla(c)) && estadoCasilla(c) !== "Entregado");
+  planPegarBat = [];
+  const n = Math.min(seriales.length, pendientes.length);
+  for (let i = 0; i < n; i++) planPegarBat.push({ comp: pendientes[i], serial: seriales[i] });
+  const avisos = [];
+  if (dup.size) avisos.push(`⚠️ Repetidos en lo pegado: ${[...dup].slice(0, 8).join(", ")}${dup.size > 8 ? "…" : ""}`);
+  if (yaUsados.length) avisos.push(`⚠️ Ya asignados en esta orden: ${yaUsados.slice(0, 8).join(", ")}${yaUsados.length > 8 ? "…" : ""}`);
+  if (seriales.length > pendientes.length) avisos.push(`⚠️ Hay ${seriales.length} seriales y solo ${pendientes.length} baterías pendientes en pantalla: sobran ${seriales.length - pendientes.length} (no se usarán).`);
+  if (seriales.length < pendientes.length) avisos.push(`ℹ️ Quedarán ${pendientes.length - seriales.length} baterías sin serial.`);
+  const filas = planPegarBat.slice(0, 200).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.comp.m_control || "Sin MC")}</td><td>${esc(p.comp.serial_retirado || "—")}</td><td><strong>${esc(p.serial)}</strong></td></tr>`).join("");
+  out.innerHTML = `${avisos.map(a => `<p class="modal-nota">${a}</p>`).join("")}
+    ${planPegarBat.length ? `<div class="scroll-x-tabla" style="max-height:260px;"><table><thead><tr><th>#</th><th>MC</th><th>Batería retirada</th><th>Serial nuevo</th></tr></thead><tbody>${filas}</tbody></table></div>
+      ${planPegarBat.length > 200 ? `<p class="modal-nota">Se muestran las 200 primeras de ${planPegarBat.length}.</p>` : ""}
+      <p><button type="button" id="bat-pegar-aplicar">✅ Asignar ${planPegarBat.length} seriales</button></p>` : "<p>No hay nada que asignar.</p>"}`;
+  const ap = document.getElementById("bat-pegar-aplicar");
+  if (ap) ap.addEventListener("click", aplicarBaterias);
+}
+async function aplicarBaterias() {
+  const cat = document.getElementById("bat-pegar-cat").value;
+  const ok = document.getElementById("bat-pegar-ok").checked;
+  if (!planPegarBat.length) return;
+  if (!confirm(`¿Asignar ${planPegarBat.length} seriales de batería${ok ? " y darles OK (listas para entregar)" : ""}?`)) return;
+  const btn = document.getElementById("bat-pegar-aplicar"); btn.disabled = true; btn.textContent = "Guardando…";
+  const tareas = planPegarBat.map(p => () => {
+    const cambios = { repo_serial_nuevo: p.serial };
+    if (cat) cambios.repo_categoria = Number(cat);
+    if (ok) cambios.repo_estado = "Listo para entregar";
+    return supabaseClient.from("componentes_retirados").update(cambios).eq("id", p.comp.id);
+  });
+  let fallos = 0, primerError = "";
+  for (let i = 0; i < tareas.length; i += 10) {
+    const res = await Promise.all(tareas.slice(i, i + 10).map(t => t()));
+    res.forEach(r => { if (r.error) { fallos++; primerError = primerError || r.error.message; } });
+    btn.textContent = `Guardando… ${Math.min(i + 10, tareas.length)}/${tareas.length}`;
+  }
+  if (fallos) alert(`${fallos} baterías no se pudieron guardar: ${primerError}`);
+  planPegarBat = [];
+  document.getElementById("bat-pegar-texto").value = "";
+  document.getElementById("bat-pegar-resultado").innerHTML = `<p>✅ Listo${fallos ? ` (con ${fallos} fallos)` : ""}.</p>`;
+  await recargarOt();
+  cargarOts();
+}
+document.getElementById("bat-pegar-prev").addEventListener("click", previsualizarBaterias);
+
+// =====================================================================
+// MATERIALES USADOS: resumen de lo que se ha repuesto en la orden
+// =====================================================================
+function abrirMaterialesUsados() {
+  const grupos = agruparPorMc(compsOtActual, otActual);
+  const lineas = [];
+  compsOtActual.forEach(c => {
+    const est = estadoCasilla(c);
+    if (!cuentaComoReposicion(c, est)) return;
+    lineas.push({ tipo: tipoCanonico(c.tipo_componente), mc: c.m_control || "Sin MC", retirado: c.serial_retirado || "", nuevo: c.repo_serial_nuevo || "",
+      cat: c.repo_categoria || 0, estado: est, albaran: c.repo_albaran || "", fecha: c.repo_fecha_entrega || "" });
+  });
+  grupos.forEach(g => g.casillas.forEach(x => {
+    if (!x.comp && x.falt && x.falt.decision === "Se repone desde stock") {
+      lineas.push({ tipo: x.tipo, mc: g.mc, retirado: "(no llegó)", nuevo: x.falt.serial_nuevo || "", cat: 0, estado: estadoFalt(x.falt) || "", albaran: x.falt.albaran || "", fecha: x.falt.fecha_entrega || "" });
+    }
+  }));
+  const tipos = [...TIPOS, ...[...new Set(lineas.map(l => l.tipo))].filter(t => !TIPOS.includes(t))].filter(t => lineas.some(l => l.tipo === t));
+  const entregada = l => l.estado === "Entregado";
+  const fila = t => {
+    const L = lineas.filter(l => l.tipo === t);
+    return [t, L.length, L.filter(entregada).length, L.length - L.filter(entregada).length, L.filter(l => l.cat === 1).length, L.filter(l => l.cat === 2).length, L.filter(l => !l.cat).length];
+  };
+  const resumen = tipos.map(fila);
+  const tot = resumen.reduce((a, f) => a.map((v, i) => i ? v + f[i] : "TOTAL"), ["TOTAL", 0, 0, 0, 0, 0, 0]);
+  const cab = ["Material", "Total", "Entregados", "Pendientes", "1ª cat.", "2ª cat.", "Sin cat."];
+  const albs = {};
+  lineas.filter(l => l.albaran).forEach(l => { const a = (albs[l.albaran] = albs[l.albaran] || {}); a[l.tipo] = (a[l.tipo] || 0) + 1; });
+  const filasAlb = Object.keys(albs).sort().map(a => [a, ...tipos.map(t => albs[a][t] || 0), Object.values(albs[a]).reduce((x, y) => x + y, 0)]);
+  const sinAlb = lineas.filter(l => entregada(l) && !l.albaran).length;
+  const cabDet = ["Material", "MC", "Retirado", "Nuevo", "Cat.", "Estado", "Albarán", "Fecha entrega"];
+  const det = lineas.slice().sort((a, b) => a.tipo.localeCompare(b.tipo) || a.mc.localeCompare(b.mc))
+    .map(l => [l.tipo, l.mc, l.retirado, l.nuevo, l.cat || "", l.estado, l.albaran, l.fecha]);
+  const tabla = (c, d, extra) => `<div class="scroll-x-tabla" style="max-height:none;"><table class="tabla-resumen-comp"><thead><tr>${c.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${d.map(r => `<tr class="${extra && r[0] === "TOTAL" ? "res-total" : ""}">${r.map(v => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  const plano = [cab, ...resumen, tot].map(r => r.join("\t")).join("\n") + "\n\n" + [cabDet, ...det].map(r => r.join("\t")).join("\n");
+  cerrarModal("modal-materiales");
+  const m = document.createElement("div");
+  m.id = "modal-materiales"; m.className = "modal-resumen";
+  m.innerHTML = `<div class="modal-resumen-caja">
+    <div class="modal-resumen-cab"><h3>🔧 Materiales usados en la reposición</h3><button type="button" class="modal-x">✕</button></div>
+    <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla)</p>
+    ${lineas.length ? tabla(cab, [...resumen, tot], true) : "<p>Todavía no hay materiales a reponer en esta orden.</p>"}
+    ${filasAlb.length ? `<h4>📄 Por albarán</h4>${tabla(["Albarán", ...tipos, "Total"], filasAlb)}` : ""}
+    ${sinAlb ? `<p class="modal-nota">⚠️ ${sinAlb} piezas entregadas todavía sin albarán.</p>` : ""}
+    ${lineas.length ? `<details><summary>Ver detalle pieza a pieza (${det.length})</summary>${tabla(cabDet, det)}</details>` : ""}
+    <div class="modal-acciones"><button type="button" class="modal-copiar">📋 Copiar (resumen + detalle)</button> <button type="button" class="modal-cerrar btn-sec">Cerrar</button></div></div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click", e => { if (e.target === m || e.target.closest(".modal-x, .modal-cerrar")) m.remove(); });
+  m.querySelector(".modal-copiar").addEventListener("click", async e => {
+    try { await navigator.clipboard.writeText(plano); e.target.textContent = "✅ Copiado"; } catch { e.target.textContent = "No se pudo copiar"; }
+  });
+}
+(function () { const b = document.getElementById("btn-materiales"); if (b) b.addEventListener("click", abrirMaterialesUsados); })();
