@@ -22,6 +22,12 @@ function pintar() {
   const est = document.getElementById("f-estado").value;
   const lista = todasSims.filter(s => (!est || s.estado === est) &&
     (!q || [s.iccid, s.mc_origen, s.mc_destino, s.id_ot, s.cliente, s.operador, s.ubicacion].some(v => String(v || "").toLowerCase().includes(q))));
+  const sel = document.getElementById("f-estado");
+  const nEst = e => todasSims.filter(s => s.estado === e).length;
+  [["Guardada", "Guardadas (pendientes)"], ["Devuelta al mismo equipo", "Devueltas al mismo equipo"], ["Pasada a MC nuevo", "Pasadas a MC nuevo"]].forEach(([v, t]) => {
+    const op = [...sel.options].find(o => o.value === v); if (op) op.textContent = `${t} (${nEst(v)})`;
+  });
+  [...sel.options].find(o => o.value === "").textContent = `Todas (${todasSims.length})`;
   document.getElementById("sims-contador").textContent = `${lista.length} SIMs · ${todasSims.filter(s => s.estado === "Guardada").length} guardadas en total`;
   document.getElementById("sims-tbody").innerHTML = lista.length ? lista.map(s => {
     const guardada = s.estado === "Guardada";

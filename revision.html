@@ -15,6 +15,23 @@
   .panel-body-ancho { max-width: 98vw; }
   /* La tabla scrollea dentro de su propia caja: así la barra horizontal queda
      siempre visible abajo en pantalla y los encabezados/filtros no se pierden */
+  /* Bloque de SIMs retiradas */
+  #sims-box input[type=text], #sims-box textarea, #sims-box select {
+    padding: 8px 11px; border: 1.5px solid #d5ddd6; border-radius: 10px; background: #fff;
+    font: inherit; font-size: .92rem; color: inherit; box-sizing: border-box;
+  }
+  #sims-box input[type=text]:focus, #sims-box textarea:focus, #sims-box select:focus {
+    outline: none; border-color: #4c8c2b; box-shadow: 0 0 0 3px rgba(76,140,43,.15);
+  }
+  #sims-box input[type=file] { font: inherit; font-size: .9rem; padding: 6px 0; }
+  #sims-box input[type=file]::file-selector-button {
+    border: 0; border-radius: 10px; padding: 7px 13px; margin-right: 10px; cursor: pointer;
+    background: #e3e8e4; color: #333; font: inherit; font-weight: 600;
+  }
+  #sims-box label { font-size: .9rem; font-weight: 500; }
+  #sims-box button { border-radius: 10px; padding: 7px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  #sims-box button:disabled { opacity: .5; cursor: default; }
+  #sims-box details > summary { padding: 4px 0; }
   .scroll-x-tabla { overflow: auto; max-width: 100%; max-height: calc(100vh - 70px); }
   .scroll-x-tabla thead tr:first-child th { position: sticky; top: 0; z-index: 3; background: var(--gris-100, #f3f4f1); }
   .scroll-x-tabla thead tr.fila-filtros th { position: sticky; top: var(--fila1-h, 34px); z-index: 2; }
