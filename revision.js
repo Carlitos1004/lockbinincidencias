@@ -31,6 +31,7 @@ const MAPA_DESTINO_A_ESTADO = {
 };
 
 const DESTINO_AMMI = "❌ Equipo dañado - Enviar a AMMI";
+const DESTINO_DESECHAR = "❌ Equipo dañado - Desechar";
 
 const otInput = document.getElementById("ot-input");
 
@@ -466,14 +467,14 @@ async function guardarFila(btn) {
     return;
   }
 
-  // Doble check: mandar un Módulo de Control a Stock o AMMI lo desvincula también en la plataforma.
+  // Doble check: mandar un Módulo de Control a Stock, AMMI o Desechar lo desvincula también en la plataforma.
   // Solo se pregunta cuando el destino cambia respecto a lo ya guardado.
   const esStock = destino === "✓ Equipo OK - Stock (1ra categoría)" || destino === "✓ Equipo OK - Stock (2da categoría)";
-  if (esStock || destino === DESTINO_AMMI) {
+  if (esStock || destino === DESTINO_AMMI || destino === DESTINO_DESECHAR) {
     const { data: previo } = await supabaseClient.from("componentes_retirados").select("tipo_componente, destino, m_control").eq("id", componenteId).maybeSingle();
     if (previo && previo.tipo_componente === "Módulo de Control" && previo.destino !== destino) {
       const mcConfirm = mcEditado || previo.m_control;
-      const textoDestino = esStock ? "STOCK" : "AMMI (equipo dañado)";
+      const textoDestino = esStock ? "STOCK" : destino === DESTINO_DESECHAR ? "DESECHAR (equipo dañado)" : "AMMI (equipo dañado)";
       if (!confirm(`Vas a mandar el MC ${mcConfirm} a ${textoDestino}.\n\nSe DESVINCULARÁ también en la plataforma LockBin.\n\n¿Es correcto?`)) return;
     }
   }
@@ -635,9 +636,9 @@ async function guardarFila(btn) {
   let avisoPlataformaFallo = false;
   if (componente.tipo_componente === "Módulo de Control") {
     const esDestinoStock = destino === "✓ Equipo OK - Stock (1ra categoría)" || destino === "✓ Equipo OK - Stock (2da categoría)";
-    if (esDestinoStock || destino === DESTINO_AMMI) {
+    if (esDestinoStock || destino === DESTINO_AMMI || destino === DESTINO_DESECHAR) {
       const mcEquipo = mcEditado || componente.m_control;
-      const tipoEventoNuevo = esDestinoStock ? "Desvinculación" : "Enviado a AMMI";
+      const tipoEventoNuevo = destino === DESTINO_AMMI ? "Enviado a AMMI" : "Desvinculación";
 
       const { data: eventoExistente } = await supabaseClient
         .from("historial_equipo")
@@ -677,7 +678,7 @@ async function guardarFila(btn) {
           mc: mcEquipo,
           tipo_evento: tipoEventoNuevo,
           id_ot: componente.id_ot,
-          notas: esDestinoStock ? "Módulo de Control revisado y enviado a stock" : "Módulo de Control enviado a AMMI"
+          notas: esDestinoStock ? "Módulo de Control revisado y enviado a stock" : destino === DESTINO_DESECHAR ? "Módulo de Control desechado" : "Módulo de Control enviado a AMMI"
         };
 
         if (eventoExistente) {
@@ -698,6 +699,12 @@ async function guardarFila(btn) {
       }
       // si ya existía uno del mismo tipo para esta misma OT, no se toca
     } else {
+      // Si el equipo vuelve al cliente tal cual, deja de estar "En revisión" (sigue vinculado en la plataforma)
+      if ((destino || "").includes("Devolver al cliente")) {
+        const mcDev = mcEditado || componente.m_control;
+        const { error: eDev } = await supabaseClient.from("equipos").update({ estado_montaje: "Instalado", actualizado_en: new Date().toISOString() }).eq("m_control", mcDev).eq("estado_montaje", "En revisión");
+        if (eDev) console.warn("No se pudo devolver el equipo a Instalado:", eDev.message);
+      }
       // El destino ya no es Stock ni AMMI (se corrigió, p. ej. a "Sigue en revisión"). Si antes Revisión anotó "Enviado a AMMI"
       // en esta OT, ese evento era falso, pero el equipo SÍ salió de la calle (se desvinculó), así que pasa a ser una
       // Desvinculación. Un evento "Desvinculación" automático no se toca.

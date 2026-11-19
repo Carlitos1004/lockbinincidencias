@@ -174,6 +174,8 @@
         filas.push(fila);
         const nuestro = porMc.get(mcN);
         if (!nuestro) { nuevos.push(fila); return; }
+        // Un equipo que marcamos "En revisión" (cambiado en Ruta) sigue "Instalado" en la plataforma hasta que se desvincule: no se pisa
+        if (normSinAcentos(nuestro.estado_montaje) === normSinAcentos("En revisión") && normSinAcentos(fila.estado_montaje) === normSinAcentos("Instalado")) fila.estado_montaje = nuestro.estado_montaje;
         const dif = {};
         COLUMNAS_FICHA.forEach(col => {
           const a = fila[col], b = nuestro[col];

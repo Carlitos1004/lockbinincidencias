@@ -1066,11 +1066,15 @@ modalEnviarBtn.addEventListener("click", async () => {
   let avisoPlataformaFallo = false;
   if (serialesNuevos.MC && codigosCambio.includes("MC") && String(serialesNuevos.MC).toUpperCase() !== equipoAbierto) {
     await registrarCambioMc(supabaseClient, equipoAbierto, serialesNuevos.MC, idOtActiva, "ruta");
-    // El MC viejo sale del contenedor: se desvincula también en la plataforma
-    const plat = await desvincularEnPlataforma(supabaseClient, equipoAbierto);
-    if (plat.resultado === "desvinculado") avisoPlataforma = `🔓 ${equipoAbierto} desvinculado en la plataforma.`;
-    else if (plat.ok) avisoPlataforma = `ℹ️ ${equipoAbierto} ya estaba desvinculado en la plataforma.`;
-    else { avisoPlataforma = `⚠️ No se pudo desvincular ${equipoAbierto} en la plataforma (${plat.mensaje || plat.resultado}): hazlo a mano.`; avisoPlataformaFallo = true; }
+    // NO se desvincula aquí: si se desvincula en campo, el equipo deja de comunicar y en el taller ya no se
+    // puede revisar con la plataforma. La desvinculación se hace después, en Revisión de taller, al darle destino.
+    // En nuestra tabla de equipos pasa a "En revisión" (así no figura como instalado junto al MC nuevo).
+    // La plataforma seguirá diciendo "Instalado" hasta que su endpoint de estado esté disponible; la sincronización respeta este valor.
+    try {
+      const { error: eRev } = await supabaseClient.from("equipos").update({ estado_montaje: "En revisión", actualizado_en: new Date().toISOString() }).eq("m_control", equipoAbierto);
+      if (eRev) console.warn("No se pudo marcar En revisión:", eRev.message);
+    } catch (e) { console.warn(e); }
+    avisoPlataforma = `ℹ️ ${equipoAbierto} queda «En revisión» y sigue vinculado en la plataforma: se desvincula al revisarlo en el taller.`;
   }
   if (huboAlgunCambio) {
     // Sin esto, "Utilizados"/"Vuelven" en Materiales se quedan con el
