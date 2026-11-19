@@ -260,6 +260,7 @@ function ordenarPorCercania(puntos, origen) {
 
 async function abrirModal(mc) {
   equipoAbierto = mc;
+  { const bp = document.getElementById("modal-plataforma-btn"); if (bp) { bp.hidden = !esManagerRuta(); bp.disabled = false; } }
   ticketExistente = null;
   serialesNuevos = {};
   categoriasPorComponente = {};
@@ -1166,7 +1167,10 @@ modalEnviarBtn.addEventListener("click", async () => {
 
   modalEnviarBtn.disabled = false;
   modalEnviarBtn.textContent = "Enviar reporte";
-  mostrarMensaje(modalMsg, "✅ Reporte guardado." + (avisoPlataforma ? " " + avisoPlataforma : ""), false);
+  const hayComponentesNuevos = !(serialesNuevos.MC && codigosCambio.includes("MC") && String(serialesNuevos.MC).toUpperCase() !== equipoAbierto) &&
+    ["LE", "CE", "BA"].some(c => codigosCambio.includes(c) && serialesNuevos[c]);
+  mostrarMensaje(modalMsg, "✅ Reporte guardado." + (avisoPlataforma ? " " + avisoPlataforma : "") +
+    (hayComponentesNuevos && esManagerRuta() ? " 🌐 Si quieres pasar los seriales nuevos a la plataforma, pulsa «Aplicar en la plataforma»." : ""), false);
 
   // Actualizamos el estado local y el color del punto en el mapa
   const ticketLocal = equiposPorMC[equipoAbierto].tickets.find(t => t.id_registro === idRegistro);
@@ -1174,7 +1178,8 @@ modalEnviarBtn.addEventListener("click", async () => {
   else equiposPorMC[equipoAbierto].tickets.push({ id_registro: idRegistro, ...datosFalla });
   actualizarColorMarcador(equipoAbierto);
 
-  setTimeout(cerrarModal, avisoPlataformaFallo ? 7000 : 1200);
+  // Si hay seriales nuevos que se pueden pasar a la plataforma, el reporte no se cierra solo: así da tiempo a pulsar el botón
+  if (!(hayComponentesNuevos && esManagerRuta())) setTimeout(cerrarModal, avisoPlataformaFallo ? 7000 : 1200);
 });
 
 function mostrarMensaje(el, texto, esError) {
@@ -1400,5 +1405,65 @@ btnComprobarCom.addEventListener("click", async () => {
     resultadoCom.textContent = "❌ " + e.message;
   } finally {
     btnComprobarCom.disabled = false;
+  }
+});
+
+
+// =====================================================================
+// Aplicar en la plataforma los componentes nuevos (LE / CE / BA) de este equipo — solo manager, con confirmación
+// =====================================================================
+function esManagerRuta() {
+  return ((window.perfilActual && window.perfilActual.rol) || sessionStorage.getItem("lb_rol")) === "manager";
+}
+document.getElementById("modal-plataforma-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("modal-plataforma-btn");
+  const idOtActiva = sessionStorage.getItem("lockbin_ot_activa");
+  const completo = document.getElementById("modal-cambio-completo").checked;
+  const codigosCambio = completo ? ["LE", "CE", "BA", "MC"] : ["LE", "CE", "BA", "MC"].filter(c => document.getElementById("modal-cambio-" + c.toLowerCase()).checked);
+  if (serialesNuevos.MC && codigosCambio.includes("MC") && String(serialesNuevos.MC).toUpperCase() !== equipoAbierto) {
+    alert(`Este reporte cambia el MC. En ese caso el setup del MC nuevo se hace a mano en la plataforma, y ${equipoAbierto} se desvincula al revisarlo en el taller.`);
+    return;
+  }
+  const comps = {}, anteriores = {};
+  [["LE", "reader"], ["CE", "lock"], ["BA", "battery"]].forEach(([cod, clave]) => {
+    const nuevo = String(serialesNuevos[cod] || "").trim().toUpperCase();
+    if (codigosCambio.includes(cod) && nuevo) { comps[clave] = nuevo; anteriores[clave] = serialViejoDe(cod); }
+  });
+  if (!Object.keys(comps).length) { alert("No hay seriales nuevos de lector, cierre o batería que aplicar. Marca el cambio y escanea o escribe el serial nuevo."); return; }
+  const SIGLA = { battery: "BA", lock: "CE", reader: "LE" };
+  const lista = Object.entries(comps).map(([k, v]) => `${SIGLA[k]}=${v}`).join(", ");
+  if (!confirm(`En la plataforma, en ${equipoAbierto}, se pondrá: ${lista}\n\n¿Aplicar?`)) return;
+
+  btn.disabled = true; const textoBtn = btn.textContent; btn.textContent = "Aplicando...";
+  try {
+    const r = await componentesEnPlataforma(supabaseClient, equipoAbierto, comps);
+    const ETIQ = { cambiado: "✅ cambiado", sin_cambio: "ya estaba", error: "❌ error", no_intentado: "— no intentado" };
+    const detalle = (r.componentes || []).map(c => `${SIGLA[c.componente]}: ${ETIQ[c.resultado] || c.resultado}`).join(" · ");
+    if (r.resultado === "no_esta_en_plataforma") { mostrarMensaje(modalMsg, `⚠️ ${equipoAbierto} no está activo en la plataforma: no se cambió nada.`, true); return; }
+    mostrarMensaje(modalMsg, r.ok ? `🌐 Aplicado en la plataforma — ${detalle}` : `⚠️ No se pudo completar${r.mensaje ? " (" + r.mensaje + ")" : ""} — ${detalle}. Puedes volver a pulsar: lo ya aplicado no se repite.`, !r.ok);
+    // Lo cambiado de verdad: Vida del equipo + nuestra ficha de Equipos al día hasta la próxima sincronización
+    const cambiados = (r.componentes || []).filter(c => c.resultado === "cambiado");
+    if (cambiados.length) {
+      const NOMBRE = { battery: "Batería", lock: "Cierre", reader: "Lector" };
+      const COL = { battery: "serie_bateria", lock: "serie_cierre", reader: "serie_lector" };
+      const { data: eqInfo } = await supabaseClient.from("equipos").select("imei, cliente").eq("m_control", equipoAbierto).maybeSingle();
+      const imeiC = eqInfo?.imei || null;
+      const clienteC = eqInfo?.cliente || equiposPorMC[equipoAbierto]?.equipo?.cliente || null;
+      let alguno = false;
+      for (const c of cambiados) {
+        const notas = `${NOMBRE[c.componente]}: ${anteriores[c.componente] || "—"} → ${c.valor} (Ruta)`;
+        const { data: ya } = await supabaseClient.from("historial_equipo").select("id").eq("mc", equipoAbierto).eq("id_ot", idOtActiva).eq("tipo_evento", "Cambio de componente").eq("notas", notas).limit(1);
+        if (!(ya && ya.length)) {
+          const { error: eH } = await supabaseClient.from("historial_equipo").insert({ imei: imeiC, mc: equipoAbierto, tipo_evento: "Cambio de componente", cliente: clienteC, id_ot: idOtActiva, [COL[c.componente]]: c.valor, notas });
+          if (eH) console.warn("Vida (Cambio de componente):", eH.message); else alguno = true;
+        }
+        await supabaseClient.from("equipos").update({ [COL[c.componente]]: c.valor, actualizado_en: new Date().toISOString() }).eq("m_control", equipoAbierto);
+      }
+      if (alguno && imeiC) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imeiC });
+    }
+  } catch (e) {
+    mostrarMensaje(modalMsg, "❌ " + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = textoBtn;
   }
 });
