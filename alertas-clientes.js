@@ -157,6 +157,7 @@ function renderCambios() {
       <td>${c.estado}</td>
       <td><div class="acciones-fila">
         ${c.estado === "Nueva" ? `<button class="btn-marcar-vista-cambio btn-secundario btn-compacto" data-id="${c.id}">Marcar vista</button>` : ""}
+        ${puedeAplicarEnPlataforma(c) ? `<button class="btn-plataforma-cambio btn-primario btn-compacto" data-id="${c.id}">🌐 Aplicar en plataforma</button>` : ""}
         ${c.estado !== "Aplicado en equipos" ? `<button class="btn-aplicar-cambio btn-primario btn-compacto" data-id="${c.id}">Marcar aplicado</button>` : ""}
         <a href="buscar-serial.html" class="btn-secundario btn-compacto btn-ver-mc-cambio" data-mc="${c.m_control}">Ver equipo →</a>
       </div></td>
@@ -165,6 +166,9 @@ function renderCambios() {
 
   tbody.querySelectorAll(".btn-marcar-vista-cambio").forEach(btn => {
     btn.addEventListener("click", () => actualizarEstadoCambio(btn.dataset.id, "Vista"));
+  });
+  tbody.querySelectorAll(".btn-plataforma-cambio").forEach(btn => {
+    btn.addEventListener("click", () => aplicarCambioEnPlataforma(btn));
   });
   tbody.querySelectorAll(".btn-aplicar-cambio").forEach(btn => {
     btn.addEventListener("click", () => actualizarEstadoCambio(btn.dataset.id, "Aplicado en equipos"));
@@ -188,3 +192,54 @@ async function actualizarEstadoCambio(id, nuevoEstado) {
 ["filtro-cambios-cliente", "filtro-cambios-estado"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderCambios);
 });
+
+
+// ================= APLICAR EN LA PLATAFORMA un cambio reportado por el cliente =================
+const CAMBIO_PLATAFORMA = {
+  "Batería": { clave: "battery", col: "serie_bateria", sigla: "BA" },
+  "Lector Electrónico": { clave: "reader", col: "serie_lector", sigla: "LE" },
+  "Cierre Electrónico": { clave: "lock", col: "serie_cierre", sigla: "CE" }
+};
+function puedeAplicarEnPlataforma(c) {
+  return !!CAMBIO_PLATAFORMA[c.tipo_componente] && !!(c.serial_nuevo || "").trim() && c.estado !== "Aplicado en equipos";
+}
+
+async function aplicarCambioEnPlataforma(btn) {
+  const c = cambiosData.find(x => String(x.id) === String(btn.dataset.id));
+  if (!c) return;
+  const def = CAMBIO_PLATAFORMA[c.tipo_componente];
+  const nuevo = c.serial_nuevo.trim().toUpperCase();
+  if (!confirm(`En la plataforma, en ${c.m_control}, se pondrá: ${def.sigla}=${nuevo}` +
+    `\n(el cliente ${c.cliente || "—"} reportó: ${c.serial_anterior || "—"} → ${nuevo})\n\n¿Aplicar y registrar el cambio?`)) return;
+  const texto = btn.textContent; btn.disabled = true; btn.textContent = "Aplicando...";
+  try {
+    const r = await componentesEnPlataforma(supabaseClient, c.m_control, { [def.clave]: nuevo });
+    if (r.resultado === "no_esta_en_plataforma") { alert(`${c.m_control} no está activo en la plataforma: no se cambió nada.`); return; }
+    const comp = (r.componentes || []).find(x => x.componente === def.clave);
+    const res = comp ? comp.resultado : "error";
+    if (res !== "cambiado" && res !== "sin_cambio") {
+      alert("No se pudo aplicar" + (r.mensaje ? " (" + r.mensaje + ")" : "") + ". Puedes volver a intentarlo.");
+      return;
+    }
+    const { data: eq } = await supabaseClient.from("equipos").select("imei, cliente").eq("m_control", c.m_control).maybeSingle();
+    const imei = eq && eq.imei || null;
+    if (res === "cambiado") {   // Vida del equipo + ficha de Equipos
+      const notas = `${c.tipo_componente}: ${c.serial_anterior || "—"} → ${nuevo} (reportado por el cliente)`;
+      const { data: ya } = await supabaseClient.from("historial_equipo").select("id").eq("mc", c.m_control).eq("tipo_evento", "Cambio de componente").eq("notas", notas).limit(1);
+      if (!(ya && ya.length)) {
+        const { error: eH } = await supabaseClient.from("historial_equipo").insert({ imei, mc: c.m_control, tipo_evento: "Cambio de componente", cliente: c.cliente || (eq && eq.cliente) || null, [def.col]: nuevo, notas });
+        if (eH) console.warn("Vida:", eH.message); else if (imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: imei });
+      }
+    }
+    await supabaseClient.from("equipos").update({ [def.col]: nuevo, actualizado_en: new Date().toISOString() }).eq("m_control", c.m_control);
+    // Si la pieza venía del stock que le entregamos al cliente, queda como instalada
+    await supabaseClient.from("entregas_cliente_items").update({ estado: "Instalada", mc_instalado: c.m_control, instalada_en: new Date().toISOString() })
+      .eq("serial", nuevo).eq("estado", "En stock del cliente");
+    await actualizarEstadoCambio(c.id, "Aplicado en equipos");
+    alert(res === "cambiado" ? "✅ Aplicado en la plataforma y registrado en la Vida del equipo." : "ℹ️ La plataforma ya tenía ese serial. Cambio marcado como aplicado.");
+  } catch (e) {
+    alert("❌ " + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = texto;
+  }
+}
