@@ -127,6 +127,11 @@
     "t": "SIMs guardadas",
     "d": "SIMs del cliente retiradas en el taller"
   },
+  "stock-clientes.html": {
+    "i": "📦",
+    "t": "Stock en clientes",
+    "d": "Material entregado que el cliente guarda"
+  },
   "materiales-serializados.html": {
     "i": "🔖",
     "t": "Serialización de Materiales",

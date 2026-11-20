@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Stock en clientes</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .panel-body-ancho { max-width: 98vw; }
+  .caja { border:1.5px solid #d5ddd6; border-radius:12px; padding:10px 16px; margin:14px 0; background:#fff; }
+  .caja input[type=text], .caja input[type=date], .caja select, .caja textarea {
+    padding:8px 11px; border:1.5px solid #d5ddd6; border-radius:10px; background:#fff; font:inherit; font-size:.92rem; box-sizing:border-box; }
+  .caja input:focus, .caja select:focus, .caja textarea:focus { outline:none; border-color:#4c8c2b; box-shadow:0 0 0 3px rgba(76,140,43,.15); }
+  .caja input[type=file]::file-selector-button { border:0; border-radius:10px; padding:7px 13px; margin-right:10px; cursor:pointer; background:#e3e8e4; color:#333; font:inherit; font-weight:600; }
+  .fila-form { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin:8px 0; }
+  .fila-form label { display:flex; flex-direction:column; gap:4px; font-size:.85rem; font-weight:500; }
+  .caja button { border-radius:10px; padding:7px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  .caja button:disabled { opacity:.5; cursor:default; }
+  .chip { display:inline-block; padding:2px 9px; border-radius:999px; font-size:.78rem; font-weight:600; background:#e3e8e4; }
+  .chip-ok { background:#dff0d6; color:#2d5d1a; } .chip-aviso { background:#fff1cf; color:#7a5a00; } .chip-info { background:#e2ecf8; color:#1f4e8c; }
+  .entrega-cab { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+</style>
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Stock en clientes</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="datos-inventario.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Datos e Inventario</a>
+  <p style="color:var(--gris-700);">Material que se entrega o vende a un cliente y él guarda en su stock (p. ej. baterías de repuesto). Cuando el cliente instala una pieza en un equipo, se detecta sola al ver su serial en Equipos.</p>
+
+  <div class="caja">
+    <h3 style="margin:4px 0 8px;">Resumen por cliente</h3>
+    <div id="resumen-clientes">Cargando…</div>
+  </div>
+
+  <details class="caja" id="nueva-entrega">
+    <summary style="cursor:pointer;font-weight:700;">➕ Registrar una entrega</summary>
+    <div class="fila-form">
+      <label>Cliente <input type="text" id="e-cliente" list="lista-clientes" placeholder="Cliente" style="width:230px;"></label>
+      <datalist id="lista-clientes"></datalist>
+      <label>Fecha <input type="date" id="e-fecha"></label>
+      <label>Nº de albarán (opcional) <input type="text" id="e-albaran" placeholder="Se puede añadir después" style="width:200px;"></label>
+      <label>Nota <input type="text" id="e-nota" placeholder="Opcional" style="width:200px;"></label>
+    </div>
+    <div class="fila-form">
+      <label>Tipo de batería
+        <select id="e-subtipo">
+          <option value="">Detectar (si se puede)</option>
+          <option value="Recargable">Recargable</option>
+          <option value="No Recargable">No recargable</option>
+          <option value="PKCELL">PKCELL</option>
+        </select></label>
+      <label>Categoría
+        <select id="e-categoria"><option value="">Sin categoría</option><option value="1">1ª categoría</option><option value="2">2ª categoría</option></select></label>
+      <label>Excel con los seriales <input type="file" id="e-excel" accept=".xlsx,.xls,.csv"></label>
+    </div>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:500;">…o pega los seriales (uno por línea; el prefijo BA, LE, CE o MC dice el tipo de pieza)
+      <textarea id="e-texto" rows="5" style="width:100%;max-width:420px;font-family:monospace;" placeholder="BA2600011&#10;BA2600050"></textarea></label>
+    <div class="fila-form"><button type="button" id="e-previa" class="btn-secundario">Vista previa</button></div>
+    <div id="e-resultado"></div>
+  </details>
+
+  <div class="caja">
+    <div class="fila-form" style="margin-top:0;">
+      <h3 style="margin:0;">Entregas</h3>
+      <label>Cliente <select id="f-cliente"><option value="">Todos</option></select></label>
+      <label>Buscar serial <input type="text" id="f-serial" placeholder="BA2600011" style="width:150px;"></label>
+    </div>
+    <p id="msg" class="resultado-msg" hidden></p>
+    <div id="lista-entregas">Cargando…</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="serializados-core.js"></script>
+<script src="stock-clientes.js"></script>
+
+<footer class="footer-fv">
+  <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="footer-fv-logo">
+  <span>Un producto de Formato Verde</span>
+</footer>
+</body>
+</html>
