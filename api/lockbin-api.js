@@ -415,7 +415,10 @@ module.exports = async (req, res) => {
         mc, encontrado: true, consultadoEn,
         lastReceptionAt: e.lastReceptionAt || null,
         lastCommunicationAt: e.lastCommunicationAt || null,
-        alertCommunications: !!e.alertCommunications
+        alertCommunications: !!e.alertCommunications,
+        // lecturas de batería (la más reciente por fecha se elige en el navegador)
+        lecturasBateria: [1, 2, 3, 4, 5, 6, 7].map(n => ({ valor: e["batteryReading" + n] ?? null, fecha: e["batteryReading" + n + "At"] ?? null })).filter(l => l.valor !== null && l.valor !== ""),
+        modeloBateria: e.batteryModelCode ?? null
       });
     }
 
