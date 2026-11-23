@@ -1393,13 +1393,18 @@ btnComprobarCom.addEventListener("click", async () => {
       resultadoCom.textContent = `❌ Sin ningún mensaje registrado. (Consultado a las ${hora})`;
       return;
     }
+    const lecs = (d.lecturasBateria || []).filter(l => l.fecha).sort((x, y) => new Date(y.fecha) - new Date(x.fecha));
+    const lec = lecs[0] || (d.lecturasBateria || [])[0];
+    const textoBat = lec
+      ? ` 🔋 Última lectura de batería: ${lec.valor}${lec.fecha ? " (" + new Date(lec.fecha).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) + ")" : ""}.`
+      : " 🔋 Sin lecturas de batería.";
     const ms = new Date(d.consultadoEn).getTime() - new Date(d.lastReceptionAt).getTime();
     const reciente = ms <= 30 * 60000;
     const fecha = new Date(d.lastReceptionAt).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
     resultadoCom.className = "resultado-comunicacion " + (reciente ? "com-ok" : "com-aviso");
     resultadoCom.textContent = `${reciente ? "✅ Ha comunicado" : "⚠️ Último mensaje"} ${textoHace(ms)} (${fecha}).` +
       (d.alertCommunications ? " La alerta «no comunica» sigue activa; puede tardar en limpiarse." : "") +
-      ` Consultado a las ${hora}.`;
+      textoBat + ` Consultado a las ${hora}.`;
   } catch (e) {
     resultadoCom.className = "resultado-comunicacion com-mal";
     resultadoCom.textContent = "❌ " + e.message;

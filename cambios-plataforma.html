@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockBin — Cambios en la plataforma</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .cp-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:10px; }
+  .cp-grid label { display:flex; flex-direction:column; gap:4px; font-weight:600; font-size:.9rem; }
+  .cp-grid input { font-family:monospace; text-transform:uppercase; }
+  .cp-actual { font-weight:400; font-size:.8rem; color:var(--gris-500); }
+  .cp-peligro { border:1px solid #f0b4b4; background:#fff5f5; border-radius:10px; padding:10px 14px; margin-top:14px; }
+  #cp-salida { white-space:pre-wrap; margin-top:12px; }
+</style>
+</head>
+<body>
+
+<div class="panel-header">
+  <div class="panel-header-marca">
+    <img src="assets/logo-formato-verde.png" alt="Formato Verde" class="panel-logo-fv">
+    <h1>Cambios en la plataforma</h1>
+  </div>
+  <button id="logout-btn">Cerrar sesión</button>
+</div>
+
+<div class="panel-body panel-body-ancho">
+  <a href="admin.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver al panel</a>
+
+  <p style="margin-top:20px;">Cambia la batería, el cierre o el lector de un equipo en la plataforma, o dalo de baja (desvincular). Cada cambio queda en la Vida del equipo y en el registro de operaciones.</p>
+
+  <div class="caja-formulario">
+    <label style="font-weight:600;">MC del equipo</label>
+    <div class="materiales-controles">
+      <input type="text" id="cp-mc" placeholder="MC2400123" style="text-transform:uppercase;">
+      <button id="cp-consultar" class="btn-secundario btn-compacto" type="button">Consultar equipo</button>
+    </div>
+    <p id="cp-actual" style="margin-top:8px; font-size:.9rem;"></p>
+
+    <div class="cp-grid">
+      <label>Batería nueva <span class="cp-actual" id="cp-act-bateria"></span><input type="text" id="cp-bateria" placeholder="BA…"></label>
+      <label>Cierre nuevo <span class="cp-actual" id="cp-act-cierre"></span><input type="text" id="cp-cierre" placeholder="CE…"></label>
+      <label>Lector nuevo <span class="cp-actual" id="cp-act-lector"></span><input type="text" id="cp-lector" placeholder="LE…"></label>
+    </div>
+    <p style="font-size:.85rem; color:var(--gris-500); margin-top:6px;">Deja vacío lo que no cambies. Si el serial ya es el que tiene la plataforma, no se toca.</p>
+    <label style="display:block; margin-top:8px;">Motivo / nota (opcional) <input type="text" id="cp-nota" style="width:100%;"></label>
+    <div class="materiales-controles" style="margin-top:12px;">
+      <button id="cp-aplicar" class="btn-primario" type="button">🌐 Aplicar cambios de componentes</button>
+    </div>
+
+    <div class="cp-peligro">
+      <strong>Desvincular</strong>
+      <p style="font-size:.9rem; margin:4px 0 8px;">Da de baja el equipo en la plataforma: deja de comunicar y el dispositivo queda libre. No toca los componentes de arriba.</p>
+      <label><input type="checkbox" id="cp-conf-desv"> Entiendo que el equipo se dará de baja</label>
+      <div class="materiales-controles" style="margin-top:8px;">
+        <button id="cp-desvincular" class="btn-secundario" type="button" disabled>🔓 Desvincular este MC</button>
+      </div>
+    </div>
+    <pre id="cp-salida"></pre>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>const ROL_ESPERADO = "manager";</script>
+<script src="sesion.js"></script>
+<script src="plataforma-core.js"></script>
+<script src="cambios-plataforma.js"></script>
+</body>
+</html>

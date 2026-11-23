@@ -127,6 +127,11 @@
     "t": "SIMs guardadas",
     "d": "SIMs del cliente retiradas en el taller"
   },
+  "cambios-plataforma.html": {
+    "i": "🌐",
+    "t": "Cambios en la plataforma",
+    "d": "Cambiar componentes o desvincular un MC"
+  },
   "stock-clientes.html": {
     "i": "📦",
     "t": "Stock en clientes",
