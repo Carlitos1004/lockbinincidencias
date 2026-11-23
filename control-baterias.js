@@ -1,293 +1,226 @@
 // =========================================================================
-// CONTROL DE BATERÍAS — activas vs retiradas, tiempo en uso calculado
-// cruzando cuándo se instaló cada serial (serial_nuevo) contra cuándo se
-// retiró (serial_retirado) o contra hoy si sigue en servicio.
+// CONTROL DE BATERÍAS — una sola lista con la vida de cada batería.
+// El tiempo corre desde que se ENTREGA (entrega al cliente > fecha de entrega de la reposición >
+// fecha del ticket > fecha de instalación del equipo, esta última marcada "aprox.").
+// Vida útil programada: 24 meses.
 // =========================================================================
+const DIAS_MES = 30.4375;
+const UMBRALES = { prematura: 3, temprana: 12, corta: 18, planificar: 20, vida: 24 };   // en meses
 
-let retiradasData = [];
-let activasData = [];
+const CLASES = {
+  prematura: { txt: "🔴 Falla prematura", ayuda: "Duró menos de 3 meses" },
+  temprana:  { txt: "🟠 Falla temprana",  ayuda: "Duró de 3 a 12 meses" },
+  corta:     { txt: "🟡 Vida corta",      ayuda: "Duró de 12 a 18 meses" },
+  cumplido:  { txt: "🟢 Ciclo cumplido",  ayuda: "Duró 18 meses o más" },
+  servicio:  { txt: "⚪ En servicio",      ayuda: "Activa, menos de 18 meses" },
+  fin:       { txt: "🟢 Ciclo cumplido (en servicio)", ayuda: "Activa, 18 meses o más" },
+  planificar:{ txt: "⏰ Planificar cambio", ayuda: "Activa, 20 meses o más" },
+  vencida:   { txt: "⏰ Vida útil superada", ayuda: "Activa, 24 meses o más" }
+};
 
-// La política de garantía de baterías todavía no está definida del todo
-// (a diferencia de los demás componentes, que sí tienen 2 años fijos) —
-// por ahora la batería tiene 1 año, y si se reemplaza sigue corriendo el
-// tiempo de la batería anterior (no se reinicia). Está en discusión si
-// una batería nueva comprada fuera de garantía arrancaría con 6 meses
-// propios. Mientras eso se decide, aquí solo se muestra la información de
-// los 2 plazos (¿entró dentro de 6 meses? ¿dentro de 1 año?), sin asumir
-// todavía cuál de los dos manda.
-const DIAS_GARANTIA_6_MESES = 180;
-const DIAS_GARANTIA_1_ANO = 365;
+let filas = [];
 
-function calcularGarantia(diasEnUso) {
-  if (diasEnUso === null || diasEnUso === undefined) {
-    return { dentro6m: null, dentro1a: null, texto6m: "—", texto1a: "—" };
-  }
-  const dentro6m = diasEnUso <= DIAS_GARANTIA_6_MESES;
-  const dentro1a = diasEnUso <= DIAS_GARANTIA_1_ANO;
-  return {
-    dentro6m,
-    dentro1a,
-    texto6m: dentro6m ? "✅ Sí" : "❌ No",
-    texto1a: dentro1a ? "✅ Sí" : "❌ No"
-  };
+const esc = t => { const d = document.createElement("div"); d.textContent = t == null ? "" : String(t); return d.innerHTML; };
+const fmtFecha = f => f ? new Date(f).toLocaleDateString("es-ES") : "—";
+const diasEntre = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 86400000));
+const meses = dias => dias / DIAS_MES;
+function textoDuracion(dias) {
+  if (dias == null) return "—";
+  const m = Math.floor(meses(dias)), d = Math.round(dias - m * DIAS_MES);
+  return (m ? m + " m " : "") + d + " d";
 }
-
-cargarDatos();
-
-function diasEntre(fechaA, fechaB) {
-  const ms = new Date(fechaB) - new Date(fechaA);
-  return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)));
+function clasificar(estado, dias) {
+  if (dias == null) return null;
+  const m = meses(dias);
+  if (estado === "Retirada") return m < UMBRALES.prematura ? "prematura" : m < UMBRALES.temprana ? "temprana" : m < UMBRALES.corta ? "corta" : "cumplido";
+  return m >= UMBRALES.vida ? "vencida" : m >= UMBRALES.planificar ? "planificar" : m >= UMBRALES.corta ? "fin" : "servicio";
 }
+const mediana = arr => { if (!arr.length) return null; const s = [...arr].sort((a, b) => a - b); const k = Math.floor(s.length / 2); return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2; };
 
-async function traerTodasLasFilas(tabla, columnas, aplicarFiltro) {
-  const TAM_PAGINA = 1000;
-  let desde = 0;
+async function traer(tabla, columnas, filtro) {
   let todas = [];
-  while (true) {
-    let query = supabaseClient.from(tabla).select(columnas).range(desde, desde + TAM_PAGINA - 1);
-    if (aplicarFiltro) query = aplicarFiltro(query);
-    const { data, error } = await query;
+  for (let d = 0; ; d += 1000) {
+    let q = supabaseClient.from(tabla).select(columnas).range(d, d + 999);
+    if (filtro) q = filtro(q);
+    const { data, error } = await q;
     if (error) throw error;
     todas = todas.concat(data || []);
-    if (!data || data.length < TAM_PAGINA) break;
-    desde += TAM_PAGINA;
+    if (!data || data.length < 1000) break;
   }
   return todas;
 }
 
+cargarDatos();
+
 async function cargarDatos() {
-  let data;
-  let equiposData = [];
+  const tb = document.getElementById("tbody-baterias");
+  let comp, equipos, entregas = [], itemsEntrega = [];
   try {
-    data = await traerTodasLasFilas(
-      "componentes_retirados",
-      "cliente, m_control, id_ot, fecha, serial_nuevo, serial_retirado, tipo_componente, categoria, reparacion, estado",
-      (q) => q.in("tipo_componente", ["Batería Recargable", "Batería No Recargable", "Batería PKCELL"]).order("id")
-    );
-    equiposData = await traerTodasLasFilas(
-      "equipos",
-      "m_control, cliente, serie_bateria, modelo_bateria, fecha_instalacion",
-      (q) => q.order("m_control")
-    );
-  } catch (err) {
-    document.getElementById("tbody-retiradas").innerHTML = `<tr><td colspan="12">Error: ${err.message}</td></tr>`;
-    return;
+    comp = await traer("componentes_retirados",
+      "cliente, m_control, id_ot, fecha, serial_nuevo, serial_retirado, tipo_componente, categoria, reparacion, repo_fecha_entrega",
+      q => q.in("tipo_componente", ["Batería Recargable", "Batería No Recargable", "Batería PKCELL"]).order("id"));
+    equipos = await traer("equipos", "m_control, cliente, serie_bateria, modelo_bateria, fecha_instalacion", q => q.order("m_control"));
+  } catch (err) { tb.innerHTML = `<tr><td colspan="11">Error: ${esc(err.message)}</td></tr>`; return; }
+  try {   // entregas a clientes (si todavía no existe el SQL 108, se sigue sin ellas)
+    entregas = await traer("entregas_cliente", "id, cliente, fecha, albaran");
+    itemsEntrega = await traer("entregas_cliente_items", "entrega_id, tipo, subtipo, serial, estado, mc_instalado, categoria", q => q.eq("tipo", "Batería"));
+  } catch (e) { /* sin stock en clientes */ }
+
+  const norm = s => String(s || "").trim().toUpperCase();
+  const entregaPorId = Object.fromEntries(entregas.map(e => [e.id, e]));
+  const entregaPorSerial = {};
+  itemsEntrega.forEach(i => { const e = entregaPorId[i.entrega_id]; if (e) entregaPorSerial[norm(i.serial)] = { ...i, fecha: e.fecha, cliente: e.cliente }; });
+
+  const ultimo = (lista, clave) => { const o = {}; lista.forEach(c => { const s = norm(c[clave]); if (!s) return; if (!o[s] || new Date(c.fecha) > new Date(o[s].fecha)) o[s] = c; }); return o; };
+  const instal = ultimo(comp, "serial_nuevo");
+  const retiros = ultimo(comp, "serial_retirado");
+  const equipoPorMC = Object.fromEntries(equipos.filter(e => e.m_control).map(e => [e.m_control, e]));
+  const equipoPorBateria = {};
+  equipos.forEach(e => { if (e.serie_bateria) equipoPorBateria[norm(e.serie_bateria)] = e; });
+  const tipoDeModelo = m => { m = String(m || "").toUpperCase(); return m.startsWith("BA02") ? "Batería Recargable" : m.startsWith("BA01") ? "Batería No Recargable" : m.startsWith("BA03") ? "Batería PKCELL" : "Batería"; };
+
+  // Desde cuándo corre el tiempo
+  function inicio(serial, reg, eq) {
+    const ent = entregaPorSerial[serial];
+    if (ent) return { fecha: ent.fecha, origen: "entrega al cliente" };
+    if (reg && reg.repo_fecha_entrega) return { fecha: reg.repo_fecha_entrega, origen: "entrega de la reposición" };
+    if (reg) return { fecha: reg.fecha, origen: "fecha del ticket" };
+    if (eq && eq.fecha_instalacion) return { fecha: eq.fecha_instalacion, origen: "instalación del equipo (aprox.)", aprox: true };
+    return { fecha: null, origen: "sin fecha" };
   }
 
-  // Última instalación conocida de cada serial (por si un serial se
-  // reutilizó más de una vez, nos quedamos con la más reciente)
-  const instalacionesPorSerial = {};
-  data.forEach(c => {
-    if (!c.serial_nuevo) return;
-    const actual = instalacionesPorSerial[c.serial_nuevo];
-    if (!actual || new Date(c.fecha) > new Date(actual.fecha)) instalacionesPorSerial[c.serial_nuevo] = c;
+  filas = [];
+  const vistos = new Set();
+  // Retiradas
+  Object.entries(retiros).forEach(([serial, r]) => {
+    vistos.add(serial);
+    const i = inicio(serial, instal[serial], equipoPorMC[r.m_control]);
+    const dias = i.fecha ? diasEntre(i.fecha, r.fecha) : null;
+    filas.push({ serial, tipo: r.tipo_componente, cliente: r.cliente, mc: r.m_control, categoria: r.categoria, estado: "Retirada",
+      desde: i.fecha, origen: i.origen, aprox: !!i.aprox, hasta: r.fecha, dias, clase: clasificar("Retirada", dias), causa: r.reparacion, idOt: r.id_ot });
   });
-
-  // Último retiro conocido de cada serial
-  const retirosPorSerial = {};
-  data.forEach(c => {
-    if (!c.serial_retirado) return;
-    const actual = retirosPorSerial[c.serial_retirado];
-    if (!actual || new Date(c.fecha) > new Date(actual.fecha)) retirosPorSerial[c.serial_retirado] = c;
+  // Activas por historial (instaladas como repuesto y no retiradas después)
+  Object.entries(instal).forEach(([serial, c]) => {
+    if (retiros[serial] && new Date(retiros[serial].fecha) >= new Date(c.fecha)) return;   // ya salió como retirada
+    if (vistos.has(serial)) return;
+    vistos.add(serial);
+    const i = inicio(serial, c, null);
+    const dias = i.fecha ? diasEntre(i.fecha, new Date()) : null;
+    filas.push({ serial, tipo: c.tipo_componente, cliente: c.cliente, mc: c.m_control, categoria: c.categoria, estado: "Activa",
+      desde: i.fecha, origen: i.origen, aprox: false, hasta: null, dias, clase: clasificar("Activa", dias), causa: null, idOt: c.id_ot });
   });
-
-  // Fecha de instalación del equipo completo, por MC — se usa como
-  // aproximación de la fecha de instalación de la batería cuando no hay
-  // ningún registro de instalación de ese serial en particular (ej. si
-  // era la batería ORIGINAL del equipo, nunca sustituida antes de esta
-  // falla). Es una aproximación, no la fecha real de la batería — se
-  // marca como tal en la tabla.
-  const equiposPorMC = {};
-  equiposData.forEach(eq => { if (eq.m_control) equiposPorMC[eq.m_control] = eq; });
-
-  retiradasData = Object.values(retirosPorSerial).map(retiro => {
-    const instalacion = instalacionesPorSerial[retiro.serial_retirado];
-    const equipoAsociado = equiposPorMC[retiro.m_control];
-    const fechaInstalacionAprox = !instalacion && equipoAsociado?.fecha_instalacion
-      ? equipoAsociado.fecha_instalacion
-      : null;
-    const fechaInstalacionFinal = instalacion?.fecha || fechaInstalacionAprox;
-
-    return {
-      serial: retiro.serial_retirado,
-      tipo: retiro.tipo_componente,
-      cliente: retiro.cliente,
-      mc: retiro.m_control,
-      categoria: retiro.categoria,
-      fechaInstalacion: fechaInstalacionFinal || null,
-      fechaEsAproximada: !instalacion && !!fechaInstalacionAprox,
-      fechaRetiro: retiro.fecha,
-      diasEnUso: fechaInstalacionFinal ? diasEntre(fechaInstalacionFinal, retiro.fecha) : null,
-      causa: retiro.reparacion,
-      idOt: retiro.id_ot
-    };
-  }).map(r => ({ ...r, garantia: calcularGarantia(r.diasEnUso) }));
-
-  activasData = Object.values(instalacionesPorSerial)
-    .filter(inst => {
-      const retiro = retirosPorSerial[inst.serial_nuevo];
-      return !retiro || new Date(retiro.fecha) <= new Date(inst.fecha);
-    })
-    .map(inst => ({
-      serial: inst.serial_nuevo,
-      tipo: inst.tipo_componente,
-      cliente: inst.cliente,
-      mc: inst.m_control,
-      categoria: inst.categoria,
-      fechaInstalacion: inst.fecha,
-      diasEnUso: diasEntre(inst.fecha, new Date()),
-      idOt: inst.id_ot
-    }))
-    .map(a => ({ ...a, garantia: calcularGarantia(a.diasEnUso) }));
-
-  // Baterías ORIGINALES que nunca se han cambiado (ninguna fila en
-  // componentes_retirados, ni como retiro ni como repuesto instalado) —
-  // sin esto no aparecían en Activas porque no había cómo saber cuándo
-  // se instalaron. Usamos la fecha de instalación del EQUIPO completo
-  // como referencia (fecha real de la batería si nunca se ha tocado).
-  const serialesConHistoria = new Set([
-    ...Object.keys(instalacionesPorSerial),
-    ...Object.keys(retirosPorSerial)
-  ].map(s => s.trim().toUpperCase()));
-
-  equiposData.forEach(eq => {
-    const serial = (eq.serie_bateria || "").trim();
-    if (!serial || serialesConHistoria.has(serial.toUpperCase())) return;
-    if (!eq.fecha_instalacion) return; // sin fecha de referencia, no se puede calcular
-
-    const modelo = (eq.modelo_bateria || "").toUpperCase();
-    const tipo = modelo.startsWith("BA02") ? "Batería Recargable"
-      : modelo.startsWith("BA01") ? "Batería No Recargable"
-      : modelo.startsWith("BA03") ? "Batería PKCELL"
-      : "Batería";
-
-    const diasEnUso = diasEntre(eq.fecha_instalacion, new Date());
-    activasData.push({
-      serial,
-      tipo,
-      cliente: eq.cliente,
-      mc: eq.m_control,
-      categoria: null,
-      fechaInstalacion: eq.fecha_instalacion,
-      diasEnUso,
-      idOt: null,
-      garantia: calcularGarantia(diasEnUso)
-    });
+  // Activas originales del equipo (sin historial)
+  equipos.forEach(e => {
+    const serial = norm(e.serie_bateria);
+    if (!serial || vistos.has(serial)) return;
+    const i = inicio(serial, null, e);
+    if (!i.fecha) return;
+    vistos.add(serial);
+    const dias = diasEntre(i.fecha, new Date());
+    filas.push({ serial, tipo: tipoDeModelo(e.modelo_bateria), cliente: e.cliente, mc: e.m_control, categoria: null, estado: "Activa",
+      desde: i.fecha, origen: i.origen, aprox: !!i.aprox, hasta: null, dias, clase: clasificar("Activa", dias), causa: null, idOt: null });
   });
-
+  // Entregadas al cliente que aún guarda en su stock
+  Object.entries(entregaPorSerial).forEach(([serial, it]) => {
+    if (it.estado !== "En stock del cliente" || vistos.has(serial)) return;
+    vistos.add(serial);
+    const dias = diasEntre(it.fecha, new Date());
+    filas.push({ serial, tipo: "Batería" + (it.subtipo ? " " + it.subtipo : ""), cliente: it.cliente, mc: null, categoria: it.categoria ? it.categoria + "ª" : null, estado: "En stock del cliente",
+      desde: it.fecha, origen: "entrega al cliente", aprox: false, hasta: null, dias, clase: clasificar("Activa", dias), causa: null, idOt: null });
+  });
+  // Piezas con entrega que ya están en un equipo: la entrega manda sobre la fecha del equipo (ya aplicado en inicio())
+  poblarFiltros();
   renderResumen();
-  renderTablas();
+  renderTabla();
+  renderTendencia();
+}
+
+function poblarFiltros() {
+  const tipos = [...new Set(filas.map(f => f.tipo))].sort();
+  document.getElementById("filtro-tipo").innerHTML = '<option value="">Todos los tipos</option>' + tipos.map(t => `<option>${esc(t)}</option>`).join("");
+  document.getElementById("filtro-clase").innerHTML = '<option value="">Todas las clases</option>' +
+    Object.entries(CLASES).map(([k, v]) => `<option value="${k}">${v.txt}</option>`).join("") + '<option value="sin_fecha">Sin fecha (no se puede calcular)</option>';
+}
+
+function filtradas() {
+  const est = document.getElementById("filtro-estado").value, cl = document.getElementById("filtro-clase").value;
+  const tipo = document.getElementById("filtro-tipo").value, cli = document.getElementById("filtro-cliente").value.trim().toLowerCase();
+  const txt = document.getElementById("filtro-texto").value.trim().toUpperCase();
+  return filas.filter(f => (!est || f.estado === est) && (!tipo || f.tipo === tipo) && (!cli || (f.cliente || "").toLowerCase().includes(cli)) &&
+    (!cl || (cl === "sin_fecha" ? f.dias == null : f.clase === cl)) && (!txt || f.serial.includes(txt) || (f.mc || "").toUpperCase().includes(txt)));
 }
 
 function renderResumen() {
-  const promedioRetiradas = retiradasData.filter(r => r.diasEnUso !== null);
-  const promedio = promedioRetiradas.length > 0
-    ? Math.round(promedioRetiradas.reduce((s, r) => s + r.diasEnUso, 0) / promedioRetiradas.length)
-    : null;
+  const ret = filas.filter(f => f.estado === "Retirada"), act = filas.filter(f => f.estado !== "Retirada");
+  const retFecha = ret.filter(f => f.dias != null);
+  const cuenta = (lista, k) => lista.filter(f => f.clase === k).length;
+  const tarjeta = (n, txt, clase, extra) => `<div class="tarjeta-resumen" data-clase="${clase || ""}" style="${clase ? "cursor:pointer;" : ""}"><strong>${n}</strong><span>${txt}</span>${extra ? `<small>${extra}</small>` : ""}</div>`;
+  const pct = n => retFecha.length ? Math.round(n * 100 / retFecha.length) + "%" : "";
+  const med = mediana(retFecha.map(f => f.dias));
+  document.getElementById("resumen-baterias").innerHTML =
+    tarjeta(act.length, "En servicio o en stock del cliente") +
+    tarjeta(ret.length, "Retiradas") +
+    tarjeta(cuenta(retFecha, "prematura"), "🔴 Fallas prematuras (&lt; 3 m)", "prematura", pct(cuenta(retFecha, "prematura"))) +
+    tarjeta(cuenta(retFecha, "temprana"), "🟠 Fallas tempranas (3–12 m)", "temprana", pct(cuenta(retFecha, "temprana"))) +
+    tarjeta(cuenta(retFecha, "corta"), "🟡 Vida corta (12–18 m)", "corta", pct(cuenta(retFecha, "corta"))) +
+    tarjeta(cuenta(retFecha, "cumplido"), "🟢 Ciclo cumplido (≥ 18 m)", "cumplido", pct(cuenta(retFecha, "cumplido"))) +
+    tarjeta(cuenta(act, "planificar") + cuenta(act, "vencida"), "⏰ Activas a planificar (≥ 20 m)", "planificar") +
+    tarjeta(med != null ? textoDuracion(med) : "—", "Duración mediana de las retiradas");
+  document.querySelectorAll("#resumen-baterias [data-clase]").forEach(t => t.addEventListener("click", () => {
+    if (!t.dataset.clase) return;
+    document.getElementById("filtro-clase").value = t.dataset.clase === "planificar" ? "planificar" : t.dataset.clase;
+    document.getElementById("filtro-estado").value = ""; renderTabla();
+  }));
 
-  const conGarantiaConocida = retiradasData.filter(r => r.diasEnUso !== null);
-  const dentro6m = conGarantiaConocida.filter(r => r.garantia.dentro6m).length;
-  const dentro1a = conGarantiaConocida.filter(r => r.garantia.dentro1a).length;
-  const pct6m = conGarantiaConocida.length > 0 ? Math.round((dentro6m / conGarantiaConocida.length) * 100) : null;
-  const pct1a = conGarantiaConocida.length > 0 ? Math.round((dentro1a / conGarantiaConocida.length) * 100) : null;
-
-  document.getElementById("resumen-baterias").innerHTML = `
-    <div class="tarjeta-resumen"><strong>${activasData.length}</strong><span>Activas hoy</span></div>
-    <div class="tarjeta-resumen"><strong>${retiradasData.length}</strong><span>Retiradas / falladas</span></div>
-    <div class="tarjeta-resumen"><strong>${promedio !== null ? promedio + " días" : "—"}</strong><span>Promedio de uso antes de fallar</span></div>
-    <div class="tarjeta-resumen"><strong>${pct1a !== null ? pct1a + "%" : "—"}</strong><span>Fallaron dentro de 1 año${conGarantiaConocida.length > 0 ? ` (${dentro1a} de ${conGarantiaConocida.length})` : ""}</span></div>
-    <div class="tarjeta-resumen"><strong>${pct6m !== null ? pct6m + "%" : "—"}</strong><span>Fallaron dentro de 6 meses${conGarantiaConocida.length > 0 ? ` (${dentro6m} de ${conGarantiaConocida.length})` : ""}</span></div>
-  `;
+  // Por tipo de batería (solo retiradas con fecha)
+  const porTipo = {};
+  retFecha.forEach(f => { (porTipo[f.tipo] = porTipo[f.tipo] || []).push(f.dias); });
+  const sinFecha = ret.length - retFecha.length;
+  document.getElementById("por-tipo").innerHTML = Object.keys(porTipo).length
+    ? `<table class="tabla-revision" style="max-width:640px;"><thead><tr><th>Tipo</th><th>Retiradas</th><th>Duración mediana</th><th>Duración media</th><th>Prematuras (&lt; 3 m)</th></tr></thead><tbody>` +
+      Object.entries(porTipo).sort().map(([t, d]) => `<tr><td>${esc(t)}</td><td>${d.length}</td><td>${textoDuracion(mediana(d))}</td><td>${textoDuracion(d.reduce((a, b) => a + b, 0) / d.length)}</td><td>${d.filter(x => meses(x) < UMBRALES.prematura).length}</td></tr>`).join("") +
+      `</tbody></table>${sinFecha ? `<p style="font-size:.85rem;color:var(--gris-500);">${sinFecha} retirada(s) sin fecha de entrega conocida no entran en estos cálculos.</p>` : ""}` : "";
 }
 
-function filasFiltradas(lista) {
-  const tipo = document.getElementById("filtro-tipo").value;
-  const cliente = document.getElementById("filtro-cliente").value.trim().toLowerCase();
-  const categoria = document.getElementById("filtro-categoria").value;
-
-  return lista.filter(r =>
-    (!tipo || r.tipo === tipo) &&
-    (!cliente || (r.cliente || "").toLowerCase().includes(cliente)) &&
-    (!categoria || r.categoria === categoria)
-  );
+function renderTabla() {
+  const lista = filtradas().sort((a, b) => {
+    const ra = a.estado === "Retirada", rb = b.estado === "Retirada";
+    if (ra !== rb) return ra ? 1 : -1;                        // primero las que siguen en servicio, de más a menos antiguas
+    return ra ? new Date(b.hasta) - new Date(a.hasta) : (b.dias ?? -1) - (a.dias ?? -1);
+  });
+  document.getElementById("contador").textContent = `${lista.length} de ${filas.length} baterías`;
+  const color = c => ({ prematura: "#fdeaea", temprana: "#fff1e0", corta: "#fffbe6", planificar: "#fff1e0", vencida: "#fdeaea" }[c] || "");
+  document.getElementById("tbody-baterias").innerHTML = lista.length ? lista.map(f => `
+    <tr style="background:${color(f.clase)}">
+      <td class="celda-mono">${esc(f.serial)}</td><td>${esc(f.tipo)}</td><td>${esc(f.cliente || "—")}</td><td>${esc(f.mc || "—")}</td>
+      <td>${esc(f.estado)}</td>
+      <td title="Desde: ${esc(f.origen)}">${fmtFecha(f.desde)}${f.aprox ? " <small>(aprox.)</small>" : ""}</td>
+      <td>${f.hasta ? fmtFecha(f.hasta) : "hoy"}</td>
+      <td>${textoDuracion(f.dias)}</td>
+      <td title="${f.clase ? esc(CLASES[f.clase].ayuda) : "Sin fecha de entrega"}">${f.clase ? CLASES[f.clase].txt : "—"}</td>
+      <td>${esc(f.causa || "—")}</td>
+      <td>${f.idOt ? `<a href="ot-detalle.html?ot=${esc(f.idOt)}">${esc(f.idOt)}</a>` : "—"}</td>
+    </tr>`).join("") : `<tr><td colspan="11">Ninguna coincide.</td></tr>`;
 }
 
-function renderTablas() {
-  const retiradas = filasFiltradas(retiradasData).sort((a, b) => new Date(b.fechaRetiro) - new Date(a.fechaRetiro));
-  const activas = filasFiltradas(activasData).sort((a, b) => new Date(a.fechaInstalacion) - new Date(b.fechaInstalacion));
-
-  const tbodyRetiradas = document.getElementById("tbody-retiradas");
-  tbodyRetiradas.innerHTML = retiradas.length === 0 ? `<tr><td colspan="12">Ninguna coincide.</td></tr>` : retiradas.map(r => `
-    <tr>
-      <td class="celda-mono">${r.serial}</td>
-      <td>${r.tipo}</td>
-      <td>${r.cliente || "—"}</td>
-      <td>${r.mc || "—"}</td>
-      <td>${r.categoria || "—"}</td>
-      <td>${r.fechaInstalacion ? new Date(r.fechaInstalacion).toLocaleDateString("es-ES") + (r.fechaEsAproximada ? " (aprox.)" : "") : "—"}</td>
-      <td>${new Date(r.fechaRetiro).toLocaleDateString("es-ES")}</td>
-      <td>${r.diasEnUso !== null ? r.diasEnUso : "—"}</td>
-      <td class="${r.garantia.dentro6m ? "garantia-si" : "garantia-no"}">${r.garantia.texto6m}</td>
-      <td class="${r.garantia.dentro1a ? "garantia-si" : "garantia-no"}">${r.garantia.texto1a}</td>
-      <td>${r.causa || "—"}</td>
-      <td>${r.idOt ? `<a href="ot-detalle.html?ot=${r.idOt}">${r.idOt}</a>` : "—"}</td>
-    </tr>
-  `).join("");
-
-  renderTendenciaFallas(retiradas);
-
-  const tbodyActivas = document.getElementById("tbody-activas");
-  tbodyActivas.innerHTML = activas.length === 0 ? `<tr><td colspan="9">Ninguna coincide.</td></tr>` : activas.map(a => `
-    <tr>
-      <td class="celda-mono">${a.serial}</td>
-      <td>${a.tipo}</td>
-      <td>${a.cliente || "—"}</td>
-      <td>${a.mc || "—"}</td>
-      <td>${a.categoria || "—"}</td>
-      <td>${new Date(a.fechaInstalacion).toLocaleDateString("es-ES")}</td>
-      <td>${a.diasEnUso}</td>
-      <td class="${a.garantia.dentro1a ? "garantia-si" : "garantia-no"}">${a.garantia.texto1a}${a.garantia.dentro1a && !a.garantia.dentro6m ? " (pasó de 6m)" : ""}</td>
-      <td>${a.idOt ? `<a href="ot-detalle.html?ot=${a.idOt}">${a.idOt}</a>` : "—"}</td>
-    </tr>
-  `).join("");
-}
-
-function renderTendenciaFallas(retiradas) {
-  const tbody = document.getElementById("tbody-tendencia-baterias");
-  if (!tbody) return;
-
+function renderTendencia() {
   const porMes = {};
-  retiradas.forEach(r => {
-    const mes = new Date(r.fechaRetiro).toLocaleDateString("es-ES", { year: "numeric", month: "long" });
-    porMes[mes] = (porMes[mes] || 0) + 1;
+  filas.filter(f => f.estado === "Retirada" && f.hasta).forEach(r => {
+    const d = new Date(r.hasta), k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    const o = (porMes[k] = porMes[k] || { total: 0, prem: 0 }); o.total++; if (r.clase === "prematura") o.prem++;
   });
-
-  // Ordenamos por fecha real, no alfabéticamente (si no, "Abril" queda
-  // antes que "Enero")
-  const meses = Object.keys(porMes).sort((a, b) => {
-    const fa = retiradas.find(r => new Date(r.fechaRetiro).toLocaleDateString("es-ES", { year: "numeric", month: "long" }) === a).fechaRetiro;
-    const fb = retiradas.find(r => new Date(r.fechaRetiro).toLocaleDateString("es-ES", { year: "numeric", month: "long" }) === b).fechaRetiro;
-    return new Date(fb) - new Date(fa);
-  });
-
-  tbody.innerHTML = meses.length > 0
-    ? meses.map(m => `<tr><td>${m}</td><td>${porMes[m]}</td></tr>`).join("")
-    : `<tr><td colspan="2">Sin datos todavía.</td></tr>`;
+  const ks = Object.keys(porMes).sort().reverse();
+  document.getElementById("tbody-tendencia-baterias").innerHTML = ks.length
+    ? ks.map(k => { const [y, m] = k.split("-"); return `<tr><td>${new Date(y, m - 1, 1).toLocaleDateString("es-ES", { year: "numeric", month: "long" })}</td><td>${porMes[k].total}</td><td>${porMes[k].prem}</td></tr>`; }).join("")
+    : `<tr><td colspan="3">Sin datos todavía.</td></tr>`;
 }
 
-["filtro-tipo", "filtro-cliente", "filtro-categoria"].forEach(id => {
-  document.getElementById(id).addEventListener("input", renderTablas);
-});
-
-// --- Pestañas ---
-function cambiarPestanaBaterias(cual) {
-  document.getElementById("vista-retiradas-box").hidden = cual !== "retiradas";
+["filtro-estado", "filtro-clase", "filtro-tipo", "filtro-cliente", "filtro-texto"].forEach(id => document.getElementById(id).addEventListener("input", renderTabla));
+function pestana(cual) {
+  document.getElementById("vista-lista-box").hidden = cual !== "lista";
   document.getElementById("vista-tendencia-box").hidden = cual !== "tendencia";
-  document.getElementById("vista-activas-box").hidden = cual !== "activas";
-  document.getElementById("tab-retiradas-btn").classList.toggle("tab-vista-activa", cual === "retiradas");
+  document.getElementById("tab-lista-btn").classList.toggle("tab-vista-activa", cual === "lista");
   document.getElementById("tab-tendencia-btn").classList.toggle("tab-vista-activa", cual === "tendencia");
-  document.getElementById("tab-activas-btn").classList.toggle("tab-vista-activa", cual === "activas");
 }
-document.getElementById("tab-retiradas-btn").addEventListener("click", () => cambiarPestanaBaterias("retiradas"));
-document.getElementById("tab-tendencia-btn").addEventListener("click", () => cambiarPestanaBaterias("tendencia"));
-document.getElementById("tab-activas-btn").addEventListener("click", () => cambiarPestanaBaterias("activas"));
+document.getElementById("tab-lista-btn").addEventListener("click", () => pestana("lista"));
+document.getElementById("tab-tendencia-btn").addEventListener("click", () => pestana("tendencia"));

@@ -25,50 +25,42 @@
 <div class="panel-body panel-body-ancho">
   <a href="operacion-diaria.html" class="btn-volver"><span class="btn-volver-flecha">←</span> Volver a Operación Diaria</a>
 
-  <p style="margin-top:20px;">El tiempo en uso se calcula solo, cruzando cuándo se instaló cada serial (como repuesto nuevo en un ticket) contra cuándo se retiró (o contra hoy, si sigue activa). Cuando no hay registro de instalación de esa batería en particular, se usa la fecha de instalación del equipo completo como aproximación — marcada como "(aprox.)" — hasta que se migren las fechas reales de instalación de cada batería.</p>
+  <p style="margin-top:20px;">Vida útil programada: 24 meses. El tiempo de cada batería corre <strong>desde que se entrega</strong> (al cliente, o en la reposición); si no hay fecha de entrega se usa el ticket o la instalación del equipo (marcada «aprox.»). Pulsa una tarjeta para filtrar.</p>
 
   <div id="resumen-baterias" class="resumen-cliente"></div>
-
-  <div class="materiales-controles">
-    <select id="filtro-tipo">
-      <option value="">Todos los tipos</option>
-      <option value="Batería Recargable">Batería Recargable</option>
-      <option value="Batería No Recargable">Batería No Recargable</option>
-      <option value="Batería PKCELL">Batería PKCELL</option>
-    </select>
-    <input type="text" id="filtro-cliente" placeholder="Filtrar por cliente...">
-    <select id="filtro-categoria">
-      <option value="">Todas las categorías</option>
-      <option value="1ra categoría">1ra categoría</option>
-      <option value="2da categoría">2da categoría</option>
-    </select>
-  </div>
+  <div id="por-tipo" style="margin:12px 0;"></div>
 
   <div class="tabs-vista">
-    <button id="tab-retiradas-btn" class="tab-vista-btn tab-vista-activa">🔴 Retiradas / Falladas</button>
-    <button id="tab-tendencia-btn" class="tab-vista-btn">📈 Fallas por mes</button>
-    <button id="tab-activas-btn" class="tab-vista-btn">🟢 Activas</button>
+    <button id="tab-lista-btn" class="tab-vista-btn tab-vista-activa">🔋 Baterías</button>
+    <button id="tab-tendencia-btn" class="tab-vista-btn">📈 Retiradas por mes</button>
   </div>
 
-  <div id="vista-retiradas-box">
-    <p style="color:var(--gris-700); font-size:0.85rem;">Política de garantía de baterías todavía sin definir del todo — por ahora se muestran los 2 plazos que se están evaluando (6 meses y 1 año) según los días en uso, calculados solos.</p>
-    <table class="tabla-revision">
-      <thead><tr><th>Serial</th><th>Tipo</th><th>Cliente</th><th>MC</th><th>Categoría</th><th>Instalada</th><th>Retirada</th><th>Días en uso</th><th>¿≤ 6 meses?</th><th>¿≤ 1 año?</th><th>Causa</th><th>OT</th></tr></thead>
-      <tbody id="tbody-retiradas"><tr><td colspan="12">Cargando...</td></tr></tbody>
-    </table>
+  <div id="vista-lista-box">
+    <div class="materiales-controles">
+      <select id="filtro-estado">
+        <option value="">Todos los estados</option>
+        <option value="Activa">Activas</option>
+        <option value="Retirada">Retiradas</option>
+        <option value="En stock del cliente">En stock del cliente</option>
+      </select>
+      <select id="filtro-clase"></select>
+      <select id="filtro-tipo"></select>
+      <input type="text" id="filtro-cliente" placeholder="Cliente...">
+      <input type="text" id="filtro-texto" placeholder="Serial o MC...">
+      <span id="contador" style="align-self:center;font-size:.9rem;color:var(--gris-500);"></span>
+    </div>
+    <div class="scroll-x-tabla">
+      <table class="tabla-revision">
+        <thead><tr><th>Serial</th><th>Tipo</th><th>Cliente</th><th>MC</th><th>Estado</th><th>Entregada</th><th>Hasta</th><th>Duración</th><th>Clase</th><th>Causa</th><th>OT</th></tr></thead>
+        <tbody id="tbody-baterias"><tr><td colspan="11">Cargando...</td></tr></tbody>
+      </table>
+    </div>
   </div>
 
   <div id="vista-tendencia-box" hidden>
-    <table class="tabla-revision" style="max-width:420px;">
-      <thead><tr><th>Mes</th><th>Fallas</th></tr></thead>
-      <tbody id="tbody-tendencia-baterias"><tr><td colspan="2">Cargando...</td></tr></tbody>
-    </table>
-  </div>
-
-  <div id="vista-activas-box" hidden>
-    <table class="tabla-revision">
-      <thead><tr><th>Serial</th><th>Tipo</th><th>Cliente</th><th>MC</th><th>Categoría</th><th>Instalada</th><th>Días en uso hasta hoy</th><th>¿Dentro de 1 año?</th><th>OT</th></tr></thead>
-      <tbody id="tbody-activas"><tr><td colspan="9">Cargando...</td></tr></tbody>
+    <table class="tabla-revision" style="max-width:520px;">
+      <thead><tr><th>Mes</th><th>Retiradas</th><th>De ellas prematuras</th></tr></thead>
+      <tbody id="tbody-tendencia-baterias"><tr><td colspan="3">Cargando...</td></tr></tbody>
     </table>
   </div>
 </div>
