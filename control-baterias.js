@@ -81,6 +81,9 @@ async function cargarDatos() {
   const ultimo = (lista, clave) => { const o = {}; lista.forEach(c => { const s = norm(c[clave]); if (!s) return; if (!o[s] || new Date(c.fecha) > new Date(o[s].fecha)) o[s] = c; }); return o; };
   const instal = ultimo(comp, "serial_nuevo");
   const retiros = ultimo(comp, "serial_retirado");
+  // Todas las instalaciones y retiros de cada serial (una recargable puede tener varios ciclos de carga)
+  const agrupar = clave => { const o = {}; comp.forEach(c => { const k = norm(c[clave]); if (k) (o[k] = o[k] || []).push(c); }); Object.values(o).forEach(l => l.sort((a, b) => new Date(a.fecha) - new Date(b.fecha))); return o; };
+  const instalTodas = agrupar("serial_nuevo"), retirosTodos = agrupar("serial_retirado");
   const equipoPorMC = Object.fromEntries(equipos.filter(e => e.m_control).map(e => [e.m_control, e]));
   const equipoPorBateria = {};
   equipos.forEach(e => { if (e.serie_bateria) equipoPorBateria[norm(e.serie_bateria)] = e; });
@@ -98,20 +101,28 @@ async function cargarDatos() {
 
   filas = [];
   const vistos = new Set();
-  // Retiradas
-  Object.entries(retiros).forEach(([serial, r]) => {
+  // Retiradas: una fila por cada retiro (cada ciclo de carga cuenta por separado)
+  Object.entries(retirosTodos).forEach(([serial, lista]) => {
     vistos.add(serial);
-    const i = inicio(serial, instal[serial], equipoPorMC[r.m_control]);
-    const dias = i.fecha ? diasEntre(i.fecha, r.fecha) : null;
-    const sinFallo = sinFalloDe(r);
-    filas.push({ serial, tipo: r.tipo_componente, cliente: r.cliente, mc: r.m_control, categoria: r.categoria, estado: "Retirada", sinFallo,
-      desde: i.fecha, origen: i.origen, aprox: !!i.aprox, hasta: r.fecha, dias, clase: sinFallo ? "sinfallo" : clasificar("Retirada", dias),
-      causa: sinFallo ? (r.destino || "Batería OK reutilizada") : r.reparacion, idOt: r.id_ot });
+    const hechos = new Set();
+    lista.forEach(r => {
+      const clave = String(r.fecha).slice(0, 10) + "|" + r.id_ot; if (hechos.has(clave)) return; hechos.add(clave);
+      const previas = (instalTodas[serial] || []).filter(c => new Date(c.fecha) <= new Date(r.fecha));
+      const reg = previas.length ? previas[previas.length - 1] : null;
+      const i = inicio(serial, reg, equipoPorMC[r.m_control]);
+      const dias = i.fecha ? diasEntre(i.fecha, r.fecha) : null;
+      let sinFallo = sinFalloDe(r), cargaAgotada = false;
+      // Una recargable que vuelve a stock normalmente solo se descargó: se recarga y vuelve a la calle.
+      // Su carga también debe durar ~2 años, así que cuenta como un ciclo de carga, no como "sin fallo".
+      if (sinFallo && r.tipo_componente === "Batería Recargable") { sinFallo = false; cargaAgotada = true; }
+      filas.push({ serial, tipo: r.tipo_componente, cliente: r.cliente, mc: r.m_control, categoria: r.categoria, estado: "Retirada", sinFallo, cargaAgotada,
+        desde: i.fecha, origen: i.origen, aprox: !!i.aprox, hasta: r.fecha, dias, clase: sinFallo ? "sinfallo" : clasificar("Retirada", dias),
+        causa: cargaAgotada ? "Carga agotada → vuelve a stock para recargar" : sinFallo ? (r.destino || "Batería OK reutilizada") : r.reparacion, idOt: r.id_ot });
+    });
   });
   // Activas por historial (instaladas como repuesto y no retiradas después)
   Object.entries(instal).forEach(([serial, c]) => {
     if (retiros[serial] && new Date(retiros[serial].fecha) >= new Date(c.fecha)) return;   // ya salió como retirada
-    if (vistos.has(serial)) return;
     vistos.add(serial);
     const i = inicio(serial, c, null);
     const dias = i.fecha ? diasEntre(i.fecha, new Date()) : null;
