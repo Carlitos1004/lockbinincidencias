@@ -11,6 +11,7 @@ const CLASES = {
   prematura: { txt: "🔴 Falla prematura", ayuda: "Duró menos de 3 meses" },
   temprana:  { txt: "🟠 Falla temprana",  ayuda: "Duró de 3 a 12 meses" },
   corta:     { txt: "🟡 Vida corta",      ayuda: "Duró de 12 a 18 meses" },
+  sinfallo:  { txt: "🔁 Retirada sin fallo", ayuda: "La batería estaba bien: volvió a stock o se reutilizó en otro equipo" },
   cumplido:  { txt: "🟢 Ciclo cumplido",  ayuda: "Duró 18 meses o más" },
   servicio:  { txt: "⚪ En servicio",      ayuda: "Activa, menos de 18 meses" },
   fin:       { txt: "🟢 Ciclo cumplido (en servicio)", ayuda: "Activa, 18 meses o más" },
@@ -54,19 +55,25 @@ cargarDatos();
 
 async function cargarDatos() {
   const tb = document.getElementById("tbody-baterias");
-  let comp, equipos, entregas = [], itemsEntrega = [];
+  let comp, equipos, entregas = [], itemsEntrega = [], bateriasOk = [];
   try {
     comp = await traer("componentes_retirados",
-      "cliente, m_control, id_ot, fecha, serial_nuevo, serial_retirado, tipo_componente, categoria, reparacion, repo_fecha_entrega",
+      "cliente, m_control, id_ot, fecha, serial_nuevo, serial_retirado, tipo_componente, categoria, reparacion, repo_fecha_entrega, destino",
       q => q.in("tipo_componente", ["Batería Recargable", "Batería No Recargable", "Batería PKCELL"]).order("id"));
     equipos = await traer("equipos", "m_control, cliente, serie_bateria, modelo_bateria, fecha_instalacion", q => q.order("m_control"));
   } catch (err) { tb.innerHTML = `<tr><td colspan="11">Error: ${esc(err.message)}</td></tr>`; return; }
+  try {   // baterías marcadas «OK, se reutiliza en otro equipo» en las listas de reposición
+    bateriasOk = await traer("reposicion_equipos", "id_ot, m_control, bateria_ok", q => q.eq("bateria_ok", true));
+  } catch (e) { /* sin ese dato */ }
   try {   // entregas a clientes (si todavía no existe el SQL 108, se sigue sin ellas)
     entregas = await traer("entregas_cliente", "id, cliente, fecha, albaran");
     itemsEntrega = await traer("entregas_cliente_items", "entrega_id, tipo, subtipo, serial, estado, mc_instalado, categoria", q => q.eq("tipo", "Batería"));
   } catch (e) { /* sin stock en clientes */ }
 
   const norm = s => String(s || "").trim().toUpperCase();
+  const okReutilizada = new Set(bateriasOk.map(b => b.id_ot + "|" + b.m_control));
+  // La batería estaba bien si Revisión la mandó a stock como OK, o si en reposiciones se marcó para reutilizar
+  const sinFalloDe = r => /^✓\s*Equipo OK/.test(String(r.destino || "")) || okReutilizada.has(r.id_ot + "|" + r.m_control);
   const entregaPorId = Object.fromEntries(entregas.map(e => [e.id, e]));
   const entregaPorSerial = {};
   itemsEntrega.forEach(i => { const e = entregaPorId[i.entrega_id]; if (e) entregaPorSerial[norm(i.serial)] = { ...i, fecha: e.fecha, cliente: e.cliente }; });
@@ -96,8 +103,10 @@ async function cargarDatos() {
     vistos.add(serial);
     const i = inicio(serial, instal[serial], equipoPorMC[r.m_control]);
     const dias = i.fecha ? diasEntre(i.fecha, r.fecha) : null;
-    filas.push({ serial, tipo: r.tipo_componente, cliente: r.cliente, mc: r.m_control, categoria: r.categoria, estado: "Retirada",
-      desde: i.fecha, origen: i.origen, aprox: !!i.aprox, hasta: r.fecha, dias, clase: clasificar("Retirada", dias), causa: r.reparacion, idOt: r.id_ot });
+    const sinFallo = sinFalloDe(r);
+    filas.push({ serial, tipo: r.tipo_componente, cliente: r.cliente, mc: r.m_control, categoria: r.categoria, estado: "Retirada", sinFallo,
+      desde: i.fecha, origen: i.origen, aprox: !!i.aprox, hasta: r.fecha, dias, clase: sinFallo ? "sinfallo" : clasificar("Retirada", dias),
+      causa: sinFallo ? (r.destino || "Batería OK reutilizada") : r.reparacion, idOt: r.id_ot });
   });
   // Activas por historial (instaladas como repuesto y no retiradas después)
   Object.entries(instal).forEach(([serial, c]) => {
@@ -151,7 +160,9 @@ function filtradas() {
 }
 
 function renderResumen() {
-  const ret = filas.filter(f => f.estado === "Retirada"), act = filas.filter(f => f.estado !== "Retirada");
+  const retTodas = filas.filter(f => f.estado === "Retirada"), act = filas.filter(f => f.estado !== "Retirada");
+  const ret = retTodas.filter(f => !f.sinFallo);          // solo las que fallaron cuentan en las estadísticas
+  const nSinFallo = retTodas.length - ret.length;
   const retFecha = ret.filter(f => f.dias != null);
   const cuenta = (lista, k) => lista.filter(f => f.clase === k).length;
   const tarjeta = (n, txt, clase, extra) => `<div class="tarjeta-resumen" data-clase="${clase || ""}" style="${clase ? "cursor:pointer;" : ""}"><strong>${n}</strong><span>${txt}</span>${extra ? `<small>${extra}</small>` : ""}</div>`;
@@ -159,7 +170,8 @@ function renderResumen() {
   const med = mediana(retFecha.map(f => f.dias));
   document.getElementById("resumen-baterias").innerHTML =
     tarjeta(act.length, "En servicio o en stock del cliente") +
-    tarjeta(ret.length, "Retiradas") +
+    tarjeta(ret.length, "Retiradas por falla") +
+    tarjeta(nSinFallo, "🔁 Retiradas sin fallo (OK)", "sinfallo") +
     tarjeta(cuenta(retFecha, "prematura"), "🔴 Fallas prematuras (&lt; 3 m)", "prematura", pct(cuenta(retFecha, "prematura"))) +
     tarjeta(cuenta(retFecha, "temprana"), "🟠 Fallas tempranas (3–12 m)", "temprana", pct(cuenta(retFecha, "temprana"))) +
     tarjeta(cuenta(retFecha, "corta"), "🟡 Vida corta (12–18 m)", "corta", pct(cuenta(retFecha, "corta"))) +
@@ -177,7 +189,7 @@ function renderResumen() {
   retFecha.forEach(f => { (porTipo[f.tipo] = porTipo[f.tipo] || []).push(f.dias); });
   const sinFecha = ret.length - retFecha.length;
   document.getElementById("por-tipo").innerHTML = Object.keys(porTipo).length
-    ? `<table class="tabla-revision" style="max-width:640px;"><thead><tr><th>Tipo</th><th>Retiradas</th><th>Duración mediana</th><th>Duración media</th><th>Prematuras (&lt; 3 m)</th></tr></thead><tbody>` +
+    ? `<table class="tabla-revision" style="max-width:640px;"><thead><tr><th>Tipo</th><th>Retiradas por falla</th><th>Duración mediana</th><th>Duración media</th><th>Prematuras (&lt; 3 m)</th></tr></thead><tbody>` +
       Object.entries(porTipo).sort().map(([t, d]) => `<tr><td>${esc(t)}</td><td>${d.length}</td><td>${textoDuracion(mediana(d))}</td><td>${textoDuracion(d.reduce((a, b) => a + b, 0) / d.length)}</td><td>${d.filter(x => meses(x) < UMBRALES.prematura).length}</td></tr>`).join("") +
       `</tbody></table>${sinFecha ? `<p style="font-size:.85rem;color:var(--gris-500);">${sinFecha} retirada(s) sin fecha de entrega conocida no entran en estos cálculos.</p>` : ""}` : "";
 }
@@ -205,7 +217,7 @@ function renderTabla() {
 
 function renderTendencia() {
   const porMes = {};
-  filas.filter(f => f.estado === "Retirada" && f.hasta).forEach(r => {
+  filas.filter(f => f.estado === "Retirada" && !f.sinFallo && f.hasta).forEach(r => {
     const d = new Date(r.hasta), k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
     const o = (porMes[k] = porMes[k] || { total: 0, prem: 0 }); o.total++; if (r.clase === "prematura") o.prem++;
   });
