@@ -215,7 +215,7 @@ function renderTabla() {
   const color = c => ({ prematura: "#fdeaea", temprana: "#fff1e0", corta: "#fffbe6", planificar: "#fff1e0", vencida: "#fdeaea" }[c] || "");
   document.getElementById("tbody-baterias").innerHTML = lista.length ? lista.map(f => `
     <tr style="background:${color(f.clase)}">
-      <td class="celda-mono">${esc(f.serial)}</td><td>${esc(f.tipo)}</td><td>${esc(f.cliente || "—")}</td><td>${esc(f.mc || "—")}</td>
+      <td class="celda-mono"><a href="buscar-serial.html" class="ir-historial" data-q="${esc(f.serial)}" title="Ver historial de esta batería">${esc(f.serial)}</a></td><td>${esc(f.tipo)}</td><td>${esc(f.cliente || "—")}</td><td>${f.mc ? `<a href="buscar-serial.html" class="ir-historial" data-q="${esc(f.mc)}" title="Ver historial de este equipo">${esc(f.mc)}</a>` : "—"}</td>
       <td>${esc(f.estado)}</td>
       <td title="Desde: ${esc(f.origen)}">${fmtFecha(f.desde)}${f.aprox ? " <small>(aprox.)</small>" : ""}</td>
       <td>${f.hasta ? fmtFecha(f.hasta) : "hoy"}</td>
@@ -247,3 +247,11 @@ function pestana(cual) {
 }
 document.getElementById("tab-lista-btn").addEventListener("click", () => pestana("lista"));
 document.getElementById("tab-tendencia-btn").addEventListener("click", () => pestana("tendencia"));
+
+// Los seriales y MC de la tabla abren «Buscar por serial» con su historial ya cargado
+document.getElementById("tbody-baterias").addEventListener("click", ev => {
+  const a = ev.target.closest(".ir-historial"); if (!a) return;
+  sessionStorage.setItem("lockbin_prellenar_busqueda", a.dataset.q);
+  sessionStorage.setItem("lockbin_volver_url", "control-baterias.html");
+  sessionStorage.setItem("lockbin_volver_texto", "Volver a Control de Baterías");
+});

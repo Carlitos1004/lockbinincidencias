@@ -55,6 +55,7 @@ async function buscar() {
   if (window.montarPanelPlataforma) montarPanelPlataforma(document.getElementById("panel-plataforma"), supabaseClient, terminos.filter(t => /^MC\d{4,12}$/i.test(t)).slice(0, 3).map(t => ({ mc: t.toUpperCase() })));
 
   try {
+    const otrosPromesa = buscarOtrosRegistros(terminos);   // equipos, entregas a clientes, materiales, cambios de clientes, SIMs, Vida
     // 1. Tickets donde el MC coincide directo
     const { data: ticketsPorMc, error: errorTickets } = await supabaseClient
       .from("historial_fallas")
@@ -95,7 +96,8 @@ async function buscar() {
     [...(ticketsPorMc || []), ...ticketsPorComponente].forEach(t => { mapaTickets[t.id_registro] = t; });
     const todosLosTickets = Object.values(mapaTickets);
 
-    if (todosLosTickets.length === 0 && (componentes || []).length === 0 && (notasPorMc || []).length === 0) {
+    const otros = await otrosPromesa;
+    if (todosLosTickets.length === 0 && (componentes || []).length === 0 && (notasPorMc || []).length === 0 && !otros.total) {
       mostrarMensaje("No se encontró nada con ese término.", true);
       buscarBtn.disabled = false;
       buscarBtn.textContent = "Buscar";
@@ -189,6 +191,7 @@ async function buscar() {
     }
 
     renderResultados(porOt, infoEquipos);
+    if (otros.total) resultados.insertAdjacentHTML("afterbegin", otros.html);
   } catch (err) {
     mostrarMensaje("❌ " + err.message, true);
   } finally {
@@ -310,4 +313,54 @@ function mostrarMensaje(texto, esError) {
 
 function escaparHtml(texto) {
   return String(texto ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+
+// ---------------------------------------------------------------------
+// Otros registros donde aparece el serial / MC: Equipos, entregas a clientes (stock), materiales
+// serializados, cambios reportados por clientes, SIMs guardadas y Vida del equipo.
+// Cada fuente es opcional: si una tabla no existe todavía, simplemente no aparece.
+// ---------------------------------------------------------------------
+async function buscarOtrosRegistros(terminos) {
+  const limpios = terminos.map(t => t.replace(/[^A-Za-z0-9_.\-]/g, "")).filter(Boolean);
+  if (!limpios.length) return { total: 0, html: "" };
+  const o = (campos) => limpios.flatMap(t => campos.map(c => `${c}.ilike.%${t}%`)).join(",");
+  const f = d => d ? new Date(d).toLocaleDateString("es-ES") : "—";
+  const mc = m => m ? `<span class="celda-mono">${escaparHtml(m)}</span>` : "—";
+  const seguro = async fn => { try { const r = await fn(); return r.error ? [] : (r.data || []); } catch (e) { return []; } };
+
+  const [equipos, items, mats, cambios, sims, vida] = await Promise.all([
+    seguro(() => supabaseClient.from("equipos").select("m_control, cliente, estado_montaje, serie_bateria, modelo_bateria, serie_cierre, serie_lector, sim, imei, fecha_instalacion")
+      .or(o(["m_control", "serie_bateria", "serie_cierre", "serie_lector", "sim", "imei"])).limit(30)),
+    seguro(() => supabaseClient.from("entregas_cliente_items").select("entrega_id, tipo, subtipo, serial, estado, mc_base, mc_instalado, instalada_en")
+      .or(o(["serial", "mc_base", "mc_instalado"])).limit(50)),
+    seguro(() => supabaseClient.from("materiales_serializados").select("id_ot, tipo_componente, serial, estado, fecha_sacado").or(o(["serial"])).limit(50)),
+    seguro(() => supabaseClient.from("cambios_cliente").select("fecha, cliente, m_control, tipo_componente, serial_anterior, serial_nuevo, estado")
+      .or(o(["m_control", "serial_anterior", "serial_nuevo"])).limit(50)),
+    seguro(() => supabaseClient.from("sims_custodia").select("iccid, operador, mc_origen, mc_destino, estado, creada_en, cliente").or(o(["iccid", "mc_origen", "mc_destino"])).limit(50)),
+    seguro(() => supabaseClient.from("historial_equipo").select("mc, tipo_evento, fecha, notas, id_ot, serie_bateria, serie_cierre, serie_lector")
+      .or(o(["serie_bateria", "serie_cierre", "serie_lector"])).order("fecha", { ascending: false }).limit(50))
+  ]);
+
+  let entregas = {};
+  const ids = [...new Set(items.map(i => i.entrega_id))];
+  if (ids.length) (await seguro(() => supabaseClient.from("entregas_cliente").select("id, cliente, fecha, albaran").in("id", ids))).forEach(e => { entregas[e.id] = e; });
+
+  const bloques = [];
+  const bloque = (titulo, lineas) => { if (lineas.length) bloques.push(`<div class="resultado-info-equipo"><strong>${titulo}</strong>${lineas.map(l => `<div class="resultado-sublinea">${l}</div>`).join("")}</div>`); };
+
+  bloque("🖥️ En Equipos (ficha actual)", equipos.map(e =>
+    `${mc(e.m_control)} · ${escaparHtml(e.cliente || "—")} · ${escaparHtml(e.estado_montaje || "—")} · BA ${mc(e.serie_bateria)}${e.modelo_bateria ? " (" + escaparHtml(e.modelo_bateria) + ")" : ""} · CE ${mc(e.serie_cierre)} · LE ${mc(e.serie_lector)}${e.sim ? " · SIM " + escaparHtml(e.sim) : ""}${e.fecha_instalacion ? " · instalado " + f(e.fecha_instalacion) : ""}`));
+  bloque("📦 Entregado a clientes (Stock en clientes)", items.map(i => {
+    const e = entregas[i.entrega_id] || {};
+    return `${mc(i.serial)} (${escaparHtml(i.tipo)}${i.subtipo ? " " + escaparHtml(i.subtipo) : ""}) — entregado a <strong>${escaparHtml(e.cliente || "?")}</strong> el ${f(e.fecha)}${e.albaran ? " · albarán " + escaparHtml(e.albaran) : " · sin albarán"} — ` +
+      (i.estado === "Instalada" ? `instalada en ${mc(i.mc_instalado)}${i.instalada_en ? " el " + f(i.instalada_en) : ""}` : "sigue en el stock del cliente") + (i.mc_base ? ` · figuraba en ${mc(i.mc_base)} al registrarla` : "");
+  }));
+  bloque("🔖 Salidas de almacén (serialización)", mats.map(m => `${mc(m.serial)} (${escaparHtml(m.tipo_componente)}) — ${escaparHtml(m.estado)} — OT <a href="ot-detalle.html?ot=${encodeURIComponent(m.id_ot)}">${escaparHtml(m.id_ot)}</a> — ${f(m.fecha_sacado)}`));
+  bloque("🧑‍🔧 Cambios reportados por clientes", cambios.map(c => `${f(c.fecha)} · ${escaparHtml(c.cliente || "—")} · ${mc(c.m_control)} · ${escaparHtml(c.tipo_componente || "—")}: ${mc(c.serial_anterior)} → ${mc(c.serial_nuevo)} — ${escaparHtml(c.estado)}`));
+  bloque("📶 SIMs guardadas", sims.map(x => `${mc(x.iccid)} · ${escaparHtml(x.operador || "—")} · de ${mc(x.mc_origen)}${x.mc_destino ? " → " + mc(x.mc_destino) : ""} — ${escaparHtml(x.estado)} (${f(x.creada_en)})`));
+  bloque("📒 Vida del equipo — eventos con este serial", vida.map(v =>
+    `${ICONOS_EVENTO_EQUIPO[v.tipo_evento] || "•"} ${escaparHtml(v.tipo_evento)} — ${mc(v.mc)} — ${f(v.fecha)}${v.id_ot ? ` (<a href="ot-detalle.html?ot=${encodeURIComponent(v.id_ot)}">${escaparHtml(v.id_ot)}</a>)` : ""}${v.notas ? " — " + escaparHtml(v.notas) : ""}`));
+
+  return { total: bloques.length, html: bloques.join("") };
 }
