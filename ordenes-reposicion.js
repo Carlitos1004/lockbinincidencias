@@ -109,7 +109,11 @@ function estadoCasilla(c) {
   // Batería en buen estado de un equipo en lista "solo batería" (o cuya batería OK se reutiliza en otro): igualmente se entrega una nueva
   if (auto === "Listo (sin cambios)" && c.m_control && tipoCanonico(c.tipo_componente) === "Batería") {
     const eq = equiposCompletos[c.m_control];
-    if (eq && (eq.tipo_reposicion === "Batería" || eq.bateria_ok)) return "Repuesto desde stock";
+    if (tipoRep(c.m_control) === "Batería" || (eq && eq.bateria_ok)) return "Repuesto desde stock";
+  }
+  // Lector / cierre que llegó solo (sin el resto del equipo): igualmente se entrega uno nuevo
+  if (auto === "Listo (sin cambios)" && c.m_control && tipoCanonico(c.tipo_componente) !== "Batería" && tipoRep(c.m_control) === tipoCanonico(c.tipo_componente)) {
+    return "Repuesto desde stock";
   }
   return (auto === "Listo (sin cambios)" || auto === "Entregado") ? auto : "Repuesto desde stock";
 }
@@ -169,15 +173,27 @@ function tipoCanonico(t) {
 }
 
 // ---------- Tipo de reposición: piezas/equipo vs solo batería ----------
-const tipoRep = mc => (equiposCompletos[mc] && equiposCompletos[mc].tipo_reposicion === "Batería") ? "Batería" : "Piezas";
+// Si no se eligió a mano (tipo_reposicion vacío), se deduce de lo que llegó a revisión:
+// si de ese MC solo llegó la batería → reposición de solo batería; si llegó otra cosa → equipo / piezas.
+// Lo elegido a mano ("Batería" o "Piezas") siempre manda.
+// Valores: "Piezas" (equipo / piezas) | "Batería" | "Lector Electrónico" | "Cierre Electrónico" (llegó solo ese componente).
+// Cuenta lo que LLEGÓ, no lo que sirve: si llegó el equipo completo (aunque solo falle una pieza) va a Equipos.
+const TIPOS_UNICOS = ["Batería", "Lector Electrónico", "Cierre Electrónico"];
+const tipoRep = mc => {
+  const e = equiposCompletos[mc], t = e && e.tipo_reposicion;
+  if (t === "Piezas" || TIPOS_UNICOS.includes(t)) return t;
+  const llegaron = [...new Set(compsOtActual.filter(c => c.m_control === mc).map(c => tipoCanonico(c.tipo_componente)))];
+  return (llegaron.length === 1 && TIPOS_UNICOS.includes(llegaron[0])) ? llegaron[0] : "Piezas";
+};
 
 // En una reposición de solo batería, el equipo solo cuenta con la casilla de la batería
 function aplicarTipoBateria(m) {
-  if (tipoRep(m.mc) !== "Batería") return;
-  m.casillas = m.casillas.filter(x => x.tipo === "Batería");
+  const tipoU = tipoRep(m.mc);
+  if (tipoU === "Piezas") return;
+  m.casillas = m.casillas.filter(x => x.tipo === tipoU);
   const x = m.casillas[0];
   const est = x ? (x.comp ? estadoCasilla(x.comp) : estadoFalt(x.falt)) : null;
-  m.faltan = (!est) ? ["Batería"] : [];
+  m.faltan = (!est) ? [tipoU] : [];
   if (m.faltan.length) m.estadoMc = "Incompleto";
   else if (est === "Entregado") m.estadoMc = "Entregado";
   else if (RESUELTOS.has(est)) m.estadoMc = "Listo para entregar";
@@ -436,7 +452,8 @@ function renderDetalle() {
     if (fCat === "Presupuesto aprobado") return m.casillas.some(x => x.comp && presPorComp[String(x.comp.id)] && presPorComp[String(x.comp.id)].aprobada === true);
     return m.casillas.some(x => x.comp && categoriaCasilla(x.comp) === fCat);
   };
-  const cumpleTipo = m => (tipoRep(m.mc) === "Batería") === (subTab === "Batería");
+  const grupoSub = m => { const t = tipoRep(m.mc); return t === "Piezas" ? "Piezas" : t === "Batería" ? "Batería" : "Componente"; };
+  const cumpleTipo = m => grupoSub(m) === subTab;
   const cumpleLista = m => !listaSel || (listaSel === "__sin" ? !(equiposCompletos[m.mc] && equiposCompletos[m.mc].lista) : (equiposCompletos[m.mc] && equiposCompletos[m.mc].lista) === listaSel);
   // Tarjetas: cuentan solo los equipos de la lista mostrada
   const mcsLista = sinListaActiva ? [] : mcs.filter(cumpleLista);
@@ -445,16 +462,19 @@ function renderDetalle() {
     (!listaSel || (listaSel !== "__sin" && c.repo_lista === listaSel)));
   const estSinMc = c => { const e = estadoCasilla(c); return e === "Entregado" ? "Entregado" : RESUELTOS.has(e) ? "Listo para entregar" : "En proceso"; };
   const delSub = mcsLista.filter(cumpleTipo);
-  const nPiezas = mcsLista.filter(m => tipoRep(m.mc) !== "Batería").length;
-  const nBat = mcsLista.filter(m => tipoRep(m.mc) === "Batería").length + sinMcBat.length;
+  const nPiezas = mcsLista.filter(m => grupoSub(m) === "Piezas").length;
+  const nBat = mcsLista.filter(m => grupoSub(m) === "Batería").length + sinMcBat.length;
+  const nComp = mcsLista.filter(m => grupoSub(m) === "Componente").length;
   document.getElementById("sub-piezas").textContent = `📦 Equipos (${nPiezas})`;
   document.getElementById("sub-bat").textContent = `🔋 Baterías (${nBat})`;
+  document.getElementById("sub-comp").textContent = `🔧 Lector / Cierre (${nComp})`;
+  document.getElementById("sub-comp").classList.toggle("orep-tab-activa", subTab === "Componente");
   document.getElementById("sub-piezas").classList.toggle("orep-tab-activa", subTab === "Piezas");
   document.getElementById("sub-bat").classList.toggle("orep-tab-activa", subTab === "Batería");
   const n = e => delSub.filter(m => m.estadoMc === e).length + (subTab === "Batería" ? sinMcBat.filter(c => estSinMc(c) === e).length : 0);
   const totalSub = delSub.length + (subTab === "Batería" ? sinMcBat.length : 0);
   document.getElementById("detalle-resumen").innerHTML = `
-    <div class="tarjeta-resumen"><strong>${totalSub}</strong><span>${subTab === "Batería" ? "Baterías" : "Equipos"}</span></div>
+    <div class="tarjeta-resumen"><strong>${totalSub}</strong><span>${subTab === "Batería" ? "Baterías" : subTab === "Componente" ? "Lector / Cierre" : "Equipos"}</span></div>
     <div class="tarjeta-resumen"><strong>${n("Incompleto")}</strong><span>Incompletos</span></div>
     <div class="tarjeta-resumen"><strong>${n("En proceso")}</strong><span>En proceso</span></div>
     <div class="tarjeta-resumen"><strong>${n("Listo para entregar")}</strong><span>Listos para entregar</span></div>
@@ -513,7 +533,8 @@ function cuentaComoReposicion(c, est) {
     if (auto === "Listo (sin cambios)" || auto === "Entregado") {
       // Excepción: batería de un equipo de lista "solo batería" o con batería OK reutilizada: se entrega una nueva igualmente
       const eq = c.m_control && equiposCompletos[c.m_control];
-      return !!(eq && tipoCanonico(c.tipo_componente) === "Batería" && (eq.tipo_reposicion === "Batería" || eq.bateria_ok));
+      return !!(c.m_control && ((tipoCanonico(c.tipo_componente) === "Batería" && (tipoRep(c.m_control) === "Batería" || (eq && eq.bateria_ok))) ||
+        (tipoCanonico(c.tipo_componente) !== "Batería" && tipoRep(c.m_control) === tipoCanonico(c.tipo_componente))));
     }
     return true;
   }
@@ -656,9 +677,10 @@ function htmlMc(m) {
   }).join("");
 
   const fechaEnt = m.casillas.map(x => x.comp && x.comp.repo_fecha_entrega).filter(Boolean)[0];
-  const esBat = tipoRep(m.mc) === "Batería";
+  const tipoU = tipoRep(m.mc), esBat = tipoU !== "Piezas";   // esBat: reposición de un solo componente
+  const nombreU = { "Batería": "🔋 Marcar batería entregada", "Lector Electrónico": "🔧 Marcar lector entregado", "Cierre Electrónico": "🔧 Marcar cierre entregado" }[tipoU];
   const botonEntrega = esBat
-    ? (m.estadoMc !== "Entregado" ? `<button type="button" class="btn-bat-entregada" data-mc="${esc(m.mc)}">🔋 Marcar batería entregada</button>` : "")
+    ? (m.estadoMc !== "Entregado" ? `<button type="button" class="btn-bat-entregada" data-mc="${esc(m.mc)}">${nombreU}</button>` : "")
     : (m.estadoMc === "Listo para entregar"
       ? `<button type="button" class="btn-entregar" data-mc="${esc(m.mc)}">📦 Marcar equipo entregado</button>` : "")
   const cambiaMc = esManager && !!planPlataforma(m.mc).nuevoMc;
@@ -1058,6 +1080,7 @@ document.getElementById("filtro-estado-mc").addEventListener("change", () => otA
 document.getElementById("filtro-categoria").addEventListener("change", () => otActual && renderDetalle());
 document.getElementById("sub-piezas").addEventListener("click", () => { subTab = "Piezas"; if (otActual) renderDetalle(); });
 document.getElementById("sub-bat").addEventListener("click", () => { subTab = "Batería"; if (otActual) renderDetalle(); });
+document.getElementById("sub-comp").addEventListener("click", () => { subTab = "Componente"; if (otActual) renderDetalle(); });
 document.getElementById("orden-mc").addEventListener("change", () => otActual && renderDetalle());
 document.getElementById("filtro-lista").addEventListener("change", e => { listaSel = e.target.value; if (otActual) renderDetalle(); });
 
@@ -1171,8 +1194,9 @@ document.addEventListener("click", async (e) => {
   if (!btn) return;
   const mc = btn.dataset.mc;
   const grupo = agruparPorMc(compsOtActual, otActual).find(m => m.mc === mc);
-  const comp = grupo && (grupo.casillas.find(x => x.tipo === "Batería") || {}).comp;
-  if (!comp) { alert("Este equipo no tiene una batería registrada en la orden. Usa la decisión de la pieza que no llegó."); return; }
+  const tipoU = tipoRep(mc);
+  const comp = grupo && (grupo.casillas.find(x => x.tipo === tipoU) || {}).comp;
+  if (!comp) { alert("Este equipo no tiene esa pieza registrada en la orden. Usa la decisión de la pieza que no llegó."); return; }
   const cambios = { repo_estado: "Entregado", repo_fecha_entrega: hoy() };
   if ((comp.destino || "").includes("Devolver al cliente")) { cambios.devuelto = true; cambios.devuelto_en = new Date().toISOString(); }
   if (await guardarComp(comp.id, cambios, false)) { await recargarOt(); cargarOts(); }
@@ -1219,7 +1243,7 @@ function renderBok() {
   if (!tb) return;
   const owners = Object.values(equiposCompletos).filter(e => e.bateria_ok).sort((a, b) => a.m_control.localeCompare(b.m_control));
   // Posibles destinos: equipos de la orden que llevan batería por reponer
-  const posibles = agruparPorMc(compsOtActual, otActual).filter(m => tipoRep(m.mc) !== "Batería").map(m => m.mc).sort();
+  const posibles = agruparPorMc(compsOtActual, otActual).filter(m => tipoRep(m.mc) === "Piezas").map(m => m.mc).sort();
   document.getElementById("bok-destinos").innerHTML = posibles.map(m => `<option value="${esc(m)}">`).join("");
   tb.innerHTML = owners.length ? owners.map(e => `<tr data-mc="${esc(e.m_control)}">
       <td><input type="checkbox" class="chk-bok" data-mc="${esc(e.m_control)}" checked title="Quitar la marca"></td>
@@ -1289,7 +1313,7 @@ function renderListas() {
   tb.innerHTML = nombres.map(nombre => {
     const eq = grupos.filter(m => (equiposCompletos[m.mc] || {}).lista === nombre);
     const sinMc = compsOtActual.filter(c => !c.m_control && c.repo_lista === nombre);
-    const nEq = eq.filter(m => tipoRep(m.mc) !== "Batería").length;
+    const nEq = eq.filter(m => tipoRep(m.mc) !== "Batería").length;   // incluye los de solo lector / cierre
     const nBat = eq.filter(m => tipoRep(m.mc) === "Batería").length + sinMc.length;
     const listos = eq.filter(m => m.estadoMc === "Listo para entregar").length + sinMc.filter(c => estS(c) === "Listo para entregar").length;
     const entregados = eq.filter(m => m.estadoMc === "Entregado").length + sinMc.filter(c => estS(c) === "Entregado").length;
@@ -1304,7 +1328,7 @@ function renderListas() {
       const e = equiposCompletos[m.mc] || {};
       const f = fechasEntrega[m.mc];
       return `<tr><td><input type="checkbox" class="chk-item" data-mc="${esc(m.mc)}"></td><td>${esc(m.mc)}</td>
-        <td>${tipoRep(m.mc) === "Batería" ? "🔋 Batería" : "📦 Equipo"}${e.bateria_ok ? " · 🔁 batería OK" : ""}</td>
+        <td>${({ "Batería": "🔋 Batería", "Lector Electrónico": "🔧 Solo lector", "Cierre Electrónico": "🔧 Solo cierre" })[tipoRep(m.mc)] || "📦 Equipo"}${e.bateria_ok ? " · 🔁 batería OK" : ""}</td>
         <td><span class="orep-badge ${claseMc(m.estadoMc)}">${esc(m.estadoMc)}</span></td>
         <td>${f ? new Date(f + "T00:00:00").toLocaleDateString("es-ES") : "—"}</td></tr>`;
     }).join("") + sinMc.map(c => `<tr><td><input type="checkbox" class="chk-item" data-id="${c.id}"></td><td>Sin MC · ${esc(c.serial_retirado || "—")}</td>
@@ -1323,7 +1347,7 @@ function renderListas() {
       <div class="materiales-controles">
         <span>Con los marcados:</span>
         <button type="button" data-act="quitar">Quitar de la lista</button>
-        <select class="sel-pasar-tipo"><option value="Piezas">Pasar a: equipos / piezas</option><option value="Batería">Pasar a: solo batería</option></select>
+        <select class="sel-pasar-tipo"><option value="Piezas">Pasar a: equipos / piezas</option><option value="Batería">Pasar a: solo batería</option><option value="Lector Electrónico">Pasar a: solo lector</option><option value="Cierre Electrónico">Pasar a: solo cierre</option></select>
         <button type="button" data-act="tipo">Aplicar</button>
       </div>
       <p class="ot-meta" style="margin-top:10px;">Añadir a esta lista (pega MC y/o seriales de batería BA…):</p>
@@ -1450,7 +1474,7 @@ document.getElementById("tbody-listas").addEventListener("click", async (e) => {
     const filas = mcsMarc.map(mc => ({ id_ot: otActual, m_control: mc, tipo_reposicion: tipo, actualizado_en: new Date().toISOString() }));
     const { error } = await supabaseClient.from("reposicion_equipos").upsert(filas, { onConflict: "id_ot,m_control" });
     if (error) { alert("No se pudo guardar: " + error.message + "\n(¿SQL 88?)"); return; }
-    await recargarOt(); msg.textContent = `✅ ${mcsMarc.length} equipos pasados a "${tipo === "Batería" ? "solo batería" : "equipos / piezas"}".`;
+    await recargarOt(); msg.textContent = `✅ ${mcsMarc.length} equipos pasados a "${({ "Batería": "solo batería", "Lector Electrónico": "solo lector", "Cierre Electrónico": "solo cierre" })[tipo] || "equipos / piezas"}".`;
   } else if (act === "anadir") {
     await procesarPegado(nombre, detalle.querySelector(".txt-anadir").value, detalle.querySelector(".sel-anadir-tipo").value, false, msg);
   }
@@ -1470,7 +1494,7 @@ function badgeAlbaran(lista) {
 function modoSel(m) {
   if (!esManager) return null;
   if (m.estadoMc === "Entregado") return "albaran";
-  if (tipoRep(m.mc) === "Batería") return "entregar";
+  if (tipoRep(m.mc) !== "Piezas") return "entregar";
   return m.estadoMc === "Listo para entregar" ? "entregar" : null;
 }
 function modoSelComp(c) {
