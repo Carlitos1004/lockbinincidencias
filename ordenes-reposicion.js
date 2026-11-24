@@ -736,7 +736,7 @@ function htmlMc(m) {
     <div class="scroll-x-tabla" style="max-height:none;"><table>
       <thead><tr><th>Componente</th><th>Serial retirado</th><th>Destino</th><th>Estado</th><th>Ajuste manual</th><th>Serial a entregar</th></tr></thead>
       <tbody>${filas}</tbody></table></div>
-    <div class="orep-acciones">${htmlSimsMc(m.mc)}${botonPlataforma}${botonEntrega}</div>
+    <div class="orep-acciones">${htmlSimsMc(m.mc)}${botonPlataforma}${botonEntrega}${selTipoMc(m.mc)}</div>
   </div>`;
 }
 
@@ -1187,6 +1187,22 @@ function mostrarPestana(id) {
   document.querySelectorAll("#orep-tabs button").forEach(b => b.classList.toggle("orep-tab-activa", b.dataset.tab === id));
 }
 document.querySelectorAll("#orep-tabs button").forEach(b => b.addEventListener("click", () => mostrarPestana(b.dataset.tab)));
+
+// Selector del tipo de reposición en cada equipo (solo manager): Automático / Equipo / Batería / Lector / Cierre
+function selTipoMc(mc) {
+  if (!esManager) return "";
+  const actual = (equiposCompletos[mc] || {}).tipo_reposicion || "";
+  const op = (v, t) => `<option value="${v}" ${actual === v ? "selected" : ""}>${t}</option>`;
+  return `<label class="orep-tipo-rep" style="display:flex;align-items:center;gap:6px;font-size:.9rem;">Tipo de reposición:
+    <select class="sel-tipo-mc" data-mc="${esc(mc)}">${op("", "Automático (según lo que llegó) → " + ({ "Piezas": "equipo", "Batería": "batería", "Lector Electrónico": "lector", "Cierre Electrónico": "cierre" })[(() => { const g = equiposCompletos[mc]; if (g) { const bak = g.tipo_reposicion; g.tipo_reposicion = null; const r = tipoRep(mc); g.tipo_reposicion = bak; return r; } return tipoRep(mc); })()])}${op("Piezas", "Equipo / piezas")}${op("Batería", "Solo batería")}${op("Lector Electrónico", "Solo lector")}${op("Cierre Electrónico", "Solo cierre")}</select></label>`;
+}
+document.addEventListener("change", async (e) => {
+  const sel = e.target.closest(".sel-tipo-mc"); if (!sel) return;
+  const mc = sel.dataset.mc, valor = sel.value || null;
+  const { error } = await supabaseClient.from("reposicion_equipos").upsert([{ id_ot: otActual, m_control: mc, tipo_reposicion: valor, actualizado_en: new Date().toISOString() }], { onConflict: "id_ot,m_control" });
+  if (error) { alert("No se pudo guardar: " + error.message + "\n(¿SQL 88?)"); return; }
+  await recargarOt(); cargarOts();
+});
 
 // Entrega directa de una reposición de solo batería
 document.addEventListener("click", async (e) => {
