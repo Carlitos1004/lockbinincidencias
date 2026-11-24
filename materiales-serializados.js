@@ -80,7 +80,7 @@ async function cargarTabla() {
       <td>${new Date(s.fecha_sacado).toLocaleDateString("es-ES")}</td>
       <td>${s.estado === "Sacado del almacén" ? `<button class="btn-marcar-devuelto-mat btn-secundario" data-id="${s.id}">📦 Marcar devuelto</button>`
         : (s.estado === "Devuelto al almacén" && s.tipo_componente.startsWith("Módulo de Control"))
-          ? (s.desvinculado_en ? `🔓 Desvinculado ${new Date(s.desvinculado_en).toLocaleDateString("es-ES")}`
+          ? (s.desvinculado_en ? `${s.desvinculado_nota ? "✔ Resuelto a mano" : "🔓 Desvinculado"} ${new Date(s.desvinculado_en).toLocaleDateString("es-ES")}${s.desvinculado_nota ? `<br><small>${s.desvinculado_nota}</small>` : ""}`
             : (esManagerMat() ? `<button class="btn-desvincular-mat btn-primario" data-id="${s.id}">🔓 Desvincular</button>` : "⏳ Pendiente de desvincular"))
           : "—"}</td>
     </tr>
@@ -494,9 +494,42 @@ async function refrescarPendientesDesvincular() {
   if (error || !data || !data.length) { box.hidden = true; box.innerHTML = ""; return; }   // sin columna o sin pendientes: no se muestra
   box.hidden = false;
   box.innerHTML = `<strong>🔓 ${data.length} Módulo(s) de Control devuelto(s) al almacén sin desvincular</strong>
-    <div style="font-size:.9rem;margin:6px 0;">${data.map(d => `<span class="celda-mono">${d.serial}</span> (${d.id_ot})`).join(" · ")}</div>
+    <div style="font-size:.9rem;margin:6px 0;">${data.map(d => `<div style="margin:3px 0;"><span class="celda-mono">${d.serial}</span> (${d.id_ot})${esManagerMat() ? ` <button type="button" class="btn-secundario btn-compacto btn-resolver-mano" data-id="${d.id}" data-serial="${d.serial}" title="No se desvincula: se guarda que ya está resuelto, con una nota">✔ Resolver a mano</button>` : ""}</div>`).join("")}</div>
     ${esManagerMat() ? `<button type="button" class="btn-primario" id="desv-todos-btn">Desvincular los ${data.length}</button>` : `<em>Un manager debe desvincularlos.</em>`}
 `;
+  box.querySelectorAll(".btn-resolver-mano").forEach(btn => btn.addEventListener("click", async () => {
+    const nota = prompt(`${btn.dataset.serial}: no se desvinculará en la plataforma, solo se quita de pendientes.\n\nEscribe una nota (qué pasó con este equipo):`, "Desvinculado y vinculado de nuevo en otro cliente");
+    if (nota === null) return;
+    const { error } = await supabaseClient.from("materiales_serializados").update({ desvinculado_en: new Date().toISOString(), desvinculado_nota: nota.trim() || "Resuelto a mano" }).eq("id", btn.dataset.id);
+    if (error) { alert("No se pudo guardar: " + error.message + "\n(¿Corriste el SQL 110?)"); return; }
+    let textoVida = "";
+    if (confirm(`¿Anotar también en la Vida de ${btn.dataset.serial} que se desvinculó y se vinculó de nuevo?`)) {
+      const pedirFecha = (txt) => {   // acepta AAAA-MM-DD o DD/MM/AAAA; vacío = hoy
+        const v = prompt(txt, new Date().toISOString().slice(0, 10)); if (v === null) return null;
+        const m = v.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/) || v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (!v.trim()) return new Date().toISOString();
+        if (!m) { alert("Fecha no válida: " + v); return null; }
+        const [y, mo, d] = m[0].includes("-") ? [m[1], m[2], m[3]] : [m[3], m[2].padStart(2, "0"), m[1].padStart(2, "0")];
+        return new Date(`${y}-${mo}-${d}T12:00:00`).toISOString();
+      };
+      const fDesv = pedirFecha("Fecha de la DESVINCULACIÓN (AAAA-MM-DD o DD/MM/AAAA):");
+      const fVinc = fDesv ? pedirFecha("Fecha de la NUEVA VINCULACIÓN (AAAA-MM-DD o DD/MM/AAAA):") : null;
+      if (fDesv && fVinc) {
+        const mc = btn.dataset.serial, fila = data.find(x => x.id === btn.dataset.id);
+        const { data: eq } = await supabaseClient.from("equipos").select("imei, cliente").eq("m_control", mc).maybeSingle();
+        const base = { imei: eq?.imei || null, mc };
+        const { error: e1 } = await supabaseClient.from("historial_equipo").insert([
+          { ...base, tipo_evento: "Desvinculación", fecha: fDesv, id_ot: fila ? fila.id_ot : null, notas: "Devuelto al almacén sin usar — desvinculado (registrado a mano)" + (nota.trim() ? " · " + nota.trim() : "") },
+          { ...base, tipo_evento: "Vinculación", fecha: fVinc, cliente: eq?.cliente || null, notas: "Vinculado de nuevo (registrado a mano)" + (nota.trim() ? " · " + nota.trim() : "") }
+        ]);
+        if (e1) textoVida = `\n⚠️ No se pudo anotar en la Vida: ${e1.message}`;
+        else { textoVida = "\n📒 Anotado en la Vida: Desvinculación y nueva Vinculación."; if (eq?.imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: eq.imei }); }
+      } else textoVida = "\nNo se anotó en la Vida (cancelaste una fecha).";
+    }
+    mostrarResultadoDesv(`✔ ${btn.dataset.serial} quitado de pendientes. Nota: ${nota.trim() || "Resuelto a mano"}` + textoVida);
+    if (typeof cargarTabla === "function" && otActual) cargarTabla();
+    refrescarPendientesDesvincular();
+  }));
   const b = document.getElementById("desv-todos-btn");
   if (b) b.addEventListener("click", async () => {
     if (!confirm(`Se darán de baja en la plataforma:\n${data.map(d => d.serial).join(", ")}\n\n¿Continuar?`)) return;
