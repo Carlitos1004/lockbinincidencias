@@ -78,50 +78,38 @@ async function cargarTabla() {
       <td class="celda-mono">${s.serial}</td>
       <td>${s.estado}</td>
       <td>${new Date(s.fecha_sacado).toLocaleDateString("es-ES")}</td>
-      <td>${s.estado === "Sacado del almacén" ? `<button class="btn-marcar-devuelto-mat btn-secundario" data-id="${s.id}">📦 Marcar devuelto</button>` : "—"}</td>
+      <td>${s.estado === "Sacado del almacén" ? `<button class="btn-marcar-devuelto-mat btn-secundario" data-id="${s.id}">📦 Marcar devuelto</button>`
+        : (s.estado === "Devuelto al almacén" && s.tipo_componente.startsWith("Módulo de Control"))
+          ? (s.desvinculado_en ? `🔓 Desvinculado ${new Date(s.desvinculado_en).toLocaleDateString("es-ES")}`
+            : (esManagerMat() ? `<button class="btn-desvincular-mat btn-primario" data-id="${s.id}">🔓 Desvincular</button>` : "⏳ Pendiente de desvincular"))
+          : "—"}</td>
     </tr>
   `).join("");
 
   tbody.querySelectorAll(".btn-marcar-devuelto-mat").forEach(btn => {
     btn.addEventListener("click", async () => {
       const fila = data.find(s => s.id === btn.dataset.id);
-
       await supabaseClient
         .from("materiales_serializados")
         .update({ estado: "Devuelto al almacén", fecha_actualizacion: new Date().toISOString() })
         .eq("id", btn.dataset.id);
 
-      // Si lo que se devuelve es un Módulo de Control, es un equipo
-      // completo que se sacó pensando instalarlo y no se usó — se
-      // desvincula solo, sin que haya pasado por Revisión de Taller.
+      // Un Módulo de Control devuelto sin usar es un equipo completo que nunca se instaló:
+      // hay que darlo de baja en la plataforma (después se le hace el factory reset).
       if (fila && fila.tipo_componente.startsWith("Módulo de Control")) {
-        const { data: eventoExistente } = await supabaseClient
-          .from("historial_equipo")
-          .select("id, tipo_evento")
-          .eq("mc", fila.serial)
-          .eq("id_ot", otActual)
-          .in("tipo_evento", ["Desvinculación", "Enviado a AMMI"])
-          .maybeSingle();
-
-        if (!eventoExistente) {
-          const { data: equipoInfo } = await supabaseClient
-            .from("equipos")
-            .select("imei")
-            .eq("m_control", fila.serial)
-            .maybeSingle();
-
-          await supabaseClient.from("historial_equipo").insert({
-            imei: equipoInfo?.imei || null,
-            mc: fila.serial,
-            tipo_evento: "Desvinculación",
-            id_ot: otActual,
-            notas: "Equipo completo sacado del almacén y devuelto sin usar (nunca se instaló)"
-          });
-          if (equipoInfo?.imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: equipoInfo.imei });
-        }
+        if (esManagerMat()) await desvincularDevuelto(fila, true);
+        else alert(`${fila.serial} quedó como devuelto. Un manager tendrá que desvincularlo en la plataforma (aparece en pendientes).`);
       }
-
       cargarTabla();
+      refrescarPendientesDesvincular();
+    });
+  });
+  tbody.querySelectorAll(".btn-desvincular-mat").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const fila = data.find(s => s.id === btn.dataset.id);
+      if (fila) await desvincularDevuelto(fila, true);
+      cargarTabla();
+      refrescarPendientesDesvincular();
     });
   });
 
@@ -430,3 +418,93 @@ async function sincronizarLlevados(idOt) {
     }
   });
 });
+
+
+// ---------------------------------------------------------------------
+// Desvincular en la plataforma los Módulos de Control devueltos al almacén sin usar
+// ---------------------------------------------------------------------
+function esManagerMat() {
+  return ((window.perfilActual && window.perfilActual.rol) || sessionStorage.getItem("lb_rol")) === "manager";
+}
+
+// ¿Está comunicando hace poco? Entonces probablemente está en la calle y no conviene darlo de baja.
+async function avisoComunicacion(mc) {
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const r = await fetch(`/api/lockbin-api?accion=comunicacion&mc=${encodeURIComponent(mc)}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.encontrado && d.lastReceptionAt && (new Date(d.consultadoEn) - new Date(d.lastReceptionAt)) < 36 * 3600000)
+      return `⚠️ ${mc} comunicó hace menos de 36 h: parece estar activo en la calle.`;
+  } catch (e) { /* sin aviso */ }
+  return null;
+}
+
+// ¿Hay señales de que este MC se volvió a vincular o a usar DESPUÉS de devolverse al almacén?
+// (una vinculación nueva en su Vida, o mensajes recibidos por la plataforma desde la devolución)
+async function señalesDeUsoPosterior(fila) {
+  const desde = fila.fecha_actualizacion || fila.fecha_sacado;
+  const mc = fila.serial, señales = [];
+  try {
+    const { data } = await supabaseClient.from("historial_equipo").select("fecha, tipo_evento, cliente").eq("mc", mc).eq("tipo_evento", "Vinculación").gt("fecha", desde).limit(3);
+    (data || []).forEach(v => señales.push(`vinculado de nuevo el ${new Date(v.fecha).toLocaleDateString("es-ES")}${v.cliente ? " (" + v.cliente + ")" : ""}`));
+  } catch (e) { /* sin dato */ }
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const r = await fetch(`/api/lockbin-api?accion=comunicacion&mc=${encodeURIComponent(mc)}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.encontrado && d.lastReceptionAt && new Date(d.lastReceptionAt) > new Date(desde))
+      señales.push(`la plataforma recibió mensajes suyos el ${new Date(d.lastReceptionAt).toLocaleDateString("es-ES")}, después de devolverse`);
+  } catch (e) { /* sin dato */ }
+  return señales;
+}
+
+// Desvincula un MC devuelto. Devuelve true si quedó desvinculado (o ya lo estaba).
+// preguntar=true (uno a uno): avisa de las señales y deja decidir. preguntar=false (en bloque): si hay señales NO lo toca.
+async function desvincularDevuelto(fila, preguntar) {
+  const mc = fila.serial;
+  const señales = await señalesDeUsoPosterior(fila);
+  if (preguntar) {
+    const aviso = señales.length ? `⚠️ ${mc}: ${señales.join("; ")}.\nPuede estar en uso con otro cliente.\n\n` : "";
+    if (!confirm(`${aviso}¿Desvincular ${mc} de la plataforma? (devuelto al almacén sin usar)`)) return false;
+  } else if (señales.length) {
+    fila._saltado = señales.join("; ");
+    return false;
+  }
+  const r = await desvincularEnPlataforma(supabaseClient, mc);
+  if (!r.ok) { alert(`No se pudo desvincular ${mc}: ${r.mensaje || r.resultado}. Queda pendiente.`); return false; }
+  const ahora = new Date().toISOString();
+  await supabaseClient.from("materiales_serializados").update({ desvinculado_en: ahora }).eq("id", fila.id);
+  const { data: yaEvento } = await supabaseClient.from("historial_equipo").select("id").eq("mc", mc).eq("id_ot", fila.id_ot).in("tipo_evento", ["Desvinculación", "Enviado a AMMI"]).limit(1);
+  if (!(yaEvento && yaEvento.length)) {
+    const { data: eq } = await supabaseClient.from("equipos").select("imei, cliente").eq("m_control", mc).maybeSingle();
+    await supabaseClient.from("historial_equipo").insert({ imei: eq?.imei || null, mc, tipo_evento: "Desvinculación", cliente: eq?.cliente || null, id_ot: fila.id_ot,
+      notas: "Equipo completo sacado del almacén y devuelto sin usar (nunca se instaló) — desvinculado en la plataforma" });
+    if (eq?.imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: eq.imei });
+  }
+  await supabaseClient.from("equipos").update({ estado_montaje: "Desvinculado", actualizado_en: ahora }).eq("m_control", mc);
+  return true;
+}
+
+// Banner con todos los MC devueltos (de cualquier OT) que aún no se desvincularon
+async function refrescarPendientesDesvincular() {
+  const box = document.getElementById("pendientes-desvincular-box");
+  if (!box) return;
+  const { data, error } = await supabaseClient.from("materiales_serializados").select("id, id_ot, serial, tipo_componente, fecha_actualizacion, fecha_sacado")
+    .eq("estado", "Devuelto al almacén").is("desvinculado_en", null).like("tipo_componente", "Módulo de Control%");
+  if (error || !data || !data.length) { box.hidden = true; box.innerHTML = ""; return; }   // sin columna o sin pendientes: no se muestra
+  box.hidden = false;
+  box.innerHTML = `<strong>🔓 ${data.length} Módulo(s) de Control devuelto(s) al almacén sin desvincular</strong>
+    <div style="font-size:.9rem;margin:6px 0;">${data.map(d => `<span class="celda-mono">${d.serial}</span> (${d.id_ot})`).join(" · ")}</div>
+    ${esManagerMat() ? `<button type="button" class="btn-primario" id="desv-todos-btn">Desvincular los ${data.length}</button>` : `<em>Un manager debe desvincularlos.</em>`}
+    <div id="desv-todos-res" style="white-space:pre-wrap;margin-top:6px;font-size:.9rem;"></div>`;
+  const b = document.getElementById("desv-todos-btn");
+  if (b) b.addEventListener("click", async () => {
+    if (!confirm(`Se darán de baja en la plataforma:\n${data.map(d => d.serial).join(", ")}\n\n¿Continuar?`)) return;
+    b.disabled = true; const res = document.getElementById("desv-todos-res"); let ok = 0; const fallos = [];
+    for (const d of data) { res.textContent = `Desvinculando ${d.serial}… (${ok}/${data.length})`; (await desvincularDevuelto(d, false)) ? ok++ : fallos.push(d._saltado ? `${d.serial} (REVISAR: ${d._saltado})` : d.serial); }
+    res.textContent = `✅ ${ok} desvinculado(s)` + (fallos.length ? `\n⚠️ No se tocaron (revísalos y desvincúlalos uno a uno si procede):\n- ${fallos.join("\n- ")}` : "");
+    if (typeof cargarTabla === "function" && otActual) cargarTabla();
+    setTimeout(refrescarPendientesDesvincular, 1500);
+  });
+}
+refrescarPendientesDesvincular();

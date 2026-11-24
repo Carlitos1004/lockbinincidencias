@@ -34,6 +34,8 @@
   </div>
   <p id="cargar-msg" class="resultado-msg" hidden></p>
 
+  <div id="pendientes-desvincular-box" hidden style="margin-top:18px;padding:12px 16px;background:#fff5e6;border:1.5px solid #f0c98a;border-radius:12px;"></div>
+
   <div id="contenido" hidden>
     <h2 style="margin-top:28px;">Escanear seriales (pistola lectora)</h2>
     <p style="font-size:0.8rem; color:var(--gris-700); margin:0 0 12px;">Haz clic en el cuadro que corresponda y empieza a escanear — cada disparo agrega una línea sola. El tipo (Lector/Cierre/Módulo) se detecta por el prefijo del serial (LE/CE/MC). Las baterías (BA) quedan pendientes de clasificar Recargable/No Recargable/PKCELL, abajo.</p>
@@ -88,6 +90,7 @@
 <script>const ROLES_PERMITIDOS = ["manager", "operario"];</script>
 <script src="sesion-multi.js"></script>
 <script src="selector-ots.js"></script>
+<script src="plataforma-core.js"></script>
 <script src="serializados-core.js"></script>
 <script src="materiales-serializados.js"></script>
 </body>
