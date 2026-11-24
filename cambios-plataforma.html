@@ -57,9 +57,12 @@
     <div class="cp-peligro">
       <strong>Desvincular</strong>
       <p style="font-size:.9rem; margin:4px 0 8px;">Da de baja el equipo en la plataforma: deja de comunicar y el dispositivo queda libre. No toca los componentes de arriba.</p>
+      <label style="display:block;font-weight:600;margin-bottom:4px;">Varios equipos a la vez (opcional): pega aquí los MC, uno por línea o separados por comas</label>
+      <textarea id="cp-desv-lista" rows="4" style="width:100%;font-family:monospace;text-transform:uppercase;" placeholder="MC2500268&#10;MC2500269&#10;MC2500270"></textarea>
+      <p id="cp-desv-cuenta" style="font-size:.85rem;color:var(--gris-500);margin:4px 0 8px;">Si lo dejas vacío, se desvincula solo el MC de arriba.</p>
       <label><input type="checkbox" id="cp-conf-desv"> Entiendo que el equipo se dará de baja</label>
       <div class="materiales-controles" style="margin-top:8px;">
-        <button id="cp-desvincular" class="btn-secundario" type="button" disabled>🔓 Desvincular este MC</button>
+        <button id="cp-desvincular" class="btn-secundario" type="button" disabled>🔓 Desvincular</button>
       </div>
     </div>
     <pre id="cp-salida"></pre>

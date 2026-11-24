@@ -98,26 +98,47 @@ $("cp-aplicar").addEventListener("click", async () => {
   finally { btn.disabled = false; }
 });
 
+const mcsDeLista = () => [...new Set((($("cp-desv-lista").value || "").toUpperCase().match(/MC\d{4,12}/g)) || [])];
+$("cp-desv-lista").addEventListener("input", () => {
+  const n = mcsDeLista().length;
+  $("cp-desv-cuenta").textContent = n ? `${n} MC detectado(s). Se desvincularán estos y no el de arriba.` : "Si lo dejas vacío, se desvincula solo el MC de arriba.";
+});
+
+// Desvincula un MC: plataforma + Vida + Equipos. Devuelve {ok, texto}
+async function desvincularUno(mc, nota) {
+  const r = await desvincularEnPlataforma(supabaseClient, mc);
+  const T = { desvinculado: "🔓 dado de baja en la plataforma", ya_dado_de_baja: "ℹ️ ya estaba dado de baja", no_esta_en_plataforma: "ℹ️ no tenía equipo en la plataforma (ya desvinculado)" };
+  if (!r.ok) return { ok: false, texto: `⚠️ ${mc}: la plataforma no aceptó la baja${r.mensaje ? " (" + r.mensaje + ")" : ""}.` };
+  const extra = [];
+  const eq = await datosEquipo(mc);
+  if (r.resultado === "desvinculado") {
+    const { error } = await supabaseClient.from("historial_equipo").insert({ imei: eq.imei || null, mc, tipo_evento: "Desvinculación", cliente: eq.cliente || null, notas: "Desvinculado manualmente en la plataforma" + (nota ? " · " + nota : "") });
+    if (error) extra.push("⚠️ no se anotó en la Vida (" + error.message + ")"); else { extra.push("📒 Vida"); if (eq.imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: eq.imei }); }
+  }
+  const { error: eU } = await supabaseClient.from("equipos").update({ estado_montaje: "Desvinculado", actualizado_en: new Date().toISOString() }).eq("m_control", mc);
+  extra.push(eU ? "⚠️ no se marcó Desvinculado en Equipos (" + eU.message + ")" : "✅ Equipos");
+  return { ok: true, texto: `${mc}: ${T[r.resultado] || r.resultado} · ${extra.join(" · ")}` };
+}
+
 $("cp-desvincular").addEventListener("click", async () => {
-  const mc = mcActual(), sal = $("cp-salida");
-  if (!/^MC\d{4,12}$/.test(mc)) { sal.textContent = "Escribe un MC válido."; return; }
-  if (!confirm(`Se DARÁ DE BAJA ${mc} en la plataforma.\nDejará de comunicar.\n\n¿Continuar?`)) return;
-  const btn = $("cp-desvincular"); btn.disabled = true; sal.textContent = "Desvinculando…";
+  const sal = $("cp-salida");
+  const lista = mcsDeLista();
+  const mcs = lista.length ? lista : [mcActual()].filter(m => /^MC\d{4,12}$/.test(m));
+  if (!mcs.length) { sal.textContent = "Escribe un MC válido, o pega una lista de MC."; return; }
+  if (!confirm(`Se DARÁ DE BAJA en la plataforma ${mcs.length === 1 ? mcs[0] : mcs.length + " equipos:\n" + mcs.join(", ")}.\nDejarán de comunicar.\n\n¿Continuar?`)) return;
+  const btn = $("cp-desvincular"); btn.disabled = true;
+  const nota = $("cp-nota").value.trim();
+  const lineas = []; let fallos = 0;
   try {
-    const r = await desvincularEnPlataforma(supabaseClient, mc);
-    const T = { desvinculado: "🔓 Equipo dado de baja en la plataforma.", ya_dado_de_baja: "ℹ️ Ya estaba dado de baja.", no_esta_en_plataforma: "ℹ️ No tenía equipo en la plataforma (ya estaba desvinculado).", error: "⚠️ La plataforma no aceptó la baja" + (r.mensaje ? " (" + r.mensaje + ")" : "") + "." };
-    let texto = T[r.resultado] || "⚠️ Respuesta inesperada.";
-    if (r.ok) {
-      const eq = await datosEquipo(mc);
-      const nota = $("cp-nota").value.trim();
-      if (r.resultado === "desvinculado") {
-        const { error } = await supabaseClient.from("historial_equipo").insert({ imei: eq.imei || null, mc, tipo_evento: "Desvinculación", cliente: eq.cliente || null, notas: "Desvinculado manualmente en la plataforma" + (nota ? " · " + nota : "") });
-        if (error) texto += `\n⚠️ No se pudo anotar en la Vida: ${error.message}`; else { texto += "\n📒 Anotado en la Vida del equipo."; if (eq.imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: eq.imei }); }
-      }
-      const { error: eU } = await supabaseClient.from("equipos").update({ estado_montaje: "Desvinculado", actualizado_en: new Date().toISOString() }).eq("m_control", mc);
-      if (eU) texto += `\n⚠️ No se pudo marcar Desvinculado en Equipos: ${eU.message}`; else texto += "\n✅ Equipos: marcado como Desvinculado.";
+    for (let k = 0; k < mcs.length; k++) {   // uno tras otro: una baja no debe repetirse a ciegas
+      sal.textContent = `Desvinculando ${k + 1} de ${mcs.length}: ${mcs[k]}…\n` + lineas.join("\n");
+      const r = await desvincularUno(mcs[k], nota).catch(e => ({ ok: false, texto: `❌ ${mcs[k]}: ${e.message}` }));
+      if (!r.ok) fallos++;
+      lineas.push(r.texto);
     }
-    sal.textContent = texto;
+    sal.textContent = (fallos ? `⚠️ ${mcs.length - fallos} de ${mcs.length} desvinculados; ${fallos} con problema (puedes volver a lanzar solo esos).` : `✅ ${mcs.length} desvinculado(s).`) + "\n" + lineas.join("\n");
     $("cp-conf-desv").checked = false;
-  } catch (e) { sal.textContent = "❌ " + e.message; $("cp-desvincular").disabled = false; }
+    if (!fallos) $("cp-desv-lista").value = "";
+    $("cp-desv-lista").dispatchEvent(new Event("input"));
+  } finally { btn.disabled = !$("cp-conf-desv").checked; }
 });
