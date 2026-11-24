@@ -496,15 +496,22 @@ async function refrescarPendientesDesvincular() {
   box.innerHTML = `<strong>🔓 ${data.length} Módulo(s) de Control devuelto(s) al almacén sin desvincular</strong>
     <div style="font-size:.9rem;margin:6px 0;">${data.map(d => `<span class="celda-mono">${d.serial}</span> (${d.id_ot})`).join(" · ")}</div>
     ${esManagerMat() ? `<button type="button" class="btn-primario" id="desv-todos-btn">Desvincular los ${data.length}</button>` : `<em>Un manager debe desvincularlos.</em>`}
-    <div id="desv-todos-res" style="white-space:pre-wrap;margin-top:6px;font-size:.9rem;"></div>`;
+`;
   const b = document.getElementById("desv-todos-btn");
   if (b) b.addEventListener("click", async () => {
     if (!confirm(`Se darán de baja en la plataforma:\n${data.map(d => d.serial).join(", ")}\n\n¿Continuar?`)) return;
-    b.disabled = true; const res = document.getElementById("desv-todos-res"); let ok = 0; const fallos = [];
-    for (const d of data) { res.textContent = `Desvinculando ${d.serial}… (${ok}/${data.length})`; (await desvincularDevuelto(d, false)) ? ok++ : fallos.push(d._saltado ? `${d.serial} (REVISAR: ${d._saltado})` : d.serial); }
-    res.textContent = `✅ ${ok} desvinculado(s)` + (fallos.length ? `\n⚠️ No se tocaron (revísalos y desvincúlalos uno a uno si procede):\n- ${fallos.join("\n- ")}` : "");
+    b.disabled = true; let ok = 0; const fallos = [];
+    for (const d of data) { mostrarResultadoDesv(`Desvinculando ${d.serial}… (${ok}/${data.length})`); (await desvincularDevuelto(d, false)) ? ok++ : fallos.push(d._saltado ? `${d.serial} (REVISAR: ${d._saltado})` : d.serial); }
+    mostrarResultadoDesv(`✅ ${ok} desvinculado(s)` + (fallos.length ? `\n⚠️ No se tocaron (revísalos y desvincúlalos uno a uno si procede):\n- ${fallos.join("\n- ")}` : ""));
     if (typeof cargarTabla === "function" && otActual) cargarTabla();
     setTimeout(refrescarPendientesDesvincular, 1500);
   });
 }
 refrescarPendientesDesvincular();
+
+// El resultado vive fuera del banner (que se refresca) y se queda hasta que se cierre
+function mostrarResultadoDesv(texto) {
+  document.getElementById("desv-resultado").hidden = false;
+  document.getElementById("desv-resultado-texto").textContent = texto;
+}
+document.getElementById("desv-resultado-cerrar").addEventListener("click", () => { document.getElementById("desv-resultado").hidden = true; });
