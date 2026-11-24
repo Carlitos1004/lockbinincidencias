@@ -80,7 +80,7 @@ async function cargarTabla() {
       <td>${new Date(s.fecha_sacado).toLocaleDateString("es-ES")}</td>
       <td>${s.estado === "Sacado del almacén" ? `<button class="btn-marcar-devuelto-mat btn-secundario" data-id="${s.id}">📦 Marcar devuelto</button>`
         : (s.estado === "Devuelto al almacén" && s.tipo_componente.startsWith("Módulo de Control"))
-          ? (s.desvinculado_en ? `${s.desvinculado_nota ? "✔ Resuelto a mano" : "🔓 Desvinculado"} ${new Date(s.desvinculado_en).toLocaleDateString("es-ES")}${s.desvinculado_nota ? `<br><small>${s.desvinculado_nota}</small>` : ""}`
+          ? (s.desvinculado_en ? `${s.desvinculado_nota ? "✔ Resuelto a mano" : "🔓 Desvinculado"} ${new Date(s.desvinculado_en).toLocaleDateString("es-ES")}${s.desvinculado_nota ? `<br><small>${s.desvinculado_nota}</small>${esManagerMat() ? `<br><button type="button" class="btn-vida-mat btn-secundario btn-compacto" data-id="${s.id}">📒 Anotar en Vida</button>` : ""}` : ""}`
             : (esManagerMat() ? `<button class="btn-desvincular-mat btn-primario" data-id="${s.id}">🔓 Desvincular</button>` : "⏳ Pendiente de desvincular"))
           : "—"}</td>
     </tr>
@@ -102,6 +102,13 @@ async function cargarTabla() {
       }
       cargarTabla();
       refrescarPendientesDesvincular();
+    });
+  });
+  tbody.querySelectorAll(".btn-vida-mat").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const fila = data.find(x => x.id === btn.dataset.id); if (!fila) return;
+      if (!confirm(`¿Anotar en la Vida de ${fila.serial} la Desvinculación y la nueva Vinculación? (si ya las anotaste, saldrán repetidas)`)) return;
+      mostrarResultadoDesv(`${fila.serial}:` + await anotarVidaDevuelto(fila.serial, fila.id_ot, fila.desvinculado_nota || ""));
     });
   });
   tbody.querySelectorAll(".btn-desvincular-mat").forEach(btn => {
@@ -504,27 +511,8 @@ async function refrescarPendientesDesvincular() {
     if (error) { alert("No se pudo guardar: " + error.message + "\n(¿Corriste el SQL 110?)"); return; }
     let textoVida = "";
     if (confirm(`¿Anotar también en la Vida de ${btn.dataset.serial} que se desvinculó y se vinculó de nuevo?`)) {
-      const pedirFecha = (txt) => {   // acepta AAAA-MM-DD o DD/MM/AAAA; vacío = hoy
-        const v = prompt(txt, new Date().toISOString().slice(0, 10)); if (v === null) return null;
-        const m = v.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/) || v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-        if (!v.trim()) return new Date().toISOString();
-        if (!m) { alert("Fecha no válida: " + v); return null; }
-        const [y, mo, d] = m[0].includes("-") ? [m[1], m[2], m[3]] : [m[3], m[2].padStart(2, "0"), m[1].padStart(2, "0")];
-        return new Date(`${y}-${mo}-${d}T12:00:00`).toISOString();
-      };
-      const fDesv = pedirFecha("Fecha de la DESVINCULACIÓN (AAAA-MM-DD o DD/MM/AAAA):");
-      const fVinc = fDesv ? pedirFecha("Fecha de la NUEVA VINCULACIÓN (AAAA-MM-DD o DD/MM/AAAA):") : null;
-      if (fDesv && fVinc) {
-        const mc = btn.dataset.serial, fila = data.find(x => x.id === btn.dataset.id);
-        const { data: eq } = await supabaseClient.from("equipos").select("imei, cliente").eq("m_control", mc).maybeSingle();
-        const base = { imei: eq?.imei || null, mc };
-        const { error: e1 } = await supabaseClient.from("historial_equipo").insert([
-          { ...base, tipo_evento: "Desvinculación", fecha: fDesv, id_ot: fila ? fila.id_ot : null, notas: "Devuelto al almacén sin usar — desvinculado (registrado a mano)" + (nota.trim() ? " · " + nota.trim() : "") },
-          { ...base, tipo_evento: "Vinculación", fecha: fVinc, cliente: eq?.cliente || null, notas: "Vinculado de nuevo (registrado a mano)" + (nota.trim() ? " · " + nota.trim() : "") }
-        ]);
-        if (e1) textoVida = `\n⚠️ No se pudo anotar en la Vida: ${e1.message}`;
-        else { textoVida = "\n📒 Anotado en la Vida: Desvinculación y nueva Vinculación."; if (eq?.imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: eq.imei }); }
-      } else textoVida = "\nNo se anotó en la Vida (cancelaste una fecha).";
+      const fila = data.find(x => x.id === btn.dataset.id);
+      textoVida = await anotarVidaDevuelto(btn.dataset.serial, fila ? fila.id_ot : null, nota.trim());
     }
     mostrarResultadoDesv(`✔ ${btn.dataset.serial} quitado de pendientes. Nota: ${nota.trim() || "Resuelto a mano"}` + textoVida);
     if (typeof cargarTabla === "function" && otActual) cargarTabla();
@@ -548,3 +536,27 @@ function mostrarResultadoDesv(texto) {
   document.getElementById("desv-resultado-texto").textContent = texto;
 }
 document.getElementById("desv-resultado-cerrar").addEventListener("click", () => { document.getElementById("desv-resultado").hidden = true; });
+
+// Anota en la Vida del equipo «Desvinculación» + nueva «Vinculación» (con fechas que se piden). Devuelve el texto del resultado.
+async function anotarVidaDevuelto(mc, idOt, nota) {
+  const pedirFecha = (txt) => {   // acepta AAAA-MM-DD o DD/MM/AAAA; vacío = hoy
+    const v = prompt(txt, new Date().toISOString().slice(0, 10)); if (v === null) return null;
+    if (!v.trim()) return new Date().toISOString();
+    const m = v.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/) || v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) { alert("Fecha no válida: " + v); return null; }
+    const [y, mo, d] = m[0].includes("-") ? [m[1], m[2], m[3]] : [m[3], m[2].padStart(2, "0"), m[1].padStart(2, "0")];
+    return new Date(`${y}-${mo}-${d}T12:00:00`).toISOString();
+  };
+  const fDesv = pedirFecha(`${mc}: fecha de la DESVINCULACIÓN (AAAA-MM-DD o DD/MM/AAAA):`);
+  const fVinc = fDesv ? pedirFecha(`${mc}: fecha de la NUEVA VINCULACIÓN (AAAA-MM-DD o DD/MM/AAAA):`) : null;
+  if (!fDesv || !fVinc) return "\nNo se anotó en la Vida (cancelaste una fecha). Puedes repetirlo con el botón «📒 Anotar en Vida» de la fila.";
+  const { data: eq } = await supabaseClient.from("equipos").select("imei, cliente").eq("m_control", mc).maybeSingle();
+  const base = { imei: eq?.imei || null, mc };
+  const { error } = await supabaseClient.from("historial_equipo").insert([
+    { ...base, tipo_evento: "Desvinculación", fecha: fDesv, id_ot: idOt, notas: "Devuelto al almacén sin usar — desvinculado (registrado a mano)" + (nota ? " · " + nota : "") },
+    { ...base, tipo_evento: "Vinculación", fecha: fVinc, cliente: eq?.cliente || null, notas: "Vinculado de nuevo (registrado a mano)" + (nota ? " · " + nota : "") }
+  ]);
+  if (error) return `\n⚠️ No se pudo anotar en la Vida: ${error.message}`;
+  if (eq?.imei) await supabaseClient.rpc("recalcular_registro_maestro", { p_imei: eq.imei });
+  return "\n📒 Anotado en la Vida: Desvinculación y nueva Vinculación.";
+}
