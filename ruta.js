@@ -382,6 +382,7 @@ function limpiarFormularioModal() {
   document.getElementById("modal-comentarios-input").value = "";
   document.getElementById("modal-estado-select").value = "";
   document.getElementById("modal-foto-input").value = "";
+  document.getElementById("modal-foto-camara").value = "";
   ["modal-cambio-le", "modal-cambio-ce", "modal-cambio-ba", "modal-cambio-mc", "modal-cambio-completo",
    "modal-retirado-cliente", "modal-falta-le", "modal-falta-ce", "modal-falta-ba", "modal-falta-mc",
    "modal-vandalismo-check"].forEach(id => { document.getElementById(id).checked = false; });
@@ -849,7 +850,7 @@ modalEnviarBtn.addEventListener("click", async () => {
   const accionesSeleccionadas = [...document.querySelectorAll(".accion-check:checked")].map(c => c.value);
   const comentarios = document.getElementById("modal-comentarios-input").value.trim();
   const estadoEquipo = document.getElementById("modal-estado-select").value;
-  const fotosFiles = [...document.getElementById("modal-foto-input").files];
+  const fotosFiles = [...document.getElementById("modal-foto-camara").files, ...document.getElementById("modal-foto-input").files];
 
   if (!falla) { mostrarMensaje(modalMsg, "⚠️ Selecciona la falla.", true); return; }
   const hayCambioOAlgoMas = ["le", "ce", "ba", "mc", "completo"].some(c => document.getElementById("modal-cambio-" + c).checked)
