@@ -216,7 +216,11 @@ async function buscarOT() {
 
   // SIMs de los equipos de esta OT (guardar la SIM del cliente desde la plataforma antes de cambiarla)
   if (typeof renderSimsMateriales === "function") {
-    const mcsSim = [...new Set(ticketsCargados.map(t => t.m_control).filter(Boolean))];
+    // MC de los tickets + MC que llegan como componente «Módulo de Control» sin ticket (OT manual)
+    const mcsSim = [...new Set([
+      ...ticketsCargados.map(t => t.m_control),
+      ...sinTicketCargados.filter(c => /m[oó]dulo/i.test(c.tipo_componente || "")).map(c => c.m_control || c.serial_retirado)
+    ].filter(Boolean).map(m => String(m).toUpperCase()))];
     renderSimsMateriales(idOt, mcsSim.map(m => ({ tipo_componente: "Módulo de Control", serial: m })), "sims-ot-box");
   }
 
