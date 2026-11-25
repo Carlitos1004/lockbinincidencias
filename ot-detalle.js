@@ -214,6 +214,12 @@ async function buscarOT() {
 
   renderTabla();
 
+  // SIMs de los equipos de esta OT (guardar la SIM del cliente desde la plataforma antes de cambiarla)
+  if (typeof renderSimsMateriales === "function") {
+    const mcsSim = [...new Set(ticketsCargados.map(t => t.m_control).filter(Boolean))];
+    renderSimsMateriales(idOt, mcsSim.map(m => ({ tipo_componente: "Módulo de Control", serial: m })), "sims-ot-box");
+  }
+
   // Si la OT no tiene ningún ticket (solo componentes sueltos, por ejemplo),
   // no tiene sentido mostrar una tabla vacía con sus filtros.
   const sinTickets = ticketsCargados.length === 0;
