@@ -52,12 +52,19 @@
       <option value="Devuelta al mismo equipo">Devueltas al mismo equipo</option>
       <option value="Pasada a MC nuevo">Pasadas a MC nuevo</option>
     </select>
+    <select id="f-ot"><option value="">Todas las OT</option></select>
+    <label style="font-size:.9rem;"><input type="checkbox" id="f-agrupar" checked> Agrupar por OT</label>
     <span id="sims-contador" style="font-size:.9rem;"></span>
+  </div>
+  <div id="sims-barra" style="display:none;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;padding:8px 12px;background:#f3f7f4;border:1.5px solid #cfe0d2;border-radius:12px;">
+    <span><strong id="sel-n">0</strong> marcadas</span>
+    <button type="button" class="btn-primario" id="sel-mismo">↩ Devueltas al mismo equipo</button>
+    <button type="button" class="btn-secundario" id="sel-limpiar">Limpiar</button>
   </div>
   <p id="sims-msg" class="resultado-msg" hidden></p>
   <div class="scroll-x-tabla" style="overflow:auto;">
     <table class="tabla-revision">
-      <thead><tr><th>ICCID</th><th>Operador</th><th>MC origen</th><th>OT</th><th>Cliente</th><th>Guardada en</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+      <thead><tr><th><input type="checkbox" id="sel-todas" title="Marcar todas las visibles pendientes"></th><th>ICCID</th><th>Operador</th><th>MC origen</th><th>OT</th><th>Cliente</th><th class="col-ubic">Dónde queda</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
       <tbody id="sims-tbody"></tbody>
     </table>
   </div>
