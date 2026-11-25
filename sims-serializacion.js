@@ -25,14 +25,11 @@ async function renderSimsMateriales(idOt, filasMat, boxId) {
   const { data: regs, error } = await supabaseClient.from("sims_custodia").select("*").eq("id_ot", idOt);
   if (error) { box.hidden = false; box.innerHTML = `<h2>📶 SIMs de los equipos</h2><p>${escSm(error.message)} (¿corriste el SQL 107?)</p>`; return; }
   const porMc = {}; (regs || []).forEach(r => { (porMc[r.mc_origen] = porMc[r.mc_origen] || []).push(r); });
-  const ub0 = localStorage.getItem("lb_sim_ubicacion") || "";
-  const pendientes = mcs.filter(m => !porMc[m]);
+    const pendientes = mcs.filter(m => !porMc[m]);
   box.hidden = false;
   box.innerHTML = `<h2>📶 SIMs de los equipos de esta OT</h2>
-    <p style="font-size:.9rem;">Pulsa <strong>Guardar SIM</strong> <u>antes de cambiar la SIM</u> del equipo: se consulta la plataforma y se copia el ICCID de la SIM que lleva (${mcs.length - pendientes.length} de ${mcs.length} guardadas). Después, en «SIMs guardadas», marca si vuelve al mismo equipo o pasa a uno nuevo.</p>
+    <p style="font-size:.9rem;">Pulsa <strong>Guardar SIM</strong> <u>antes de cambiar la SIM</u> del equipo: se consulta la plataforma y se copia el ICCID de la SIM que lleva (${mcs.length - pendientes.length} de ${mcs.length} guardadas). Dónde queda cada SIM (pegada al MC o en caja/bolsa) se decide después de revisar el equipo, en «SIMs guardadas».</p>
     ${esManager ? `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;">
-      <label>Dónde queda la SIM <input type="text" id="simm-ubic" list="simm-ubics" placeholder="Elige o escribe" value="${escSm(ub0)}" style="width:190px;"></label>
-      <datalist id="simm-ubics"><option value="Pegada al MC"><option value="Caja"><option value="Bolsa"></datalist>
       ${pendientes.length ? `<button type="button" class="btn-primario" id="simm-todos">📶 Guardar SIM de los ${pendientes.length} pendientes</button>` : ""}
       <a href="sims.html" class="btn-secundario" style="text-decoration:none;padding:6px 12px;">📋 Ver SIMs guardadas</a></div>` : `<p><em>Solo un manager puede guardar SIMs desde aquí.</em></p>`}
     <div class="scroll-x-tabla" style="max-height:340px;"><table class="tabla-revision"><thead><tr><th>MC</th><th>SIM</th><th></th></tr></thead><tbody>
@@ -48,8 +45,7 @@ async function renderSimsMateriales(idOt, filasMat, boxId) {
     try { info = await iccidDePlataforma(mc); } catch (e) { return `${mc}: ❌ ${e.message}`; }
     if (!info.encontrado) return `${mc}: no está activo en la plataforma (¿ya desvinculado?).`;
     if (!info.iccid) return `${mc}: la plataforma no devuelve ninguna SIM para este equipo.`;
-    const ubic = (document.getElementById("simm-ubic") || {}).value || null;
-    if (ubic !== null) localStorage.setItem("lb_sim_ubicacion", ubic);
+    const ubic = null;   // dónde queda la SIM se decide después de revisar el equipo (página de SIMs)
     const { error: e2 } = await supabaseClient.from("sims_custodia").insert({ iccid: info.iccid, operador: simOperador(info.iccid) || null, mc_origen: mc, id_ot: idOt, cliente: info.cliente, ubicacion: ubic || null, creada_por: await simUsuario() });
     if (e2) return e2.code === "23505" ? `${mc}: esa SIM (${simCorta(info.iccid)}) ya está guardada para otro equipo.` : `${mc}: ❌ ${e2.message}`;
     return "";

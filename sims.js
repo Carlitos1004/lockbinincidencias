@@ -19,12 +19,18 @@ function mensaje(t) { const p = document.getElementById("sims-msg"); p.textConte
 
 const seleccion = new Set();          // ids marcados (se conservan al repintar)
 const cerradas = new Set();          // OT plegadas
+const UBICACIONES = ["Pegada al MC", "Caja", "Bolsa"];
+function selUbic(s) {
+  if (s.estado !== "Guardada") return `<td>${escH(s.ubicacion || "—")}</td>`;
+  const op = [...UBICACIONES, ...(s.ubicacion && !UBICACIONES.includes(s.ubicacion) ? [s.ubicacion] : [])];
+  return `<td><select class="sel-ubic" style="min-width:140px;"><option value="">— por decidir —</option>${op.map(o => `<option ${o === s.ubicacion ? "selected" : ""}>${escH(o)}</option>`).join("")}</select></td>`;
+}
 function filaSim(s, conUbic) {
   const guardada = s.estado === "Guardada";
   return `<tr data-id="${s.id}">
       <td>${guardada ? `<input type="checkbox" class="chk-sim" ${seleccion.has(s.id) ? "checked" : ""}>` : ""}</td>
       <td title="${escH(s.iccid)}">${escH(simCorta(s.iccid))}</td><td>${escH(s.operador || simOperador(s.iccid) || "")}</td><td><strong>${escH(s.mc_origen || "—")}</strong></td>
-      <td>${escH(s.id_ot || "")}</td><td>${escH(s.cliente || "")}</td>${conUbic ? `<td>${escH(s.ubicacion || "—")}</td>` : ""}
+      <td>${escH(s.id_ot || "")}</td><td>${escH(s.cliente || "")}</td>${selUbic(s)}
       <td>${guardada ? "📶 Guardada" : escH(s.estado) + (s.mc_destino ? " → <strong>" + escH(s.mc_destino) + "</strong>" : "")}</td>
       <td>${new Date(s.resuelta_en || s.creada_en).toLocaleDateString("es-ES")}</td>
       <td>${guardada ? `<button type="button" class="btn-primario sim-mismo">↩ Devuelta al mismo equipo</button> <button type="button" class="btn-secundario sim-nuevo">➡ Pasada a MC nuevo…</button> ` : `<button type="button" class="btn-secundario sim-reabrir">Reabrir</button> `}<button type="button" class="btn-secundario sim-borrar" title="Borrar el registro">✕</button></td></tr>`;
@@ -49,9 +55,8 @@ function pintar() {
   [...sel.options].find(o => o.value === "").textContent = `Todas (${todasSims.length})`;
   document.getElementById("sims-contador").textContent = `${lista.length} SIMs · ${todasSims.filter(s => s.estado === "Guardada").length} guardadas en total`;
   // La columna «Dónde queda» solo se muestra si alguna SIM la tiene rellena
-  const conUbic = lista.some(s => s.ubicacion);
-  document.querySelectorAll(".col-ubic").forEach(th => { th.hidden = !conUbic; });
-  const ncol = 9 + (conUbic ? 1 : 0);
+  const conUbic = true;
+  const ncol = 10;
   const tb = document.getElementById("sims-tbody");
   if (!lista.length) tb.innerHTML = `<tr><td colspan="${ncol}">No hay SIMs con ese filtro.</td></tr>`;
   else if (!agrupar) tb.innerHTML = lista.map(s => filaSim(s, conUbic)).join("");
@@ -92,7 +97,7 @@ document.getElementById("sims-tbody").addEventListener("click", async e => {
   }
   if (e.target.closest(".chk-sim")) { e.target.checked ? seleccion.add(tr.dataset.id) : seleccion.delete(tr.dataset.id); actualizarBarra(); return; }
   const id = tr.dataset.id;
-  if (e.target.closest(".sim-mismo")) { await cerrarSim(id, { estado: "Devuelta al mismo equipo", mc_destino: null }); }
+  if (e.target.closest(".sim-mismo")) { await cerrarSim(id, { estado: "Devuelta al mismo equipo", mc_destino: null, ubicacion: "Pegada al MC" }); }
   else if (e.target.closest(".sim-nuevo")) {
     const mc = (prompt("¿En qué MC nuevo se colocó esta SIM? (ej. MC2603293)") || "").trim().toUpperCase();
     if (!mc) return;
@@ -127,6 +132,23 @@ document.getElementById("n-guardar").addEventListener("click", async () => {
 });
 cargarSims();
 
+document.getElementById("sims-tbody").addEventListener("change", async e => {
+  if (!e.target.classList.contains("sel-ubic")) return;
+  const tr = e.target.closest("tr"), id = tr.dataset.id, valor = e.target.value || null;
+  const { error } = await supabaseClient.from("sims_custodia").update({ ubicacion: valor }).eq("id", id);
+  if (error) { alert("No se pudo guardar: " + error.message); return; }
+  const s = todasSims.find(x => x.id === id); if (s) s.ubicacion = valor;
+});
+document.getElementById("sel-ubic-btn").addEventListener("click", async () => {
+  const valor = document.getElementById("sel-ubic").value;
+  const ids = [...seleccion].filter(id => todasSims.some(s => s.id === id && s.estado === "Guardada"));
+  if (!ids.length || !valor) { alert(!valor ? "Elige primero dónde queda." : "Marca alguna SIM."); return; }
+  for (let k = 0; k < ids.length; k += 100) {
+    const { error } = await supabaseClient.from("sims_custodia").update({ ubicacion: valor }).in("id", ids.slice(k, k + 100));
+    if (error) { alert("No se pudo guardar: " + error.message); return; }
+  }
+  seleccion.clear(); await cargarSims();
+});
 document.getElementById("f-ot").addEventListener("change", pintar);
 document.getElementById("f-agrupar").addEventListener("change", pintar);
 document.getElementById("sel-limpiar").addEventListener("click", () => { seleccion.clear(); pintar(); });
@@ -141,7 +163,7 @@ document.getElementById("sel-mismo").addEventListener("click", async () => {
   const btn = document.getElementById("sel-mismo"); btn.disabled = true;
   const usuario = await simUsuario(), ahora = new Date().toISOString();
   for (let k = 0; k < ids.length; k += 100) {
-    const { error } = await supabaseClient.from("sims_custodia").update({ estado: "Devuelta al mismo equipo", mc_destino: null, resuelta_por: usuario, resuelta_en: ahora }).in("id", ids.slice(k, k + 100));
+    const { error } = await supabaseClient.from("sims_custodia").update({ estado: "Devuelta al mismo equipo", mc_destino: null, ubicacion: "Pegada al MC", resuelta_por: usuario, resuelta_en: ahora }).in("id", ids.slice(k, k + 100));
     if (error) { alert("No se pudo guardar: " + error.message + (k ? ` (se guardaron las primeras ${k})` : "")); break; }
   }
   btn.disabled = false; seleccion.clear(); await cargarSims();

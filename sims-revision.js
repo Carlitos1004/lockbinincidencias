@@ -31,7 +31,6 @@ async function renderSimsOt(idOt, comps, ot) {
 
   const nGuardadas = (regs || []).filter(r => r.estado === "Guardada").length;
   const op0 = localStorage.getItem("lb_sim_operador") || "";
-  const ub0 = localStorage.getItem("lb_sim_ubicacion") || "";
   box.hidden = false;
   document.getElementById("sims-resumen").textContent = `📶 SIMs del cliente retiradas — ${(regs || []).length} de ${mcs.length} equipos${nGuardadas ? ` · ${nGuardadas} guardadas` : ""}`;
   const filas = mcs.map(mc => {
@@ -49,8 +48,6 @@ async function renderSimsOt(idOt, comps, ot) {
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;">
       <label>Operador <input type="text" id="sim-operador" list="sim-operadores" placeholder="NOS" value="${escS(op0)}" style="width:120px;"></label>
       <datalist id="sim-operadores"><option value="NOS"><option value="Orange"><option value="DT"><option value="Movistar"><option value="Melita"></datalist>
-      <label>Dónde queda la SIM <input type="text" id="sim-ubicacion" list="sim-ubics" placeholder="Elige o escribe" value="${escS(ub0)}" style="width:190px;"></label>
-      <datalist id="sim-ubics"><option value="Pegada al MC"><option value="Caja"><option value="Bolsa"></datalist>
       <input type="text" id="sim-filtro" placeholder="Filtrar MC…" style="width:130px;">
       <label><input type="checkbox" id="sim-solo-no-dev" checked> Ocultar los que se devuelven</label>
       <a href="sims.html" class="btn-secundario" style="text-decoration:none;padding:6px 12px;">📋 Ver todas las SIMs guardadas</a>
@@ -120,10 +117,10 @@ async function renderSimsOt(idOt, comps, ot) {
       const ap = document.getElementById("sim-excel-aplicar");
       if (ap) ap.addEventListener("click", async () => {
         const devueltas = document.getElementById("sim-excel-devueltas").checked;
-        const ubic = document.getElementById("sim-ubicacion").value.trim() || null;
+        const ubic = null;   // dónde queda la SIM se decide después, en la página de SIMs
         const usuario = await simUsuario(), ahora = new Date().toISOString();
         const filasIns = planExcel.map(p => ({ iccid: p.iccid, operador: p.op || opEsc || null, mc_origen: p.mc, id_ot: idOt, cliente: cliente || null,
-          ubicacion: devueltas ? null : ubic, creada_por: usuario, nota: "Cargada desde Excel anterior a la OT",
+          ubicacion: devueltas ? "Pegada al MC" : ubic, creada_por: usuario, nota: "Cargada desde Excel anterior a la OT",
           ...(devueltas ? { estado: "Devuelta al mismo equipo", resuelta_por: usuario, resuelta_en: ahora } : {}) }));
         ap.disabled = true; ap.textContent = "Guardando…";
         for (let i = 0; i < filasIns.length; i += 100) {
@@ -136,8 +133,8 @@ async function renderSimsOt(idOt, comps, ot) {
   });
   document.getElementById("sim-pegar-btn").addEventListener("click", async () => {
     const operador = document.getElementById("sim-operador").value.trim() || null;
-    const ubicacion = document.getElementById("sim-ubicacion").value.trim() || null;
-    localStorage.setItem("lb_sim_operador", operador || ""); localStorage.setItem("lb_sim_ubicacion", ubicacion || "");
+    const ubicacion = null;   // se decide después, en la página de SIMs
+    localStorage.setItem("lb_sim_operador", operador || "");
     const usuario = await simUsuario();
     const nuevas = [], problemas = [], vistos = new Set();
     document.getElementById("sim-pegar").value.split(/\n/).forEach((linea, i) => {
@@ -172,8 +169,8 @@ async function renderSimsOt(idOt, comps, ot) {
     if (!res.coincide && plat[mc] && !confirm(`El ICCID que escribiste (${simCorta(res.iccid)}) no coincide con el de la plataforma para ${mc} (${simCorta(plat[mc])}). ¿Guardarlo igualmente?`)) return;
     const operadorEscrito = document.getElementById("sim-operador").value.trim();
     const operador = simOperador(res.iccid) || operadorEscrito || null;
-    const ubicacion = document.getElementById("sim-ubicacion").value.trim() || null;
-    localStorage.setItem("lb_sim_operador", operadorEscrito); localStorage.setItem("lb_sim_ubicacion", ubicacion || "");
+    const ubicacion = null;   // se decide después, en la página de SIMs
+    localStorage.setItem("lb_sim_operador", operadorEscrito);
     btn.disabled = true;
     const { error: e2 } = await supabaseClient.from("sims_custodia").insert({ iccid: res.iccid, operador, mc_origen: mc, id_ot: idOt, cliente: cliente || null, ubicacion, creada_por: await simUsuario() });
     if (e2) { msg(e2.code === "23505" ? `⚠️ Esa SIM (${simCorta(res.iccid)}) ya está guardada para otro equipo.` : "❌ " + e2.message); btn.disabled = false; return; }
