@@ -1716,9 +1716,11 @@ async function abrirMaterialesUsados() {
   // Misma regla que la pantalla: una pieza por equipo y tipo (si hay dos del mismo tipo, la que no se desechó)
   const mcsContados = new Set();
   const fueraDeListas = new Set();   // equipos con material pero sin lista: no salen en la pantalla, no se cuentan
+  // Si la orden no usa listas (ningún equipo ni batería asignado a una), se cuenta toda la orden
+  const hayListas = Object.values(equiposCompletos).some(e => e && e.lista) || compsOtActual.some(c => c.repo_lista);
   grupos.forEach(g => {
     aplicarTipoBateria(g);
-    const enLista = !!listaDe(g.mc);
+    const enLista = !hayListas || !!listaDe(g.mc);
     g.casillas.forEach(x => {
       if (!enLista) {
         if ((x.comp && cuentaComoReposicion(x.comp, estadoCasilla(x.comp))) || (x.falt && x.falt.decision === "Se repone desde stock")) fueraDeListas.add(g.mc);
