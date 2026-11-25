@@ -27,6 +27,8 @@
   .tabla-revision .input-mc-fila::placeholder, .tabla-revision .input-serial-fila::placeholder { color: #9aa59c; }
   .foto-opcion { margin-bottom:4px; }
   .foto-opcion small { display:block; color:#5b665e; font-weight:600; }
+  /* En ordenador (ratón) solo hay un campo de fotos; la opción de cámara y las etiquetas solo se ven en pantallas táctiles */
+  @media (hover: hover) and (pointer: fine) { .foto-solo-movil { display:none !important; } }
   /* Bloque de SIMs retiradas */
   #sims-box input[type=text], #sims-box textarea, #sims-box select {
     padding: 8px 11px; border: 1.5px solid #d5ddd6; border-radius: 10px; background: #fff;

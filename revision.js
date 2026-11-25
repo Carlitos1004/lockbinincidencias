@@ -347,8 +347,8 @@ function renderTabla(componentes, mostrarOt = false) {
         <td>${celdaAmmi}</td>
         <td>${celdaDevuelto}</td>
         <td>
-          <div class="foto-opcion"><small>📷 Cámara</small><input type="file" class="input-foto-revision input-foto-camara" accept="image/*" capture="environment" multiple></div>
-          <div class="foto-opcion"><small>🖼️ Galería</small><input type="file" class="input-foto-revision input-foto-galeria" accept="image/*" multiple></div>
+          <div class="foto-opcion foto-solo-movil"><small>📷 Cámara</small><input type="file" class="input-foto-revision input-foto-camara" accept="image/*" capture="environment" multiple></div>
+          <div class="foto-opcion"><small class="foto-solo-movil">🖼️ Galería</small><input type="file" class="input-foto-revision input-foto-galeria" accept="image/*" multiple></div>
           ${celdaFotosRevision(c)}
         </td>
         <td><button class="btn-guardar-fila" ${bloqueado ? "disabled" : ""}>Guardar</button></td>
