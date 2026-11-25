@@ -1759,23 +1759,37 @@ async function abrirMaterialesUsados() {
     const st = l.bt ? "Batería " + l.bt : (s && tiposBat.exacto[s]);
     l.clave = "Batería · " + (st ? st.replace("Batería ", "") : (s ? "Sin tipo" : "Sin serial aún"));
   });
-  const ordenClave = c => { const i = TIPOS.indexOf(c.split(" · ")[0]); return (i < 0 ? 99 : i) + c; };
-  const tipos = [...new Set(lineas.map(l => l.clave))].sort((a, b) => ordenClave(a).localeCompare(ordenClave(b)));
+  // Nombres oficiales de los reportes (LB A/B/C/D…), uno por tipo y categoría, para copiar tal cual a los departamentos
+  const BASE_OFICIAL = {
+    "Cierre Electrónico": "LB A R00 Modulo Cerradura Std.",
+    "Lector Electrónico": "LB B R01 Modulo Identificación",
+    "Módulo de Control": "LB C R00 Modulo Control",
+    "Batería · Recargable": "LB D R00 Modulo Batería Recargable",
+    "Batería · No Recargable": "LB D R00 Modulo Batería No Recargable",
+    "Batería · PKCELL": "LB D R00 Modulo Batería PKCELL"   // este nombre no figura en el reporte de OT: confirmar
+  };
+  const nombreMaterial = l => {
+    const base = BASE_OFICIAL[l.clave] || (l.clave.startsWith("Batería") ? "Batería (" + l.clave.replace("Batería · ", "") + ")" : l.clave);
+    return base + (l.cat === 1 ? " 1ª" : l.cat === 2 ? " 2ª" : " (sin categoría)");
+  };
+  lineas.forEach(l => { l.nombre = nombreMaterial(l); });
+  const claveOrden = n => n.startsWith("LB") ? n : "ZZ" + n;
+  const tipos = [...new Set(lineas.map(l => l.nombre))].sort((a, b) => claveOrden(a).localeCompare(claveOrden(b)));
   const entregada = l => l.estado === "Entregado";
   const fila = t => {
-    const L = lineas.filter(l => l.clave === t);
-    return [t, L.length, L.filter(entregada).length, L.length - L.filter(entregada).length, L.filter(l => l.cat === 1).length, L.filter(l => l.cat === 2).length, L.filter(l => !l.cat).length];
+    const L = lineas.filter(l => l.nombre === t);
+    return [t, L.length, L.filter(entregada).length, L.length - L.filter(entregada).length];
   };
   const resumen = tipos.map(fila);
-  const tot = resumen.reduce((a, f) => a.map((v, i) => i ? v + f[i] : "TOTAL"), ["TOTAL", 0, 0, 0, 0, 0, 0]);
-  const cab = ["Material", "Piezas", "Entregadas", "Pendientes", "1ª cat.", "2ª cat.", "Sin cat."];
+  const tot = resumen.reduce((a, f) => a.map((v, i) => i ? v + f[i] : "TOTAL"), ["TOTAL", 0, 0, 0]);
+  const cab = ["Material", "Piezas", "Entregadas", "Pendientes"];
   const albs = {};
-  lineas.filter(l => l.albaran).forEach(l => { const a = (albs[l.albaran] = albs[l.albaran] || {}); a[l.clave] = (a[l.clave] || 0) + 1; });
+  lineas.filter(l => l.albaran).forEach(l => { const a = (albs[l.albaran] = albs[l.albaran] || {}); a[l.nombre] = (a[l.nombre] || 0) + 1; });
   const filasAlb = Object.keys(albs).sort().map(a => [a, ...tipos.map(t => albs[a][t] || 0), Object.values(albs[a]).reduce((x, y) => x + y, 0)]);
   const sinAlb = lineas.filter(l => entregada(l) && !l.albaran).length;
   const cabDet = ["Material", "MC", "Lista", "Retirado", "Nuevo", "Cat.", "Estado", "Albarán", "Fecha entrega"];
-  const det = lineas.slice().sort((a, b) => a.clave.localeCompare(b.clave) || a.mc.localeCompare(b.mc))
-    .map(l => [l.clave, l.mc, l.lista, l.retirado, l.nuevo, l.cat || "", l.estado, l.albaran, l.fecha]);
+  const det = lineas.slice().sort((a, b) => claveOrden(a.nombre).localeCompare(claveOrden(b.nombre)) || a.mc.localeCompare(b.mc))
+    .map(l => [l.nombre, l.mc, l.lista, l.retirado, l.nuevo, l.cat || "", l.estado, l.albaran, l.fecha]);
   const tabla = (c, d, extra) => `<div class="scroll-x-tabla" style="max-height:none;"><table class="tabla-resumen-comp"><thead><tr>${c.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${d.map(r => `<tr class="${extra && r[0] === "TOTAL" ? "res-total" : ""}">${r.map(v => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   const plano = [cab, ...resumen, tot].map(r => r.join("\t")).join("\n") + "\n\n" + [cabDet, ...det].map(r => r.join("\t")).join("\n");
   cerrarModal("modal-materiales");
