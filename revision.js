@@ -347,7 +347,8 @@ function renderTabla(componentes, mostrarOt = false) {
         <td>${celdaAmmi}</td>
         <td>${celdaDevuelto}</td>
         <td>
-          <input type="file" class="input-foto-revision" accept="image/*" capture="environment" multiple>
+          <div class="foto-opcion"><small>📷 Cámara</small><input type="file" class="input-foto-revision input-foto-camara" accept="image/*" capture="environment" multiple></div>
+          <div class="foto-opcion"><small>🖼️ Galería</small><input type="file" class="input-foto-revision input-foto-galeria" accept="image/*" multiple></div>
           ${celdaFotosRevision(c)}
         </td>
         <td><button class="btn-guardar-fila" ${bloqueado ? "disabled" : ""}>Guardar</button></td>
@@ -484,7 +485,7 @@ async function guardarFila(btn) {
 
   // Subir las fotos de revisión que se hayan elegido (se AÑADEN a las que ya haya)
   const fotosNuevasUrls = [];
-  const archivosFoto = [...fila.querySelector(".input-foto-revision").files];
+  const archivosFoto = [...fila.querySelectorAll(".input-foto-revision")].flatMap(i => [...i.files]);
   for (let i = 0; i < archivosFoto.length; i++) {
     try {
       const nombreArchivo = `revision_${Date.now()}_${i}_${archivosFoto[i].name}`;
@@ -498,7 +499,7 @@ async function guardarFila(btn) {
   }
 
   // Vaciamos el selector: ya se subieron, así un nuevo "Guardar" no las repite
-  fila.querySelector(".input-foto-revision").value = "";
+  fila.querySelectorAll(".input-foto-revision").forEach(i => { i.value = ""; });
 
   const nuevoEstado = MAPA_DESTINO_A_ESTADO[destino];
 
