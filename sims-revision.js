@@ -49,7 +49,8 @@ async function renderSimsOt(idOt, comps, ot) {
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;">
       <label>Operador <input type="text" id="sim-operador" list="sim-operadores" placeholder="NOS" value="${escS(op0)}" style="width:120px;"></label>
       <datalist id="sim-operadores"><option value="NOS"><option value="Orange"><option value="DT"><option value="Movistar"><option value="Melita"></datalist>
-      <label>Guardada en <input type="text" id="sim-ubicacion" placeholder="Caja / bolsa" value="${escS(ub0)}" style="width:150px;"></label>
+      <label>Dónde queda la SIM <input type="text" id="sim-ubicacion" list="sim-ubics" placeholder="Elige o escribe" value="${escS(ub0)}" style="width:190px;"></label>
+      <datalist id="sim-ubics"><option value="Pegada al MC"><option value="Caja"><option value="Bolsa"></datalist>
       <input type="text" id="sim-filtro" placeholder="Filtrar MC…" style="width:130px;">
       <label><input type="checkbox" id="sim-solo-no-dev" checked> Ocultar los que se devuelven</label>
       <a href="sims.html" class="btn-secundario" style="text-decoration:none;padding:6px 12px;">📋 Ver todas las SIMs guardadas</a>

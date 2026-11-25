@@ -28,10 +28,11 @@ async function renderSimsMateriales(idOt, filasMat, boxId) {
   const ub0 = localStorage.getItem("lb_sim_ubicacion") || "";
   const pendientes = mcs.filter(m => !porMc[m]);
   box.hidden = false;
-  box.innerHTML = `<h2 style="margin-top:32px;">📶 SIMs de los equipos de esta OT</h2>
+  box.innerHTML = `<h2>📶 SIMs de los equipos de esta OT</h2>
     <p style="font-size:.9rem;">Pulsa <strong>Guardar SIM</strong> <u>antes de cambiar la SIM</u> del equipo: se consulta la plataforma y se copia el ICCID de la SIM que lleva (${mcs.length - pendientes.length} de ${mcs.length} guardadas). Después, en «SIMs guardadas», marca si vuelve al mismo equipo o pasa a uno nuevo.</p>
     ${esManager ? `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;">
-      <label>Guardada en <input type="text" id="simm-ubic" placeholder="Caja / bolsa" value="${escSm(ub0)}" style="width:160px;"></label>
+      <label>Dónde queda la SIM <input type="text" id="simm-ubic" list="simm-ubics" placeholder="Elige o escribe" value="${escSm(ub0)}" style="width:190px;"></label>
+      <datalist id="simm-ubics"><option value="Pegada al MC"><option value="Caja"><option value="Bolsa"></datalist>
       ${pendientes.length ? `<button type="button" class="btn-primario" id="simm-todos">📶 Guardar SIM de los ${pendientes.length} pendientes</button>` : ""}
       <a href="sims.html" class="btn-secundario" style="text-decoration:none;padding:6px 12px;">📋 Ver SIMs guardadas</a></div>` : `<p><em>Solo un manager puede guardar SIMs desde aquí.</em></p>`}
     <div class="scroll-x-tabla" style="max-height:340px;"><table class="tabla-revision"><thead><tr><th>MC</th><th>SIM</th><th></th></tr></thead><tbody>
