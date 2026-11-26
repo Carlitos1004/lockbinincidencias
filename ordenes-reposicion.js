@@ -1004,6 +1004,39 @@ async function aplicarEnPlataforma(mc, btn) {
           : `❌ ${SIGLA_API[k]}: en la reposición ${esperado} · en la plataforma ${real || "(vacío)"}`;
       });
       const hayError = lineas.some(l => l.startsWith("❌"));
+      if (hayError) {
+        // Componentes que no coinciden: se puede corregir aquí mismo, en la plataforma o en la reposición
+        const dif = Object.entries(plan.comps).filter(([k, esperado]) => norm(nuevo[CAMPO_PLAT[k]]) !== norm(esperado)).map(([k, esperado]) => ({ k, esperado, real: nuevo[CAMPO_PLAT[k]] || "" }));
+        const detalleDif = dif.map(d => `${SIGLA_API[d.k]}: reposición ${d.esperado} · plataforma ${d.real || "(vacío)"}`).join("\n");
+        if (confirm(`En ${plan.nuevoMc} no coinciden:\n${detalleDif}\n\nAceptar = PONER en la plataforma lo de la reposición.\nCancelar = ver otras opciones.`)) {
+          const compsCorr = Object.fromEntries(dif.map(d => [d.k, d.esperado]));
+          const r = await componentesEnPlataforma(supabaseClient, plan.nuevoMc, compsCorr);
+          const ETIQ = { cambiado: "✅ cambiado", sin_cambio: "ya estaba", error: "❌ error", no_intentado: "— no intentado" };
+          const COLS = { battery: "serie_bateria", lock: "serie_cierre", reader: "serie_lector" };
+          if (r.resultado !== "no_esta_en_plataforma") {
+            await cambioComponenteHistorial(plan.nuevoMc, { anteriores: Object.fromEntries(dif.map(d => [d.k, d.real])) }, r.componentes);
+            const upd = { actualizado_en: new Date().toISOString() };
+            r.componentes.filter(c => c.resultado === "cambiado" || c.resultado === "sin_cambio").forEach(c => { upd[COLS[c.componente]] = c.valor; });
+            await supabaseClient.from("equipos").update(upd).eq("m_control", plan.nuevoMc);
+          }
+          alert((r.ok ? "🌐 Corregido en la plataforma:\n" : "⚠️ No se pudo completar" + (r.mensaje ? " (" + r.mensaje + ")" : "") + ":\n") + r.componentes.map(c => `${SIGLA_API[c.componente]}: ${c.valor} → ${ETIQ[c.resultado] || c.resultado}`).join("\n") + "\n\nVuelve a pulsar «Comprobar» para ver el resultado.");
+          return;
+        }
+        const conReal = dif.filter(d => d.real);
+        if (conReal.length && confirm(`¿Prefieres actualizar la REPOSICIÓN con lo que hay en la plataforma?\n${conReal.map(d => `${SIGLA_API[d.k]}: ${d.esperado} → ${d.real}`).join("\n")}\n\n(Aceptar = cambiar el serial a entregar en la orden · Cancelar = dejarlo como está)`)) {
+          const g = agruparPorMc(compsOtActual, otActual).find(m => m.mc === mc);
+          const TIPO_DE = { battery: "Batería", lock: "Cierre Electrónico", reader: "Lector Electrónico" };
+          for (const d of conReal) {
+            const x = g && g.casillas.find(c => c.tipo === TIPO_DE[d.k]);
+            if (!x) continue;
+            if (x.comp) await guardarComp(x.comp.id, { repo_serial_nuevo: d.real }, false);
+            else if (x.falt) await supabaseClient.from("reposicion_faltantes").update({ serial_nuevo: d.real }).eq("id", x.falt.id);
+          }
+          await recargarOt(); cargarOts();
+          alert("✅ Orden actualizada con los seriales de la plataforma. Vuelve a pulsar «Comprobar» para verificar.");
+          return;
+        }
+      }
       const viejo = await equipoEnPlataforma(mc);
       const lineaViejo = viejo
         ? `⚠️ ${mc} sigue VINCULADO en la plataforma (debería estar ya desvinculado desde Revisión).`
