@@ -1043,7 +1043,14 @@ async function aplicarEnPlataforma(mc, btn) {
         : `✅ ${mc} ya está desvinculado.`;
       const pendientes = plan.faltan.length ? `\n\nAún sin resolver en la orden:\n- ${plan.faltan.join("\n- ")}` : "";
       const informe = `Comprobación de ${plan.nuevoMc} en la plataforma\n\n${lineas.join("\n") || "(sin componentes que comparar)"}\n\n${lineaViejo}${hayError ? "\n\n❌ Hay componentes que no coinciden: corrígelos en la plataforma o en la orden." : ""}${pendientes}`;
+      // Solo se desvincula si el equipo se fue a AMMI o se desecha; si sigue en revisión (o sin destino) se queda vinculado
+      const destinosViejo = compsOtActual.filter(c => c.m_control === mc).map(c => c.destino || "");
+      const sigueRev = !destinosViejo.length || destinosViejo.some(d => !d || d.includes("Sigue en revisión"));
+      const sale = destinosViejo.some(d => d === DESTINO_AMMI || d.includes("Desechar"));
       if (!viejo) { alert(informe); }
+      else if (!sale || sigueRev) {
+        alert(`${informe}\n\nℹ️ No se ofrece desvincular ${mc}: ${sigueRev ? "todavía sigue en revisión / sin destino" : "no se fue a AMMI ni se desecha"}. Solo se desvincula cuando va a AMMI o se desecha.`);
+      }
       else if (confirm(`${informe}\n\n¿Quieres desvincular ${mc} de la plataforma ahora?\n(Aceptar = desvincular · Cancelar = dejarlo como está)`)) {
         const d = await desvincularEnPlataforma(supabaseClient, mc);
         if (d.ok) await desvinculacionHistorial(mc);
