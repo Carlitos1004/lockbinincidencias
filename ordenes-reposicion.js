@@ -1900,6 +1900,7 @@ function abrirSimsReposicion(filtro) {
   grupos.forEach(g => aplicarTipoBateria(g));
   const filas = [];
   grupos.sort((a, b) => a.mc.localeCompare(b.mc)).forEach(g => {
+    if (tipoRep(g.mc) !== "Piezas") return;   // las reposiciones de solo batería / lector / cierre no llevan SIM: solo equipos
     const est = g.estadoMc;
     if (filtro === "pendientes" && est === "Entregado") return;
     if (filtro === "listo" && est !== "Listo para entregar") return;
