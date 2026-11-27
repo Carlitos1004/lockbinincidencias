@@ -1742,7 +1742,8 @@ document.getElementById("bat-pegar-prev").addEventListener("click", previsualiza
 // =====================================================================
 // MATERIALES USADOS: resumen de lo que se ha repuesto en la orden
 // =====================================================================
-async function abrirMaterialesUsados() {
+async function abrirMaterialesUsados(filtro) {
+  if (typeof filtro !== "string" || !["todos", "pendientes", "entregados"].includes(filtro)) filtro = "todos";
   const grupos = agruparPorMc(compsOtActual, otActual);
   const lineas = [];
   const listaDe = mc => (equiposCompletos[mc] && equiposCompletos[mc].lista) || "";
@@ -1806,6 +1807,11 @@ async function abrirMaterialesUsados() {
     return base + (l.cat === 1 ? " 1ª" : l.cat === 2 ? " 2ª" : " (sin categoría)");
   };
   lineas.forEach(l => { l.nombre = nombreMaterial(l); });
+  const todasLineas = lineas.slice();   // sin filtrar: el asignador de tipo de batería trabaja sobre todas
+  if (filtro !== "todos") {
+    const quedan = lineas.filter(l => (l.estado === "Entregado") === (filtro === "entregados"));
+    lineas.length = 0; quedan.forEach(l => lineas.push(l));
+  }
   const claveOrden = n => n.startsWith("LB") ? n : "ZZ" + n;
   const tipos = [...new Set(lineas.map(l => l.nombre))].sort((a, b) => claveOrden(a).localeCompare(claveOrden(b)));
   const entregada = l => l.estado === "Entregado";
@@ -1830,10 +1836,10 @@ async function abrirMaterialesUsados() {
   m.id = "modal-materiales"; m.className = "modal-resumen";
   m.innerHTML = `<div class="modal-resumen-caja">
     <div class="modal-resumen-cab"><h3>🔧 Materiales usados en la reposición</h3><button type="button" class="modal-x">✕</button></div>
-    <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla) · piezas repuestas en <strong>${mcsContados.size}</strong> equipos con MC${nSinMc ? ` y <strong>${nSinMc}</strong> baterías sin MC` : ""}</p>
-    ${lineas.length ? tabla(cab, [...resumen, tot], true) : "<p>Todavía no hay materiales a reponer en esta orden.</p>"}
+    <p class="modal-sub">Orden ${esc(otActual)} · toda la orden (no depende del filtro de pantalla) · Mostrar: <select id="mat-filtro"><option value="todos"${filtro === "todos" ? " selected" : ""}>Todos</option><option value="pendientes"${filtro === "pendientes" ? " selected" : ""}>Pendientes</option><option value="entregados"${filtro === "entregados" ? " selected" : ""}>Entregados</option></select> · piezas repuestas en <strong>${mcsContados.size}</strong> equipos con MC${nSinMc ? ` y <strong>${nSinMc}</strong> baterías sin MC` : ""}</p>
+    ${lineas.length ? tabla(cab, [...resumen, tot], true) : `<p>${filtro === "todos" ? "Todavía no hay materiales a reponer en esta orden." : "No hay piezas " + filtro + "."}</p>`}
     ${filasAlb.length ? `<h4>📄 Por albarán</h4>${tabla(["Albarán", ...tipos, "Total"], filasAlb)}` : ""}
-    ${lineas.some(l => l.clave === "Batería · Sin tipo" && l.id) ? `<div class="modal-nota" id="mat-asignar-tipo">🔋 ${lineas.filter(l => l.clave === "Batería · Sin tipo" && l.id).length} baterías sin tipo. Asignar a todas: <select id="mat-tipo-sel"><option value="">— elige —</option><option>No Recargable</option><option>Recargable</option><option>PKCELL</option></select> <button type="button" class="btn-prim" id="mat-tipo-btn">Aplicar</button></div>` : ""}
+    ${todasLineas.some(l => l.clave === "Batería · Sin tipo" && l.id) ? `<div class="modal-nota" id="mat-asignar-tipo">🔋 ${todasLineas.filter(l => l.clave === "Batería · Sin tipo" && l.id).length} baterías sin tipo. Asignar a todas: <select id="mat-tipo-sel"><option value="">— elige —</option><option>No Recargable</option><option>Recargable</option><option>PKCELL</option></select> <button type="button" class="btn-prim" id="mat-tipo-btn">Aplicar</button></div>` : ""}
     ${sinAlb ? `<p class="modal-nota">⚠️ ${sinAlb} piezas entregadas todavía sin albarán.</p>` : ""}
     ${lineas.length ? `<details><summary>Ver detalle pieza a pieza (${det.length})</summary>${tabla(cabDet, det)}</details>` : ""}
     <div class="modal-acciones"><button type="button" class="modal-copiar">📋 Copiar (resumen + detalle)</button> <button type="button" class="modal-cerrar btn-sec">Cerrar</button></div></div>`;
@@ -1843,7 +1849,7 @@ async function abrirMaterialesUsados() {
   if (btnTipo) btnTipo.addEventListener("click", async () => {
     const tipo = m.querySelector("#mat-tipo-sel").value;
     if (!tipo) { alert("Elige el tipo de batería."); return; }
-    const ids = lineas.filter(l => l.clave === "Batería · Sin tipo" && l.id).map(l => l.id);
+    const ids = todasLineas.filter(l => l.clave === "Batería · Sin tipo" && l.id).map(l => l.id);
     if (!confirm(`¿Marcar ${ids.length} baterías como ${tipo}?`)) return;
     btnTipo.disabled = true; btnTipo.textContent = "Guardando…";
     for (let i = 0; i < ids.length; i += 60) {
@@ -1851,8 +1857,10 @@ async function abrirMaterialesUsados() {
       if (error) { alert("No se pudo guardar: " + error.message + " (¿corriste el SQL 106?)"); btnTipo.disabled = false; btnTipo.textContent = "Aplicar"; return; }
     }
     await recargarOt();
-    abrirMaterialesUsados();
+    abrirMaterialesUsados(filtro);
   });
+  const selFiltro = m.querySelector("#mat-filtro");
+  if (selFiltro) selFiltro.addEventListener("change", () => abrirMaterialesUsados(selFiltro.value));
   m.querySelector(".modal-copiar").addEventListener("click", async e => {
     try { await navigator.clipboard.writeText(plano); e.target.textContent = "✅ Copiado"; } catch { e.target.textContent = "No se pudo copiar"; }
   });
