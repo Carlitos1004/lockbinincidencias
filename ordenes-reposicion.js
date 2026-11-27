@@ -1889,3 +1889,46 @@ document.addEventListener("click", async e => {
   if (error) { alert("No se pudo guardar: " + error.message); btn.disabled = false; return; }
   await recargarOt();
 });
+
+
+// =====================================================================
+// SIMs de la reposición: para cada equipo de la orden, qué SIM (guardada en custodia) hay que colocar y en qué MC nuevo
+// =====================================================================
+function abrirSimsReposicion(soloPendientes) {
+  const grupos = agruparPorMc(compsOtActual, otActual);
+  grupos.forEach(g => aplicarTipoBateria(g));
+  const filas = [];
+  grupos.sort((a, b) => a.mc.localeCompare(b.mc)).forEach(g => {
+    const entregado = g.estadoMc === "Entregado";
+    if (soloPendientes && entregado) return;
+    const plan = planPlataforma(g.mc);
+    const nuevoMc = (plan && plan.nuevoMc) || "";
+    const sims = (simsPorMc[g.mc] || []).slice().sort((x, y) => (x.estado === "Guardada" ? -1 : 1));
+    if (!sims.length) { filas.push({ mc: g.mc, nuevo: nuevoMc, equipo: g.estadoMc, iccid: "", op: "", estado: "Sin SIM guardada", donde: "", accion: "" }); return; }
+    sims.forEach(s => filas.push({ mc: g.mc, nuevo: nuevoMc, equipo: g.estadoMc, iccid: s.iccid || "", op: s.operador || simOperador(s.iccid) || "", estado: s.estado,
+      donde: s.ubicacion || "", accion: s.estado === "Guardada" ? (nuevoMc ? "Colocar en " + nuevoMc : "Pegada al mismo equipo") : (s.mc_destino ? "Colocada en " + s.mc_destino : "Ya devuelta al equipo") }));
+  });
+  const cab = ["MC retirado", "MC nuevo a entregar", "Estado del equipo", "ICCID", "Operador", "Estado de la SIM", "Dónde queda", "Qué hacer"];
+  const datos = filas.map(f => [f.mc, f.nuevo || "—", f.equipo, f.iccid || "—", f.op || "—", f.estado, f.donde || "—", f.accion || "—"]);
+  const nCon = filas.filter(f => f.iccid).length, nPend = filas.filter(f => f.estado === "Guardada").length;
+  cerrarModal("modal-sims-rep");
+  const m = document.createElement("div");
+  m.id = "modal-sims-rep"; m.className = "modal-resumen";
+  m.innerHTML = `<div class="modal-resumen-caja">
+    <div class="modal-resumen-cab"><h3>📶 SIMs de la reposición</h3><button type="button" class="modal-x">✕</button></div>
+    <p class="modal-sub">Orden ${esc(otActual)} · ${filas.length} equipos · ${nCon} con SIM guardada · <strong>${nPend}</strong> por colocar</p>
+    <label style="display:block;margin:6px 0;"><input type="checkbox" id="sims-rep-solo" ${soloPendientes ? "checked" : ""}> Solo los equipos que aún no se entregaron</label>
+    ${filas.length ? `<div class="scroll-x-tabla" style="max-height:none;"><table class="tabla-resumen-comp"><thead><tr>${cab.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${datos.map(r => `<tr>${r.map(v => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : "<p>No hay equipos con ese filtro.</p>"}
+    <p class="modal-nota">«Sin SIM guardada»: la SIM de ese equipo no se registró (equipo sin cambio de SIM, o aún no guardada en la OT).</p>
+    <div class="modal-acciones"><button type="button" class="modal-copiar">📋 Copiar (para Excel)</button> <button type="button" class="modal-cerrar btn-sec">Cerrar</button></div></div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click", e => { if (e.target === m || e.target.closest(".modal-x, .modal-cerrar")) m.remove(); });
+  m.querySelector("#sims-rep-solo").addEventListener("change", e => abrirSimsReposicion(e.target.checked));
+  const cp = m.querySelector(".modal-copiar");
+  if (cp) cp.addEventListener("click", async () => {
+    const texto = [cab, ...datos].map(r => r.join("\t")).join("\n");
+    try { await navigator.clipboard.writeText(texto); cp.textContent = "✅ Copiado"; } catch (e) { alert("No se pudo copiar automáticamente."); }
+    setTimeout(() => { cp.textContent = "📋 Copiar (para Excel)"; }, 1800);
+  });
+}
+(function () { const b = document.getElementById("btn-sims-rep"); if (b) b.addEventListener("click", () => abrirSimsReposicion(true)); })();
